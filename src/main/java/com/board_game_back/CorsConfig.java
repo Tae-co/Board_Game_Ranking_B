@@ -17,8 +17,7 @@ public class CorsConfig {
         configuration.setAllowedOrigins(Arrays.asList(
             "http://localhost:5173",
             "http://localhost:3000",
-            "https://board-game-ranking-f.pages.dev",
-            "https://meeple.pages.dev"  // 이름 바꾸면 추가
+            "https://boardup.pages.dev"  // 이름 바꾸면 추가
         ));
 
         configuration.setAllowedMethods(Arrays.asList(
