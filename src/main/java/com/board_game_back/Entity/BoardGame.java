@@ -31,6 +31,12 @@ public class BoardGame {
         this.imageUrl = imageUrl;
         this.minPlayers = minPlayers;
         this.maxPlayers = maxPlayers;
+    }
 
+    public void update(String name, String imageUrl, int minPlayers, int maxPlayers) {
+        this.name = name;
+        this.imageUrl = imageUrl;
+        this.minPlayers = minPlayers;
+        this.maxPlayers = maxPlayers;
     }
 }

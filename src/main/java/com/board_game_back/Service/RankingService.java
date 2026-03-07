@@ -2,7 +2,9 @@ package com.board_game_back.Service;
 
 import com.board_game_back.DTO.RankingDto;
 import com.board_game_back.DTO.RankingDto.GameRankingResponse;
+import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.PlayerGameRating;
+import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
@@ -16,6 +18,8 @@ import org.springframework.stereotype.Service;
 public class RankingService {
 
     private final PlayerGameRatingRepository ratingRepository;
+    private final MemberRepository memberRepository;
+
 
     // 특정 보드게임의 리더보드 데이터 가져오기
     public List<GameRankingResponse> getGameRanking(Long boardGameId) {
@@ -37,15 +41,59 @@ public class RankingService {
                 continue;
             }
 
-            responseList.add(new RankingDto.GameRankingResponse(
-                currentRank++, // 순위를 1씩 증가시키면서 넣음
-                rating.getMember().getId(),
-                rating.getMember().getNickname(),
-                rating.getGameStats().getRating(),
-                rating.getPlayCount()
-            ));
+            responseList.add(
+                new RankingDto.GameRankingResponse(currentRank++, rating.getMember().getId(),
+                    rating.getMember().getNickname(), rating.getGameStats().getRating(),
+                    rating.getPlayCount(), rating.getWinCount(),    // 추가
+                    rating.getLoseCount()    // 추가
+                ));
         }
 
         return responseList;
     }
+
+    public List<RankingDto.GlobalRankingResponse> getGlobalRanking() {
+        List<Member> members = memberRepository.findAllByOrderByOverallStatsRatingDesc();
+
+        List<RankingDto.GlobalRankingResponse> responseList = new ArrayList<>();
+        int currentRank = 1;
+
+        for (Member member : members) {
+            if (member.getOverallStats() == null || member.getOverallStats().getRating() == 1500.0) continue;
+
+            responseList.add(new RankingDto.GlobalRankingResponse(
+                currentRank++,
+                member.getId(),
+                member.getNickname(),
+                member.getOverallStats().getRating()
+            ));
+        }
+        return responseList;
+    }
+
+    // 방별 특정 보드게임 랭킹 조회
+    public List<GameRankingResponse> getRoomRanking(Long roomId, Long boardGameId) {
+        List<PlayerGameRating> ratings = ratingRepository.findByRoomIdAndBoardGameIdOrderByGameStatsRatingDesc(
+            roomId, boardGameId);
+
+        List<RankingDto.GameRankingResponse> responseList = new ArrayList<>();
+        int currentRank = 1;
+
+        for (PlayerGameRating rating : ratings) {
+            if (rating.getPlayCount() == 0) {
+                continue;
+            }
+
+            responseList.add(
+                new RankingDto.GameRankingResponse(currentRank++, rating.getMember().getId(),
+                    rating.getMember().getNickname(), rating.getGameStats().getRating(),
+                    rating.getPlayCount(), rating.getWinCount(),    // 추가
+                    rating.getLoseCount()    // 추가
+                ));
+        }
+
+        return responseList;
+    }
+
+
 }

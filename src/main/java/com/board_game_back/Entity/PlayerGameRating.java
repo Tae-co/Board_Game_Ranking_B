@@ -40,16 +40,27 @@ public class PlayerGameRating {
     @Embedded
     private GlickoStats gameStats = new GlickoStats(); // 이 게임 전용 Glicko-2 랭킹
 
-    private int playCount = 0; // 이 게임을 몇 번 플레이했는지
+    private int playCount = 0;
+    private int winCount = 0;   // 추가
+    private int loseCount = 0;  // 추가
 
     @Builder
-    public PlayerGameRating(Member member, BoardGame boardGame) {
+    public PlayerGameRating(Member member, BoardGame boardGame, Room room) {
         this.member = member;
         this.boardGame = boardGame;
+        this.room = room;
     }
 
     public void addPlayCount() {
         this.playCount++;
+    }
+
+    public void addWinCount() {
+        this.winCount++;
+    }
+
+    public void addLoseCount() {
+        this.loseCount++;
     }
 
 }

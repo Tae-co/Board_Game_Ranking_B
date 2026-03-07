@@ -14,5 +14,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     Optional<Member> findByPhoneNumber(String phoneNumber);
 
     // 전체 종합 랭킹(overallRating) 순으로 유저 목록 조회 (리더보드용)
+    boolean existsByNickname(String nickname);
+
     List<Member> findAllByOrderByOverallStatsRatingDesc();
 }

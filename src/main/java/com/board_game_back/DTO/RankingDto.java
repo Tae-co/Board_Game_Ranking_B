@@ -1,12 +1,24 @@
 package com.board_game_back.DTO;
 
 public class RankingDto {
-    // 📤 [Response] Spring -> React: 특정 게임의 랭킹 목록 조회
+
     public record GameRankingResponse(
-        int rank,               // 현재 순위 (1, 2, 3...)
+        int rank,
         Long memberId,
         String nickname,
-        double rating,          // 현재 점수
-        int playCount           // 플레이 횟수 (예: 10판 이상 한 사람만 랭킹에 올릴 때 유용)
+        double rating,
+        int playCount,
+        int winCount,    // 추가
+        int loseCount    // 추가
+    ) {
+
+    }
+
+    // 전체 랭킹 응답 (점수만)
+    public record GlobalRankingResponse(
+        int rank,
+        Long memberId,
+        String nickname,
+        double rating
     ) {}
 }

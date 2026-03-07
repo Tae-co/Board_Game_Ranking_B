@@ -7,10 +7,12 @@ import com.board_game_back.Entity.MatchParticipant;
 import com.board_game_back.Entity.MatchRecord;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.PlayerGameRating;
+import com.board_game_back.Entity.Room;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
+import com.board_game_back.Repository.RoomRepository;
 import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +28,7 @@ public class MatchService {
     private final BoardGameRepository boardGameRepository;
     private final MemberRepository memberRepository;
     private final Glicko2Calculator glicko2Calculator;
+    private final RoomRepository roomRepository;
 
     @Transactional
     public List<ResultResponse> recordMatchResult(MatchDto.ResultRequest request) {
@@ -34,48 +37,53 @@ public class MatchService {
         BoardGame game = boardGameRepository.findById(request.boardGameId())
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임입니다."));
 
-        // 2. 매치 기록(MatchRecord) 생성
+        Room room = roomRepository.findById(request.roomId())
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
+
+        // 2. 매치 기록 생성
         MatchRecord matchRecord = MatchRecord.builder().boardGame(game).build();
 
         List<Glicko2Calculator.PlayerResult> calcResults = new ArrayList<>();
         List<MatchParticipant> participants = new ArrayList<>();
+        List<PlayerGameRating> gameRatings = new ArrayList<>(); // 🔴 버그 수정: 이중조회 제거
 
-        // 3. 참가자 데이터 수집
+        // 3. 참가자 데이터 수집 (gameRating을 여기서 한 번만 조회)
         for (MatchDto.ParticipantRequest pr : request.participants()) {
             Member member = memberRepository.findById(pr.memberId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
 
-            // 개별 게임 랭킹 찾기 (없으면 새로 생성)
-            PlayerGameRating gameRating = ratingRepository.findByMemberAndBoardGame(member, game)
-                .orElseGet(() -> new PlayerGameRating(member, game));
+            // 개별 게임 랭킹 찾기 (없으면 새로 생성 후 바로 저장)
+            PlayerGameRating gameRating = ratingRepository.findByMemberAndBoardGameAndRoom(member, game, room)
+                .orElseGet(() -> {
+                    PlayerGameRating newRating = PlayerGameRating.builder()
+                        .member(member)
+                        .boardGame(game)
+                        .room(room)
+                        .build();
+                    return ratingRepository.save(newRating); // 🔴 버그 수정: 즉시 저장
+                });
 
-            // 계산기용 데이터 준비
-            calcResults.add(new Glicko2Calculator.PlayerResult(member.getId(), pr.placement(),
-                gameRating.getGameStats()));
+            calcResults.add(new Glicko2Calculator.PlayerResult(
+                member.getId(), pr.placement(), gameRating.getGameStats()
+            ));
 
-            // DB 저장용 참가자 기록 생성
             participants.add(new MatchParticipant(matchRecord, member, pr.placement()));
+            gameRatings.add(gameRating); // 리스트에 보관
         }
 
-        // 4. Glicko-2 알고리즘으로 새로운 점수 계산
+        // 4. Glicko-2 계산
         glicko2Calculator.calculateMultiplayerRatings(calcResults);
 
         List<MatchDto.ResultResponse> responseList = new ArrayList<>();
 
-        // 5. 계산된 새 점수를 DB에 업데이트 및 응답 데이터 만들기
+        // 5. 계산된 점수 DB 업데이트 (이중조회 없이 위에서 모아둔 리스트 사용)
         for (int i = 0; i < participants.size(); i++) {
             MatchParticipant participant = participants.get(i);
             Glicko2Calculator.PlayerResult calcResult = calcResults.get(i);
-
+            PlayerGameRating gameRating = gameRatings.get(i); // 🔴 버그 수정: 재조회 없이 사용
             Member member = participant.getMember();
-            PlayerGameRating gameRating = ratingRepository.findByMemberAndBoardGame(member, game)
-                .orElseGet(() -> {
-                    // 데이터가 없으면(처음 하는 게임이면) 새로 만들어서 저장
-                    PlayerGameRating newRating = new PlayerGameRating(member, game);
-                    return ratingRepository.save(newRating);
-                });
 
-            // 점수 변화량 계산 (+15.2, -8.4 등)
+            // 점수 변화량 계산
             double ratingChange =
                 calcResult.newStats.getRating() - gameRating.getGameStats().getRating();
             participant.updateRatingChange(ratingChange);
@@ -88,20 +96,31 @@ public class MatchService {
             );
             gameRating.addPlayCount();
 
-            // TODO: 종합 랭킹(member.getOverallStats())도 업데이트하는 로직 추가
+            // 🔴 winCount/loseCount 업데이트 (1등이면 승리, 나머지는 패배)
+            if (participant.getPlacement() == 1) {
+                gameRating.addWinCount();
+            } else {
+                gameRating.addLoseCount();
+            }
+
+            // 🔴 종합 랭킹 업데이트 (TODO 해결)
+            member.getOverallStats().update(
+                calcResult.newStats.getRating(),
+                calcResult.newStats.getRatingDeviation(),
+                calcResult.newStats.getVolatility()
+            );
 
             ratingRepository.save(gameRating);
+            memberRepository.save(member);
 
-            // 프론트엔드로 보낼 응답 생성
             responseList.add(new MatchDto.ResultResponse(
                 member.getId(), member.getNickname(), participant.getPlacement(), ratingChange
             ));
         }
 
-        // 6. 매치 기록 최종 저장 (Cascade 설정으로 인해 Participant들도 같이 저장됨)
+        // 6. 매치 기록 저장
         matchRecordRepository.save(matchRecord);
 
         return responseList;
     }
-
 }

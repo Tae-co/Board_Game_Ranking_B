@@ -6,6 +6,7 @@ public class MatchDto {
     // 📩 [Request] React -> Spring: 게임 결과 제출
     public record ResultRequest(
         Long boardGameId,
+        Long roomId,
         List<ParticipantRequest> participants // 참가자 명단과 등수 리스트
     ) {}
 
