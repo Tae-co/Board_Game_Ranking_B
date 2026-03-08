@@ -1,7 +1,9 @@
 package com.board_game_back.Controller;
 
+import com.board_game_back.DTO.MemberDto;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Repository.MemberRepository;
+import java.util.HashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -29,12 +31,14 @@ public class MemberController {
     public ResponseEntity<?> getMember(@PathVariable Long memberId) {
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new RuntimeException("멤버를 찾을 수 없습니다."));
-        return ResponseEntity.ok(Map.of(
-            "memberId", member.getId(),
-            "nickname", member.getNickname(),
-            "phoneNumber", member.getPhoneNumber(),
-            "role", member.getRole()
-        ));
+        return ResponseEntity.ok(
+            new MemberDto.ProfileResponse(
+                member.getId(),
+                member.getNickname(),
+                member.getOverallStats().getRating(),
+                member.getOverallStats().getRatingDeviation()
+            )
+        );
     }
 
     // 닉네임 변경
