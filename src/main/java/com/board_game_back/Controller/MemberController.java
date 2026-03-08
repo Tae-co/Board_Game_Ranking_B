@@ -28,12 +28,12 @@ public class MemberController {
     @GetMapping("/{memberId}")
     public ResponseEntity<?> getMember(@PathVariable Long memberId) {
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new RuntimeException("멤버를 찾을 수 없습니다."));
+            .orElseThrow(() -> new RuntimeException("멤버를 찾을 수 없습니다."));
         return ResponseEntity.ok(Map.of(
-                "memberId", member.getId(),
-                "nickname", member.getNickname(),
-                "phoneNumber", member.getPhoneNumber(),
-                "role", member.getRole()
+            "memberId", member.getId(),
+            "nickname", member.getNickname(),
+            "phoneNumber", member.getPhoneNumber(),
+            "role", member.getRole()
         ));
     }
 
@@ -41,14 +41,14 @@ public class MemberController {
     @PatchMapping("/{id}/nickname")
     @Transactional
     public ResponseEntity<Void> updateNickname(
-            @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
+        @PathVariable Long id,
+        @RequestBody Map<String, String> body) {
         String nickname = body.get("nickname");
         if (nickname == null || nickname.isBlank() || nickname.length() < 2) {
             return ResponseEntity.badRequest().build();
         }
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
         member.updateNickname(nickname.trim());
         return ResponseEntity.ok().build();
     }
@@ -57,8 +57,8 @@ public class MemberController {
     @PatchMapping("/{id}/password")
     @Transactional
     public ResponseEntity<Map<String, String>> updatePassword(
-            @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
+        @PathVariable Long id,
+        @RequestBody Map<String, String> body) {
         String currentPassword = body.get("currentPassword");
         String newPassword = body.get("newPassword");
 
@@ -67,10 +67,11 @@ public class MemberController {
         }
 
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
 
         if (member.getPassword() != null && !member.getPassword().isBlank()) {
-            if (currentPassword == null || !passwordEncoder.matches(currentPassword, member.getPassword())) {
+            if (currentPassword == null || !passwordEncoder.matches(currentPassword,
+                member.getPassword())) {
                 return ResponseEntity.status(401).body(Map.of("message", "현재 비밀번호가 올바르지 않습니다."));
             }
         }
