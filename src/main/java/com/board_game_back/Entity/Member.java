@@ -27,6 +27,9 @@ public class Member {
     @Column(unique = true)
     private String phoneNumber;
 
+    @Column(unique = true)
+    private String socialId;
+
     private String username;
     private String nickname;
     private String password;
@@ -56,8 +59,9 @@ public class Member {
     }
 
     @Builder
-    public Member(String phoneNumber, String username, String nickname, String password, String role) {
+    public Member(String phoneNumber, String socialId, String username, String nickname, String password, String role) {
         this.phoneNumber = phoneNumber;
+        this.socialId = socialId;
         this.username = username;
         this.nickname = nickname;
         this.password = password;

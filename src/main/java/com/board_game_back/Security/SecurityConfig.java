@@ -47,6 +47,10 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/auth/kakao/**").permitAll()
+                .requestMatchers("/api/auth/google/**").permitAll()
+                .requestMatchers("/oauth2/**").permitAll()
+                .requestMatchers("/api/health").permitAll()
                 .requestMatchers("/api/images/**").permitAll()
                 .requestMatchers("/api/games/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")

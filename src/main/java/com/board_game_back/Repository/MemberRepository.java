@@ -13,6 +13,9 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     // 로그인 ID(phoneNumber)로 유저 찾기
     Optional<Member> findByPhoneNumber(String phoneNumber);
 
+    // 소셜 로그인 ID로 유저 찾기
+    Optional<Member> findBySocialId(String socialId);
+
     // 전체 종합 랭킹(overallRating) 순으로 유저 목록 조회 (리더보드용)
     boolean existsByNickname(String nickname);
 
