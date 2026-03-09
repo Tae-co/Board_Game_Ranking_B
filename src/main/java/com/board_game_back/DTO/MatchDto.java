@@ -28,6 +28,7 @@ public class MatchDto {
 
     public record MatchHistoryResponse(
         Long matchId,
+        Long boardGameId,
         String gameName,
         String playedAt,
         List<ParticipantHistoryResponse> participants

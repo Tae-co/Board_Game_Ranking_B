@@ -14,6 +14,8 @@ public interface PlayerGameRatingRepository extends JpaRepository<PlayerGameRati
 
     Optional<PlayerGameRating> findByMemberAndBoardGameAndRoom(Member member, BoardGame boardGame, Room room);
 
+    Optional<PlayerGameRating> findByMemberAndBoardGame(Member member, BoardGame boardGame);
+
     List<PlayerGameRating> findByRoomIdAndBoardGameIdOrderByGameStatsRatingDesc(Long roomId, Long boardGameId);
 
     List<PlayerGameRating> findByRoomIdAndBoardGameIdAndPlayCountGreaterThanEqualOrderByGameStatsRatingDesc(

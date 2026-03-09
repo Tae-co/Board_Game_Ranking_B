@@ -3,6 +3,7 @@ package com.board_game_back.Service;
 import com.board_game_back.DTO.MatchDto;
 import com.board_game_back.DTO.MatchDto.ResultResponse;
 import com.board_game_back.Entity.BoardGame;
+import com.board_game_back.Entity.GlickoStats;
 import com.board_game_back.Entity.MatchParticipant;
 import com.board_game_back.Entity.MatchRecord;
 import com.board_game_back.Entity.Member;
@@ -126,6 +127,7 @@ public class MatchService {
         return matches.stream()
             .map(m -> new MatchDto.MatchHistoryResponse(
                 m.getId(),
+                m.getBoardGame().getId(),
                 m.getBoardGame().getName(),
                 m.getPlayedAt().toString(),
                 m.getParticipants().stream()
@@ -142,38 +144,82 @@ public class MatchService {
     }
 
     @Transactional
-    public void updateMatch(Long matchId, MatchDto.UpdateRequest request) {
+    public List<MatchDto.ResultResponse> updateMatchResult(Long matchId, MatchDto.ResultRequest request) {
+
+        // 1. 기존 매치 조회
         MatchRecord match = matchRecordRepository.findById(matchId)
-            .orElseThrow(() -> new IllegalArgumentException("매치를 찾을 수 없습니다."));
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 매치입니다."));
 
-        if (match.getRoom() == null) {
-            throw new IllegalArgumentException("방 정보가 없는 매치는 수정할 수 없습니다.");
+        BoardGame game = match.getBoardGame();
+
+        // 2. 기존 참가자들의 ratingChange를 역산해서 점수 되돌리기
+        for (MatchParticipant oldParticipant : match.getParticipants()) {
+            Member member = oldParticipant.getMember();
+            PlayerGameRating gameRating = ratingRepository
+                .findByMemberAndBoardGame(member, game)
+                .orElseThrow();
+
+            double oldChange = oldParticipant.getRatingChange();
+            GlickoStats stats = gameRating.getGameStats();
+            stats.update(
+                stats.getRating() - oldChange,
+                stats.getRatingDeviation(),
+                stats.getVolatility()
+            );
+            ratingRepository.save(gameRating);
         }
 
-        Long roomId = match.getRoom().getId();
-        Long boardGameId = match.getBoardGame().getId();
+        // 3. 새 순위로 Glicko-2 재계산
+        List<Glicko2Calculator.PlayerResult> calcResults = new ArrayList<>();
+        List<MatchParticipant> newParticipants = new ArrayList<>();
 
-        RoomMember roomMember = roomMemberRepository.findByRoomIdAndMemberId(roomId, request.requesterId())
-            .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
-        if (!"HOST".equals(roomMember.getRole())) {
-            throw new SecurityException("방장만 수정할 수 있습니다.");
-        }
+        for (MatchDto.ParticipantRequest pr : request.participants()) {
+            Member member = memberRepository.findById(pr.memberId()).orElseThrow();
+            PlayerGameRating gameRating = ratingRepository
+                .findByMemberAndBoardGame(member, game)
+                .orElseGet(() -> ratingRepository.save(
+                    PlayerGameRating.builder().member(member).boardGame(game).room(match.getRoom()).build()
+                ));
 
-        Map<Long, Integer> placementMap = request.participants().stream()
-            .collect(Collectors.toMap(
-                MatchDto.ParticipantRequest::memberId,
-                MatchDto.ParticipantRequest::placement
+            calcResults.add(new Glicko2Calculator.PlayerResult(
+                member.getId(), pr.placement(), gameRating.getGameStats()
             ));
-
-        for (MatchParticipant mp : match.getParticipants()) {
-            Integer newPlacement = placementMap.get(mp.getMember().getId());
-            if (newPlacement != null) {
-                mp.updatePlacement(newPlacement);
-            }
+            newParticipants.add(new MatchParticipant(match, member, pr.placement()));
         }
 
+        glicko2Calculator.calculateMultiplayerRatings(calcResults);
+
+        List<MatchDto.ResultResponse> responseList = new ArrayList<>();
+
+        for (int i = 0; i < newParticipants.size(); i++) {
+            MatchParticipant participant = newParticipants.get(i);
+            Glicko2Calculator.PlayerResult calcResult = calcResults.get(i);
+            Member member = participant.getMember();
+
+            PlayerGameRating gameRating = ratingRepository
+                .findByMemberAndBoardGame(member, game).orElseThrow();
+
+            double ratingChange = calcResult.newStats.getRating() - gameRating.getGameStats().getRating();
+            participant.updateRatingChange(ratingChange);
+
+            gameRating.getGameStats().update(
+                calcResult.newStats.getRating(),
+                calcResult.newStats.getRatingDeviation(),
+                calcResult.newStats.getVolatility()
+            );
+            ratingRepository.save(gameRating);
+
+            responseList.add(new MatchDto.ResultResponse(
+                member.getId(), member.getNickname(), participant.getPlacement(), ratingChange
+            ));
+        }
+
+        // 4. 기존 참가자 목록 교체 후 저장
+        match.getParticipants().clear();
+        match.getParticipants().addAll(newParticipants);
         matchRecordRepository.save(match);
-        recalculateRatings(roomId, boardGameId);
+
+        return responseList;
     }
 
     @Transactional

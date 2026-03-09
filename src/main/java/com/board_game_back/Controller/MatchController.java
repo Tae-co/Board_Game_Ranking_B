@@ -32,11 +32,10 @@ public class MatchController {
     }
 
     @PutMapping("/{matchId}")
-    public ResponseEntity<Void> updateMatch(
+    public ResponseEntity<?> updateMatch(
         @PathVariable Long matchId,
-        @RequestBody MatchDto.UpdateRequest request) {
-        matchService.updateMatch(matchId, request);
-        return ResponseEntity.ok().build();
+        @RequestBody MatchDto.ResultRequest request) {
+        return ResponseEntity.ok(matchService.updateMatchResult(matchId, request));
     }
 
     @DeleteMapping("/{matchId}")
