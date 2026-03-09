@@ -31,14 +31,19 @@ public class MatchRecord {
     @JoinColumn(name = "board_game_id")
     private BoardGame boardGame;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "room_id")
+    private Room room;
+
     private LocalDateTime playedAt; // 게임 종료 및 랭킹 반영 시간
 
-    @OneToMany(mappedBy = "matchRecord", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "matchRecord", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MatchParticipant> participants = new ArrayList<>();
 
     @Builder
-    public MatchRecord(BoardGame boardGame) {
+    public MatchRecord(BoardGame boardGame, Room room) {
         this.boardGame = boardGame;
+        this.room = room;
         this.playedAt = LocalDateTime.now();
     }
 }

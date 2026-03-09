@@ -46,4 +46,8 @@ public class MatchParticipant {
         this.ratingChange = change;
     }
 
+    public void updatePlacement(int placement) {
+        this.placement = placement;
+    }
+
 }

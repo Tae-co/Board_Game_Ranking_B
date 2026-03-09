@@ -8,14 +8,20 @@ import com.board_game_back.Entity.MatchRecord;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Entity.Room;
+import com.board_game_back.Entity.RoomMember;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
+import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
 import jakarta.transaction.Transactional;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -29,30 +35,27 @@ public class MatchService {
     private final MemberRepository memberRepository;
     private final Glicko2Calculator glicko2Calculator;
     private final RoomRepository roomRepository;
+    private final RoomMemberRepository roomMemberRepository;
 
     @Transactional
     public List<ResultResponse> recordMatchResult(MatchDto.ResultRequest request) {
 
-        // 1. 게임 정보 조회
         BoardGame game = boardGameRepository.findById(request.boardGameId())
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임입니다."));
 
         Room room = roomRepository.findById(request.roomId())
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
 
-        // 2. 매치 기록 생성
-        MatchRecord matchRecord = MatchRecord.builder().boardGame(game).build();
+        MatchRecord matchRecord = MatchRecord.builder().boardGame(game).room(room).build();
 
         List<Glicko2Calculator.PlayerResult> calcResults = new ArrayList<>();
         List<MatchParticipant> participants = new ArrayList<>();
-        List<PlayerGameRating> gameRatings = new ArrayList<>(); // 🔴 버그 수정: 이중조회 제거
+        List<PlayerGameRating> gameRatings = new ArrayList<>();
 
-        // 3. 참가자 데이터 수집 (gameRating을 여기서 한 번만 조회)
         for (MatchDto.ParticipantRequest pr : request.participants()) {
             Member member = memberRepository.findById(pr.memberId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
 
-            // 개별 게임 랭킹 찾기 (없으면 새로 생성 후 바로 저장)
             PlayerGameRating gameRating = ratingRepository.findByMemberAndBoardGameAndRoom(member, game, room)
                 .orElseGet(() -> {
                     PlayerGameRating newRating = PlayerGameRating.builder()
@@ -60,7 +63,7 @@ public class MatchService {
                         .boardGame(game)
                         .room(room)
                         .build();
-                    return ratingRepository.save(newRating); // 🔴 버그 수정: 즉시 저장
+                    return ratingRepository.save(newRating);
                 });
 
             calcResults.add(new Glicko2Calculator.PlayerResult(
@@ -68,27 +71,23 @@ public class MatchService {
             ));
 
             participants.add(new MatchParticipant(matchRecord, member, pr.placement()));
-            gameRatings.add(gameRating); // 리스트에 보관
+            gameRatings.add(gameRating);
         }
 
-        // 4. Glicko-2 계산
         glicko2Calculator.calculateMultiplayerRatings(calcResults);
 
         List<MatchDto.ResultResponse> responseList = new ArrayList<>();
 
-        // 5. 계산된 점수 DB 업데이트 (이중조회 없이 위에서 모아둔 리스트 사용)
         for (int i = 0; i < participants.size(); i++) {
             MatchParticipant participant = participants.get(i);
             Glicko2Calculator.PlayerResult calcResult = calcResults.get(i);
-            PlayerGameRating gameRating = gameRatings.get(i); // 🔴 버그 수정: 재조회 없이 사용
+            PlayerGameRating gameRating = gameRatings.get(i);
             Member member = participant.getMember();
 
-            // 점수 변화량 계산
             double ratingChange =
                 calcResult.newStats.getRating() - gameRating.getGameStats().getRating();
             participant.updateRatingChange(ratingChange);
 
-            // 개별 랭킹 업데이트
             gameRating.getGameStats().update(
                 calcResult.newStats.getRating(),
                 calcResult.newStats.getRatingDeviation(),
@@ -96,14 +95,12 @@ public class MatchService {
             );
             gameRating.addPlayCount();
 
-            // 🔴 winCount/loseCount 업데이트 (1등이면 승리, 나머지는 패배)
             if (participant.getPlacement() == 1) {
                 gameRating.addWinCount();
             } else {
                 gameRating.addLoseCount();
             }
 
-            // 🔴 종합 랭킹 업데이트 (TODO 해결)
             member.getOverallStats().update(
                 calcResult.newStats.getRating(),
                 calcResult.newStats.getRatingDeviation(),
@@ -118,9 +115,147 @@ public class MatchService {
             ));
         }
 
-        // 6. 매치 기록 저장
         matchRecordRepository.save(matchRecord);
 
         return responseList;
+    }
+
+    @Transactional
+    public List<MatchDto.MatchHistoryResponse> getMatchHistory(Long roomId) {
+        List<MatchRecord> matches = matchRecordRepository.findByRoomIdOrderByPlayedAtDesc(roomId);
+        return matches.stream()
+            .map(m -> new MatchDto.MatchHistoryResponse(
+                m.getId(),
+                m.getBoardGame().getName(),
+                m.getPlayedAt().toString(),
+                m.getParticipants().stream()
+                    .map(p -> new MatchDto.ParticipantHistoryResponse(
+                        p.getMember().getId(),
+                        p.getMember().getNickname(),
+                        p.getPlacement(),
+                        p.getRatingChange()
+                    ))
+                    .sorted(Comparator.comparingInt(MatchDto.ParticipantHistoryResponse::placement))
+                    .collect(Collectors.toList())
+            ))
+            .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void updateMatch(Long matchId, MatchDto.UpdateRequest request) {
+        MatchRecord match = matchRecordRepository.findById(matchId)
+            .orElseThrow(() -> new IllegalArgumentException("매치를 찾을 수 없습니다."));
+
+        if (match.getRoom() == null) {
+            throw new IllegalArgumentException("방 정보가 없는 매치는 수정할 수 없습니다.");
+        }
+
+        Long roomId = match.getRoom().getId();
+        Long boardGameId = match.getBoardGame().getId();
+
+        RoomMember roomMember = roomMemberRepository.findByRoomIdAndMemberId(roomId, request.requesterId())
+            .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
+        if (!"HOST".equals(roomMember.getRole())) {
+            throw new SecurityException("방장만 수정할 수 있습니다.");
+        }
+
+        Map<Long, Integer> placementMap = request.participants().stream()
+            .collect(Collectors.toMap(
+                MatchDto.ParticipantRequest::memberId,
+                MatchDto.ParticipantRequest::placement
+            ));
+
+        for (MatchParticipant mp : match.getParticipants()) {
+            Integer newPlacement = placementMap.get(mp.getMember().getId());
+            if (newPlacement != null) {
+                mp.updatePlacement(newPlacement);
+            }
+        }
+
+        matchRecordRepository.save(match);
+        recalculateRatings(roomId, boardGameId);
+    }
+
+    @Transactional
+    public void deleteMatch(Long matchId, Long requesterId) {
+        MatchRecord match = matchRecordRepository.findById(matchId)
+            .orElseThrow(() -> new IllegalArgumentException("매치를 찾을 수 없습니다."));
+
+        if (match.getRoom() == null) {
+            throw new IllegalArgumentException("방 정보가 없는 매치는 삭제할 수 없습니다.");
+        }
+
+        Long roomId = match.getRoom().getId();
+        Long boardGameId = match.getBoardGame().getId();
+
+        RoomMember roomMember = roomMemberRepository.findByRoomIdAndMemberId(roomId, requesterId)
+            .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
+        if (!"HOST".equals(roomMember.getRole())) {
+            throw new SecurityException("방장만 삭제할 수 있습니다.");
+        }
+
+        matchRecordRepository.delete(match);
+        recalculateRatings(roomId, boardGameId);
+    }
+
+    private void recalculateRatings(Long roomId, Long boardGameId) {
+        Room room = roomRepository.findById(roomId).orElseThrow();
+        BoardGame game = boardGameRepository.findById(boardGameId).orElseThrow();
+
+        // 1. 해당 방/게임의 모든 rating 초기화
+        List<PlayerGameRating> allRatings = ratingRepository
+            .findByRoomIdAndBoardGameIdOrderByGameStatsRatingDesc(roomId, boardGameId);
+        Map<Long, PlayerGameRating> ratingByMemberId = new HashMap<>();
+        for (PlayerGameRating gr : allRatings) {
+            gr.reset();
+            ratingByMemberId.put(gr.getMember().getId(), gr);
+        }
+
+        // 2. 시간순 매치 재계산
+        List<MatchRecord> matches = matchRecordRepository
+            .findByRoomIdAndBoardGameIdOrderByPlayedAtAsc(roomId, boardGameId);
+
+        for (MatchRecord match : matches) {
+            List<Glicko2Calculator.PlayerResult> calcResults = new ArrayList<>();
+            List<MatchParticipant> participants = match.getParticipants();
+
+            for (MatchParticipant mp : participants) {
+                Long memberId = mp.getMember().getId();
+                PlayerGameRating gr = ratingByMemberId.computeIfAbsent(memberId, id -> {
+                    PlayerGameRating nr = PlayerGameRating.builder()
+                        .member(mp.getMember()).boardGame(game).room(room).build();
+                    return ratingRepository.save(nr);
+                });
+                calcResults.add(new Glicko2Calculator.PlayerResult(
+                    memberId, mp.getPlacement(), gr.getGameStats()
+                ));
+            }
+
+            glicko2Calculator.calculateMultiplayerRatings(calcResults);
+
+            for (int i = 0; i < participants.size(); i++) {
+                MatchParticipant mp = participants.get(i);
+                Glicko2Calculator.PlayerResult result = calcResults.get(i);
+                Long memberId = mp.getMember().getId();
+                PlayerGameRating gr = ratingByMemberId.get(memberId);
+
+                double ratingChange = result.newStats.getRating() - gr.getGameStats().getRating();
+                mp.updateRatingChange(ratingChange);
+
+                gr.getGameStats().update(
+                    result.newStats.getRating(),
+                    result.newStats.getRatingDeviation(),
+                    result.newStats.getVolatility()
+                );
+                gr.addPlayCount();
+                if (mp.getPlacement() == 1) {
+                    gr.addWinCount();
+                } else {
+                    gr.addLoseCount();
+                }
+            }
+        }
+
+        ratingRepository.saveAll(ratingByMemberId.values());
     }
 }

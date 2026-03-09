@@ -54,6 +54,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/images/**").permitAll()
                 .requestMatchers("/api/games/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/matches/**").authenticated()
+                .requestMatchers(HttpMethod.DELETE, "/api/matches/**").authenticated()
                 .anyRequest().permitAll()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

@@ -1,10 +1,12 @@
 package com.board_game_back.Controller;
 
+import com.board_game_back.DTO.MatchDto;
 import com.board_game_back.DTO.RankingDto;
 import com.board_game_back.DTO.RoomDto;
 import com.board_game_back.DTO.RoomDto.Response;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Repository.RoomMemberRepository;
+import com.board_game_back.Service.MatchService;
 import com.board_game_back.Service.RankingService;
 import com.board_game_back.Service.RoomService;
 import java.util.List;
@@ -30,6 +32,7 @@ public class RoomController {
     private final RoomService roomService;
     private final RankingService rankingService;
     private final RoomMemberRepository roomMemberRepository;
+    private final MatchService matchService;
 
     /** 1. 방 만들기 */
     @PostMapping
@@ -102,5 +105,12 @@ public class RoomController {
     public ResponseEntity<String> deleteRoom(@PathVariable Long roomId) {
         roomService.deleteRoom(roomId);
         return ResponseEntity.ok("방이 삭제되었습니다.");
+    }
+
+    /** 9. 방 매치 기록 - GET /api/rooms/{roomId}/matches */
+    @GetMapping("/{roomId}/matches")
+    public ResponseEntity<List<MatchDto.MatchHistoryResponse>> getMatchHistory(
+            @PathVariable Long roomId) {
+        return ResponseEntity.ok(matchService.getMatchHistory(roomId));
     }
 }

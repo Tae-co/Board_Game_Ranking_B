@@ -25,4 +25,11 @@ public class GlickoStats {
         this.volatility = volatility;
     }
 
+    // 초기값으로 리셋
+    public void reset() {
+        this.rating = 1500.0;
+        this.ratingDeviation = 350.0;
+        this.volatility = 0.06;
+    }
+
 }

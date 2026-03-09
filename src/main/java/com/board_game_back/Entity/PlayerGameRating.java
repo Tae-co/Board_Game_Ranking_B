@@ -63,4 +63,11 @@ public class PlayerGameRating {
         this.loseCount++;
     }
 
+    public void reset() {
+        this.playCount = 0;
+        this.winCount = 0;
+        this.loseCount = 0;
+        this.gameStats.reset();
+    }
+
 }
