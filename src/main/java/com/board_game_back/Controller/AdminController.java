@@ -4,7 +4,6 @@ import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
-import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -112,8 +111,7 @@ public class AdminController {
     /** 게임 이미지 업로드 */
     @PostMapping("/upload-image")
     public ResponseEntity<Map<String, String>> uploadImage(
-            @RequestParam MultipartFile file,
-            HttpServletRequest request) throws IOException {
+            @RequestParam MultipartFile file) throws IOException {
         checkAdmin();
         Path uploadPath = Paths.get(uploadDir);
         Files.createDirectories(uploadPath);
@@ -123,7 +121,6 @@ public class AdminController {
                 : "";
         String filename = UUID.randomUUID() + ext;
         Files.copy(file.getInputStream(), uploadPath.resolve(filename));
-        String baseUrl = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
-        return ResponseEntity.ok(Map.of("url", baseUrl + "/api/images/" + filename));
+        return ResponseEntity.ok(Map.of("url", "/images/" + filename));
     }
 }

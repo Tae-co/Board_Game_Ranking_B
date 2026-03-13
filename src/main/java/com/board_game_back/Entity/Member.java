@@ -39,8 +39,7 @@ public class Member {
     @AttributeOverrides({
         @AttributeOverride(name = "rating", column = @Column(name = "overall_rating")),
         @AttributeOverride(name = "ratingDeviation", column = @Column(name = "overall_rd")),
-        @AttributeOverride(name = "volatility", column = @Column(name = "overall_volatility"))
-    })
+        @AttributeOverride(name = "volatility", column = @Column(name = "overall_volatility"))})
     private GlickoStats overallStats = new GlickoStats();
 
     public GlickoStats getOverallStats() {
@@ -59,7 +58,8 @@ public class Member {
     }
 
     @Builder
-    public Member(String phoneNumber, String socialId, String username, String nickname, String password, String role) {
+    public Member(String phoneNumber, String socialId, String username, String nickname,
+        String password, String role) {
         this.phoneNumber = phoneNumber;
         this.socialId = socialId;
         this.username = username;
