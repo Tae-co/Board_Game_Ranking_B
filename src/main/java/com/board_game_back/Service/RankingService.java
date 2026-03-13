@@ -71,25 +71,27 @@ public class RankingService {
         return responseList;
     }
 
-    // 방별 특정 보드게임 랭킹 조회
+    // 방별 특정 보드게임 랭킹 조회 (플레이한 멤버 먼저, 미플레이 멤버 포함)
     public List<GameRankingResponse> getRoomRanking(Long roomId, Long boardGameId) {
-        List<PlayerGameRating> ratings = ratingRepository.findByRoomIdAndBoardGameIdOrderByGameStatsRatingDesc(
+        List<PlayerGameRating> ratings = ratingRepository.findByRoomIdAndBoardGameIdOrderByPlayedThenRating(
             roomId, boardGameId);
 
         List<RankingDto.GameRankingResponse> responseList = new ArrayList<>();
         int currentRank = 1;
 
         for (PlayerGameRating rating : ratings) {
-            if (rating.getPlayCount() == 0) {
-                continue;
+            if (rating.getPlayCount() > 0) {
+                responseList.add(
+                    new RankingDto.GameRankingResponse(currentRank++, rating.getMember().getId(),
+                        rating.getMember().getNickname(), rating.getGameStats().getRating(),
+                        rating.getPlayCount(), rating.getWinCount(), rating.getLoseCount()));
+            } else {
+                // 미플레이 멤버: rank = null
+                responseList.add(
+                    new RankingDto.GameRankingResponse(null, rating.getMember().getId(),
+                        rating.getMember().getNickname(), rating.getGameStats().getRating(),
+                        rating.getPlayCount(), rating.getWinCount(), rating.getLoseCount()));
             }
-
-            responseList.add(
-                new RankingDto.GameRankingResponse(currentRank++, rating.getMember().getId(),
-                    rating.getMember().getNickname(), rating.getGameStats().getRating(),
-                    rating.getPlayCount(), rating.getWinCount(),    // 추가
-                    rating.getLoseCount()    // 추가
-                ));
         }
 
         return responseList;

@@ -16,4 +16,7 @@ public class RoomDto {
     public record Response(Long roomId, String roomName, String inviteCode, Long boardGameId) {
 
     }
+
+    // 초기 LP 설정 요청
+    public record UpdateRatingRequest(Long requesterId, double rating) {}
 }

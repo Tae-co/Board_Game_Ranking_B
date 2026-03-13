@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -117,5 +118,19 @@ public class RoomController {
     public ResponseEntity<List<MatchDto.MatchHistoryResponse>> getMatchHistory(
             @PathVariable Long roomId) {
         return ResponseEntity.ok(matchService.getMatchHistory(roomId));
+    }
+
+    /** 10. 초기 LP 설정 (방장만) - PUT /api/rooms/{roomId}/members/{memberId}/rating */
+    @PutMapping("/{roomId}/members/{memberId}/rating")
+    public ResponseEntity<String> updateMemberRating(
+            @PathVariable Long roomId,
+            @PathVariable Long memberId,
+            @RequestBody RoomDto.UpdateRatingRequest request) {
+        try {
+            roomService.updateMemberRating(roomId, memberId, request.requesterId(), request.rating());
+            return ResponseEntity.ok("점수가 업데이트되었습니다.");
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }

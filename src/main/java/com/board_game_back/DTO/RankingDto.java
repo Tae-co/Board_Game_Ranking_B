@@ -3,13 +3,13 @@ package com.board_game_back.DTO;
 public class RankingDto {
 
     public record GameRankingResponse(
-        int rank,
+        Integer rank,
         Long memberId,
         String nickname,
         double rating,
         int playCount,
-        int winCount,    // 추가
-        int loseCount    // 추가
+        int winCount,
+        int loseCount
     ) {
 
     }

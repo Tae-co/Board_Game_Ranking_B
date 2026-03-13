@@ -108,4 +108,28 @@ public class RoomService {
         // Room 삭제 (CascadeType.ALL로 RoomMember도 함께 삭제됨)
         roomRepository.delete(room);
     }
+
+    /** 초기 LP 설정 (방장만 가능, 매치 기록 없는 멤버만) */
+    @Transactional
+    public void updateMemberRating(Long roomId, Long memberId, Long requesterId, double rating) {
+        // 1. 요청자가 방장인지 확인
+        RoomMember requesterMember = roomMemberRepository.findByRoomIdAndMemberId(roomId, requesterId)
+            .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
+        if (!"HOST".equals(requesterMember.getRole())) {
+            throw new IllegalStateException("방장만 점수를 수정할 수 있습니다.");
+        }
+
+        // 2. 대상 멤버의 PlayerGameRating 조회
+        com.board_game_back.Entity.PlayerGameRating pgr = playerGameRatingRepository.findByMember_IdAndRoom_Id(memberId, roomId)
+            .orElseThrow(() -> new IllegalArgumentException("해당 멤버의 점수 정보가 없습니다."));
+
+        // 3. 매치 기록이 있으면 수정 불가
+        if (pgr.getPlayCount() > 0) {
+            throw new IllegalStateException("매치 기록이 있는 멤버의 점수는 수정할 수 없습니다.");
+        }
+
+        // 4. LP 업데이트
+        pgr.updateInitialRating(rating);
+        playerGameRatingRepository.save(pgr);
+    }
 }

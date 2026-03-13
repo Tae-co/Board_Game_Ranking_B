@@ -70,4 +70,8 @@ public class PlayerGameRating {
         this.gameStats.reset();
     }
 
+    public void updateInitialRating(double newRating) {
+        this.gameStats.update(newRating, this.gameStats.getRatingDeviation(), this.gameStats.getVolatility());
+    }
+
 }
