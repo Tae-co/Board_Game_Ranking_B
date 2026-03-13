@@ -25,12 +25,12 @@ public class RoomService {
 
     /** 1. 새로운 방 생성 */
     @Transactional
-    public Room createRoom(String roomName, Long memberId) {
+    public Room createRoom(String roomName, Long memberId, Long boardGameId) {
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
 
         String inviteCode = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
-        Room room = new Room(roomName, inviteCode);
+        Room room = new Room(roomName, inviteCode, boardGameId);
         Room savedRoom = roomRepository.save(room);
 
         RoomMember roomMember = new RoomMember(savedRoom, member, "HOST");

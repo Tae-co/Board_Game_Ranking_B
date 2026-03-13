@@ -37,9 +37,9 @@ public class RoomController {
     /** 1. 방 만들기 */
     @PostMapping
     public ResponseEntity<RoomDto.Response> createRoom(@RequestBody RoomDto.CreateRequest request) {
-        Room room = roomService.createRoom(request.roomName(), request.memberId());
+        Room room = roomService.createRoom(request.roomName(), request.memberId(), request.boardGameId());
         return ResponseEntity.ok(
-            new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode()));
+            new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode(), room.getBoardGameId()));
     }
 
     /** 2. 초대 코드로 방 입장 */
@@ -53,7 +53,7 @@ public class RoomController {
     @GetMapping("/my/{memberId}")
     public ResponseEntity<List<Response>> getMyRooms(@PathVariable Long memberId) {
         List<RoomDto.Response> responses = roomService.getMyRooms(memberId).stream()
-            .map(r -> new RoomDto.Response(r.getId(), r.getName(), r.getInviteCode()))
+            .map(r -> new RoomDto.Response(r.getId(), r.getName(), r.getInviteCode(), r.getBoardGameId()))
             .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
     }
@@ -80,15 +80,19 @@ public class RoomController {
     public ResponseEntity<RoomDto.Response> getRoomDetail(@PathVariable Long roomId) {
         Room room = roomService.getRoomById(roomId);
         return ResponseEntity.ok(
-            new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode()));
+            new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode(), room.getBoardGameId()));
     }
 
-    /** 6. 방별 랭킹 */
+    /** 6. 방별 랭킹 (boardGameId 미전달 시 방의 고정 게임 사용) */
     @GetMapping("/{roomId}/rankings")
     public ResponseEntity<List<RankingDto.GameRankingResponse>> getRoomRankings(
             @PathVariable Long roomId,
-            @RequestParam Long boardGameId) {
-        return ResponseEntity.ok(rankingService.getRoomRanking(roomId, boardGameId));
+            @RequestParam(required = false) Long boardGameId) {
+        Long gameId = boardGameId != null ? boardGameId : roomService.getRoomById(roomId).getBoardGameId();
+        if (gameId == null) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
+        return ResponseEntity.ok(rankingService.getRoomRanking(roomId, gameId));
     }
 
     /** 7. 방 나가기 / 강퇴 - DELETE /api/rooms/{roomId}/members/{memberId} */

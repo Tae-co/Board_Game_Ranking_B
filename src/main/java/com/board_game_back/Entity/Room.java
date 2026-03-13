@@ -28,11 +28,14 @@ public class Room {
     @Column(unique = true)
     private String inviteCode; // 6자리 랜덤 초대 코드
 
+    private Long boardGameId; // 방에 고정된 게임
+
     @OneToMany(mappedBy = "room", cascade = CascadeType.ALL)
     private List<RoomMember> roomMembers = new ArrayList<>();
 
-    public Room(String name, String inviteCode) {
+    public Room(String name, String inviteCode, Long boardGameId) {
         this.name = name;
         this.inviteCode = inviteCode;
+        this.boardGameId = boardGameId;
     }
 }
