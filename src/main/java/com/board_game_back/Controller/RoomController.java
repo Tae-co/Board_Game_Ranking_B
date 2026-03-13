@@ -44,9 +44,10 @@ public class RoomController {
 
     /** 2. 초대 코드로 방 입장 */
     @PostMapping("/join")
-    public ResponseEntity<String> joinRoom(@RequestBody RoomDto.JoinRequest request) {
-        roomService.joinRoom(request.inviteCode(), request.memberId());
-        return ResponseEntity.ok("방 가입에 성공했습니다.");
+    public ResponseEntity<RoomDto.Response> joinRoom(@RequestBody RoomDto.JoinRequest request) {
+        Room room = roomService.joinRoom(request.inviteCode(), request.memberId());
+        return ResponseEntity.ok(
+            new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode(), room.getBoardGameId()));
     }
 
     /** 3. 내가 참여 중인 방 목록 */

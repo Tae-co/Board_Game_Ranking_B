@@ -41,7 +41,7 @@ public class RoomService {
 
     /** 2. 초대 코드로 방 가입 */
     @Transactional
-    public void joinRoom(String inviteCode, Long memberId) {
+    public Room joinRoom(String inviteCode, Long memberId) {
         Room room = roomRepository.findByInviteCode(inviteCode)
             .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 초대 코드입니다."));
 
@@ -52,12 +52,12 @@ public class RoomService {
             .stream()
             .anyMatch(rm -> rm.getMember().getId().equals(memberId));
 
-        if (isAlreadyMember) {
-            throw new IllegalStateException("이미 가입된 방입니다.");
+        if (!isAlreadyMember) {
+            RoomMember roomMember = new RoomMember(room, member, "MEMBER");
+            roomMemberRepository.save(roomMember);
         }
 
-        RoomMember roomMember = new RoomMember(room, member, "MEMBER");
-        roomMemberRepository.save(roomMember);
+        return room;
     }
 
     /** 3. 내가 속한 방 목록 조회 */
