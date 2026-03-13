@@ -1,8 +1,11 @@
 package com.board_game_back.Service;
 
+import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Member;
+import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Entity.RoomMember;
+import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomMemberRepository;
@@ -22,6 +25,7 @@ public class RoomService {
     private final RoomMemberRepository roomMemberRepository;
     private final MemberRepository memberRepository;
     private final PlayerGameRatingRepository playerGameRatingRepository;
+    private final BoardGameRepository boardGameRepository;
 
     /** 1. 새로운 방 생성 */
     @Transactional
@@ -35,6 +39,19 @@ public class RoomService {
 
         RoomMember roomMember = new RoomMember(savedRoom, member, "HOST");
         roomMemberRepository.save(roomMember);
+
+        // 방장 PlayerGameRating 즉시 생성 (랭킹에 바로 노출)
+        if (boardGameId != null) {
+            boardGameRepository.findById(boardGameId).ifPresent(game -> {
+                boolean exists = playerGameRatingRepository
+                    .findByMemberAndBoardGameAndRoom(member, game, savedRoom).isPresent();
+                if (!exists) {
+                    playerGameRatingRepository.save(
+                        PlayerGameRating.builder().member(member).boardGame(game).room(savedRoom).build()
+                    );
+                }
+            });
+        }
 
         return savedRoom;
     }
@@ -55,6 +72,19 @@ public class RoomService {
         if (!isAlreadyMember) {
             RoomMember roomMember = new RoomMember(room, member, "MEMBER");
             roomMemberRepository.save(roomMember);
+        }
+
+        // PlayerGameRating 없으면 생성 (랭킹에 바로 노출)
+        if (room.getBoardGameId() != null) {
+            boardGameRepository.findById(room.getBoardGameId()).ifPresent(game -> {
+                boolean exists = playerGameRatingRepository
+                    .findByMemberAndBoardGameAndRoom(member, game, room).isPresent();
+                if (!exists) {
+                    playerGameRatingRepository.save(
+                        PlayerGameRating.builder().member(member).boardGame(game).room(room).build()
+                    );
+                }
+            });
         }
 
         return room;
