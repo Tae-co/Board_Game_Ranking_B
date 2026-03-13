@@ -33,9 +33,6 @@ public class OAuth2AuthController {
     private final MemberRepository memberRepository;
     private final JwtTokenProvider jwtTokenProvider;
 
-    @Value("${KAKAO_CLIENT_ID:}")
-    private String kakaoClientId;
-
     @Value("${GOOGLE_CLIENT_ID:}")
     private String googleClientId;
 
@@ -48,24 +45,9 @@ public class OAuth2AuthController {
     @Value("${BACKEND_URL:https://meeple-production.up.railway.app}")
     private String backendUrl;
 
-    private static final String KAKAO_AUTH_URL = "https://kauth.kakao.com/oauth/authorize";
-    private static final String KAKAO_TOKEN_URL = "https://kauth.kakao.com/oauth/token";
-    private static final String KAKAO_USER_URL = "https://kapi.kakao.com/v2/user/me";
     private static final String GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
     private static final String GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
     private static final String GOOGLE_USER_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
-
-    /** 카카오 인증 페이지로 리다이렉트 */
-    @GetMapping("/kakao")
-    public void kakaoLogin(HttpServletResponse response) throws IOException {
-        String redirectUri = backendUrl + "/api/auth/kakao/callback";
-        String url = KAKAO_AUTH_URL
-                + "?client_id=" + kakaoClientId
-                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
-                + "&response_type=code"
-                + "&scope=profile_nickname";
-        response.sendRedirect(url);
-    }
 
     /** 구글 인증 페이지로 리다이렉트 */
     @GetMapping("/google")
@@ -77,43 +59,6 @@ public class OAuth2AuthController {
                 + "&response_type=code"
                 + "&scope=profile+email";
         response.sendRedirect(url);
-    }
-
-    /** 카카오 OAuth2 콜백 */
-    @GetMapping("/kakao/callback")
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    public void kakaoCallback(@RequestParam String code, HttpServletResponse response) throws IOException {
-        try {
-            RestTemplate restTemplate = new RestTemplate();
-            String redirectUri = backendUrl + "/api/auth/kakao/callback";
-
-            // 1. 토큰 교환
-            MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-            params.add("grant_type", "authorization_code");
-            params.add("client_id", kakaoClientId);
-            params.add("redirect_uri", redirectUri);
-            params.add("code", code);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-            ResponseEntity<Map> tokenResponse = restTemplate.postForEntity(
-                    KAKAO_TOKEN_URL, new HttpEntity<>(params, headers), Map.class);
-            String accessToken = (String) tokenResponse.getBody().get("access_token");
-
-            // 2. 사용자 정보 조회
-            HttpHeaders userHeaders = new HttpHeaders();
-            userHeaders.setBearerAuth(accessToken);
-            ResponseEntity<Map> userResponse = restTemplate.exchange(
-                    KAKAO_USER_URL, HttpMethod.GET, new HttpEntity<>(userHeaders), Map.class);
-            Map<String, Object> userBody = userResponse.getBody();
-
-            String socialId = "KAKAO_" + userBody.get("id");
-            String nickname = extractKakaoNickname(userBody);
-
-            redirectWithToken(response, socialId, nickname);
-        } catch (Exception e) {
-            response.sendRedirect(frontendUrl + "/login?error=kakao");
-        }
     }
 
     /** 구글 OAuth2 콜백 */
@@ -154,23 +99,6 @@ public class OAuth2AuthController {
         }
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    private String extractKakaoNickname(Map<String, Object> userBody) {
-        try {
-            Map<String, Object> kakaoAccount = (Map<String, Object>) userBody.get("kakao_account");
-            if (kakaoAccount != null) {
-                Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
-                if (profile != null && profile.get("nickname") != null) {
-                    return (String) profile.get("nickname");
-                }
-            }
-            Map<String, Object> properties = (Map<String, Object>) userBody.get("properties");
-            if (properties != null && properties.get("nickname") != null) {
-                return (String) properties.get("nickname");
-            }
-        } catch (Exception ignored) {}
-        return "카카오유저";
-    }
 
     private void redirectWithToken(HttpServletResponse response, String socialId, String nickname) throws IOException {
         Member member = memberRepository.findBySocialId(socialId)
