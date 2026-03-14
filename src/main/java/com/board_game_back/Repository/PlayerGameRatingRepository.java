@@ -32,6 +32,10 @@ public interface PlayerGameRatingRepository extends JpaRepository<PlayerGameRati
     @org.springframework.data.jpa.repository.Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.member WHERE p.boardGame.id = :boardGameId ORDER BY p.gameStats.rating DESC")
     List<PlayerGameRating> findByBoardGameIdWithMember(@org.springframework.data.repository.query.Param("boardGameId") Long boardGameId);
 
+    // 멤버별 플레이한 게임 통계용 (playCount > 0)
+    @org.springframework.data.jpa.repository.Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.boardGame WHERE p.member.id = :memberId AND p.playCount > 0")
+    List<PlayerGameRating> findPlayedByMemberId(@org.springframework.data.repository.query.Param("memberId") Long memberId);
+
     // 방 삭제 시 FK 제거용
     void deleteByRoomId(Long roomId);
 }

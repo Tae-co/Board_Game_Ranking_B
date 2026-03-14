@@ -11,7 +11,8 @@ public class MatchDto {
 
     public record ParticipantRequest(
         Long memberId,
-        int placement
+        int placement,
+        String scoresJson   // nullable — MatchForm 호환
     ) {}
 
     public record ResultResponse(
@@ -38,6 +39,7 @@ public class MatchDto {
         Long memberId,
         String nickname,
         int placement,
-        double ratingChange
+        double ratingChange,
+        String scoresJson   // nullable (구버전 데이터)
     ) {}
 }

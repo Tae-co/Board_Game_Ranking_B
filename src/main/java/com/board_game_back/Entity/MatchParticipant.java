@@ -34,6 +34,9 @@ public class MatchParticipant {
 
     private double ratingChange; // 이 판으로 인해 레이팅이 얼마나 올랐/떨어졌는지 (+15.2, -8.4 등 UI 표시용)
 
+    @Column(columnDefinition = "TEXT")
+    private String scoresJson; // 카테고리별 점수 JSON {"settlement":3,"cities":2,...}
+
     @Builder
     public MatchParticipant(MatchRecord matchRecord, Member member, int placement) {
         this.matchRecord = matchRecord;
@@ -48,6 +51,10 @@ public class MatchParticipant {
 
     public void updatePlacement(int placement) {
         this.placement = placement;
+    }
+
+    public void updateScoresJson(String scoresJson) {
+        this.scoresJson = scoresJson;
     }
 
 }

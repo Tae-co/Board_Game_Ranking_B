@@ -2,9 +2,12 @@ package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.MemberDto;
 import com.board_game_back.Entity.Member;
+import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Repository.MemberRepository;
-import java.util.HashMap;
+import com.board_game_back.Repository.PlayerGameRatingRepository;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class MemberController {
 
     private final MemberRepository memberRepository;
+    private final PlayerGameRatingRepository playerGameRatingRepository;
     private final PasswordEncoder passwordEncoder;
 
     // 멤버 조회
@@ -39,6 +43,26 @@ public class MemberController {
                 member.getOverallStats().getRatingDeviation()
             )
         );
+    }
+
+    // 플레이 통계 조회
+    @GetMapping("/{memberId}/stats")
+    @Transactional(readOnly = true)
+    public ResponseEntity<MemberDto.StatsResponse> getMemberStats(@PathVariable Long memberId) {
+        List<PlayerGameRating> ratings = playerGameRatingRepository.findPlayedByMemberId(memberId);
+
+        int totalPlay = ratings.stream().mapToInt(PlayerGameRating::getPlayCount).sum();
+        int totalWin  = ratings.stream().mapToInt(PlayerGameRating::getWinCount).sum();
+        int totalLose = ratings.stream().mapToInt(PlayerGameRating::getLoseCount).sum();
+
+        List<MemberDto.GameStatItem> games = ratings.stream()
+            .map(r -> new MemberDto.GameStatItem(
+                r.getBoardGame().getName(),
+                r.getPlayCount(), r.getWinCount(), r.getLoseCount()
+            ))
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(new MemberDto.StatsResponse(totalPlay, totalWin, totalLose, games));
     }
 
     // 닉네임 변경

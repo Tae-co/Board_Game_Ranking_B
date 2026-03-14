@@ -71,7 +71,11 @@ public class MatchService {
                 member.getId(), pr.placement(), gameRating.getGameStats()
             ));
 
-            participants.add(new MatchParticipant(matchRecord, member, pr.placement()));
+            MatchParticipant mp = new MatchParticipant(matchRecord, member, pr.placement());
+            if (pr.scoresJson() != null) {
+                mp.updateScoresJson(pr.scoresJson());
+            }
+            participants.add(mp);
             gameRatings.add(gameRating);
         }
 
@@ -135,7 +139,8 @@ public class MatchService {
                         p.getMember().getId(),
                         p.getMember().getNickname(),
                         p.getPlacement(),
-                        p.getRatingChange()
+                        p.getRatingChange(),
+                        p.getScoresJson()
                     ))
                     .sorted(Comparator.comparingInt(MatchDto.ParticipantHistoryResponse::placement))
                     .collect(Collectors.toList())
@@ -184,7 +189,11 @@ public class MatchService {
             calcResults.add(new Glicko2Calculator.PlayerResult(
                 member.getId(), pr.placement(), gameRating.getGameStats()
             ));
-            newParticipants.add(new MatchParticipant(match, member, pr.placement()));
+            MatchParticipant newMp = new MatchParticipant(match, member, pr.placement());
+            if (pr.scoresJson() != null) {
+                newMp.updateScoresJson(pr.scoresJson());
+            }
+            newParticipants.add(newMp);
         }
 
         glicko2Calculator.calculateMultiplayerRatings(calcResults);
