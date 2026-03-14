@@ -11,4 +11,6 @@ public interface MatchRecordRepository extends JpaRepository<MatchRecord, Long> 
     List<MatchRecord> findByRoomIdOrderByPlayedAtDesc(Long roomId);
 
     List<MatchRecord> findByRoomIdAndBoardGameIdOrderByPlayedAtAsc(Long roomId, Long boardGameId);
+
+    void deleteByRoomId(Long roomId);
 }

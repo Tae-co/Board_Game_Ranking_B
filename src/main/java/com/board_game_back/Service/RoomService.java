@@ -6,6 +6,7 @@ import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Entity.RoomMember;
 import com.board_game_back.Repository.BoardGameRepository;
+import com.board_game_back.Repository.MatchRecordRepository;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomMemberRepository;
@@ -26,6 +27,7 @@ public class RoomService {
     private final MemberRepository memberRepository;
     private final PlayerGameRatingRepository playerGameRatingRepository;
     private final BoardGameRepository boardGameRepository;
+    private final MatchRecordRepository matchRecordRepository;
 
     /** 1. 새로운 방 생성 */
     @Transactional
@@ -132,7 +134,10 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
 
-        // PlayerGameRating FK 먼저 삭제
+        // MatchRecord(+MatchParticipant cascade) 먼저 삭제
+        matchRecordRepository.deleteByRoomId(roomId);
+
+        // PlayerGameRating FK 삭제
         playerGameRatingRepository.deleteByRoomId(roomId);
 
         // Room 삭제 (CascadeType.ALL로 RoomMember도 함께 삭제됨)
