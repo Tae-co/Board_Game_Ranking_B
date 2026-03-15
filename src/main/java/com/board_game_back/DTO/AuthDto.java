@@ -30,4 +30,7 @@ public class AuthDto {
 
     // 비밀번호 변경
     public record ChangePasswordRequest(String currentPassword, String newPassword) {}
+
+    // 카카오 소셜 로그인
+    public record KakaoLoginRequest(String kakaoAccessToken) {}
 }

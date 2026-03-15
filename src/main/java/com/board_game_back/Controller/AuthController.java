@@ -83,6 +83,21 @@ public class AuthController {
         ));
     }
 
+    /** 카카오 소셜 로그인 */
+    @PostMapping("/kakao")
+    public ResponseEntity<AuthDto.LoginResponse> kakaoLogin(
+            @RequestBody AuthDto.KakaoLoginRequest request,
+            HttpServletResponse response) {
+        AuthService.LoginResult result = authService.kakaoLogin(request.kakaoAccessToken());
+        setRefreshTokenCookie(response, result.refreshToken());
+        return ResponseEntity.ok(new AuthDto.LoginResponse(
+                result.member().getId(),
+                result.member().getNickname(),
+                result.member().getRole(),
+                result.accessToken()
+        ));
+    }
+
     /** 관리자 로그인 */
     @PostMapping("/admin-login")
     public ResponseEntity<AuthDto.LoginResponse> adminLogin(
