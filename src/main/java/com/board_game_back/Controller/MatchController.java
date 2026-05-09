@@ -48,7 +48,11 @@ public class MatchController {
 
     @PostMapping("/admin/recalculate-all")
     public ResponseEntity<String> recalculateAll() {
-        matchService.recalculateAllRatings();
-        return ResponseEntity.ok("재계산 완료");
+        try {
+            matchService.recalculateAllRatings();
+            return ResponseEntity.ok("재계산 완료");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("재계산 실패: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+        }
     }
 }

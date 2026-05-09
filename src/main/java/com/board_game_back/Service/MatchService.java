@@ -306,8 +306,8 @@ public class MatchService {
     public void recalculateAllRatings() {
         List<Object[]> pairs = matchRecordRepository.findDistinctRoomBoardGamePairs();
         for (Object[] pair : pairs) {
-            Long roomId = (Long) pair[0];
-            Long boardGameId = (Long) pair[1];
+            Long roomId = ((Number) pair[0]).longValue();
+            Long boardGameId = ((Number) pair[1]).longValue();
             recalculateRatings(roomId, boardGameId);
         }
     }
