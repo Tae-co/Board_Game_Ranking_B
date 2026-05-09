@@ -1,81 +1,71 @@
 package com.board_game_back.Service;
 
 import com.board_game_back.Entity.GlickoStats;
-import com.board_game_back.Utils.Rating;
-import com.board_game_back.Utils.RatingCalculator;
-import com.board_game_back.Utils.RatingPeriodResults;
+import de.gesundkrank.jskills.GameInfo;
+import de.gesundkrank.jskills.IPlayer;
+import de.gesundkrank.jskills.ITeam;
+import de.gesundkrank.jskills.Player;
+import de.gesundkrank.jskills.Rating;
+import de.gesundkrank.jskills.Team;
+import de.gesundkrank.jskills.TrueSkillCalculator;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 @Component
 public class Glicko2Calculator {
 
-    // 다인원 매치 결과를 받아 각 플레이어의 새로운 스탯을 계산
+    // μ₀=25, σ₀=25/3, β=25/6, τ=25/300, drawProbability=0
+    private static final GameInfo GAME_INFO =
+        new GameInfo(25.0, 25.0 / 3, 25.0 / 6, 25.0 / 300, 0.0);
+
     public void calculateMultiplayerRatings(List<PlayerResult> results) {
+        // 등수 오름차순 정렬 (jskills는 1등 팀부터)
+        List<PlayerResult> sorted = results.stream()
+            .sorted(Comparator.comparingInt(r -> r.placement))
+            .collect(Collectors.toList());
 
-        // 1. Glicko-2 수학 계산기 세팅 (변동성 0.06, 시스템 상수 Tau 0.5가 기본값입니다)
-        RatingCalculator calculator = new RatingCalculator(0.06, 0.5);
-        RatingPeriodResults engineResults = new RatingPeriodResults();
+        List<ITeam> teams = new ArrayList<>();
+        int[] ranks = new int[sorted.size()];
 
-        // 2. 우리 DB의 GlickoStats 데이터를 라이브러리 전용 'Rating' 객체로 변환
-        Map<Long, Rating> ratingMap = new HashMap<>();
-
-        for (PlayerResult pr : results) {
-            // (이름, 계산기, 현재 Rating, 현재 RD, 현재 Volatility)
-            Rating rating = new Rating(
-                pr.memberId.toString(),
-                calculator,
+        for (int i = 0; i < sorted.size(); i++) {
+            PlayerResult pr = sorted.get(i);
+            Rating tsRating = new Rating(
                 pr.currentStats.getRating(),
-                pr.currentStats.getRatingDeviation(),
-                pr.currentStats.getVolatility()
+                pr.currentStats.getRatingDeviation()
             );
-            ratingMap.put(pr.memberId, rating);
+            Team team = new Team(new Player<>(pr.memberId), tsRating);
+            teams.add(team);
+            ranks[i] = pr.placement; // 동점 → 같은 숫자 = 무승부 처리
         }
 
-        // 3. 모든 플레이어를 서로 1대1 매칭시켜서 라이브러리 결과 바구니(engineResults)에 담기
-        for (int i = 0; i < results.size(); i++) {
-            for (int j = i + 1; j < results.size(); j++) {
-                PlayerResult p1 = results.get(i);
-                PlayerResult p2 = results.get(j);
+        Map<IPlayer, Rating> newRatings =
+            TrueSkillCalculator.calculateNewRatings(GAME_INFO, teams, ranks);
 
-                Rating rating1 = ratingMap.get(p1.memberId);
-                Rating rating2 = ratingMap.get(p2.memberId);
-
-                // 등수를 비교하여 라이브러리에 승/무/패 입력
-                if (p1.placement < p2.placement) {
-                    engineResults.addResult(rating1, rating2); // p1 승리
-                } else if (p1.placement > p2.placement) {
-                    engineResults.addResult(rating2, rating1); // p2 승리
-                } else {
-                    engineResults.addDraw(rating1, rating2);   // 동점 (무승부)
-                }
-            }
+        // memberId → 새 Rating 매핑
+        Map<Long, Rating> resultMap = new HashMap<>();
+        for (Map.Entry<IPlayer, Rating> entry : newRatings.entrySet()) {
+            @SuppressWarnings("unchecked")
+            Long memberId = ((Player<Long>) entry.getKey()).getId();
+            resultMap.put(memberId, entry.getValue());
         }
 
-        // 4. 🚀 수학 엔진 가동! (알아서 복잡한 공식을 돌려 점수를 재계산함)
-        calculator.updateRatings(engineResults);
-
-        // 5. 계산이 끝난 새로운 점수를 다시 우리의 DTO(PlayerResult)에 저장
         for (PlayerResult pr : results) {
-            Rating updatedRating = ratingMap.get(pr.memberId);
-
-            pr.newStats = new GlickoStats(
-                updatedRating.getRating(),
-                updatedRating.getRatingDeviation(),
-                updatedRating.getVolatility()
-            );
+            Rating r = resultMap.get(pr.memberId);
+            pr.newStats = new GlickoStats(r.getMean(), r.getStandardDeviation(), 0.0);
         }
     }
 
-    // 계산을 위해 임시로 사용할 내부 DTO
     public static class PlayerResult {
 
         public Long memberId;
         public int placement;
-        public GlickoStats currentStats; // 현재 스탯
-        public GlickoStats newStats;     // 계산 완료 후 적용될 스탯
+        public GlickoStats currentStats;
+        public GlickoStats newStats;
 
         public PlayerResult(Long memberId, int placement, GlickoStats currentStats) {
             this.memberId = memberId;

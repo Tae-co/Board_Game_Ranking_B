@@ -61,7 +61,7 @@ public class MemberController {
             new MemberDto.ProfileResponse(
                 member.getId(),
                 member.getNickname(),
-                member.getOverallStats().getRating(),
+                member.getOverallStats().getDisplayScore(),
                 member.getOverallStats().getRatingDeviation(),
                 member.getProfileImage()
             )

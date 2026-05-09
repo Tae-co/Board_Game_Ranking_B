@@ -45,4 +45,10 @@ public class MatchController {
         matchService.deleteMatch(matchId, requesterId);
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/admin/recalculate-all")
+    public ResponseEntity<String> recalculateAll() {
+        matchService.recalculateAllRatings();
+        return ResponseEntity.ok("재계산 완료");
+    }
 }

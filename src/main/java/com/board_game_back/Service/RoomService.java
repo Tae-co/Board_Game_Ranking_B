@@ -287,8 +287,10 @@ public class RoomService {
             throw new IllegalStateException("매치 기록이 있는 멤버의 점수는 수정할 수 없습니다.");
         }
 
-        // 4. LP 업데이트
-        pgr.updateInitialRating(rating);
+        // 4. LP 업데이트 — 입력값은 display score, μ로 역산: μ = (display - 1500) / 50 + 3σ
+        double currentSigma = pgr.getGameStats().getRatingDeviation();
+        double newMu = (rating - 1500.0) / 50.0 + 3 * currentSigma;
+        pgr.updateInitialRating(newMu);
         playerGameRatingRepository.save(pgr);
     }
 }

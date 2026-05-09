@@ -89,15 +89,15 @@ public class MatchService {
             PlayerGameRating gameRating = gameRatings.get(i);
             Member member = participant.getMember();
 
-            double ratingChange =
-                calcResult.newStats.getRating() - gameRating.getGameStats().getRating();
+            double ratingChange = calcResult.newStats.getDisplayScore()
+                - gameRating.getGameStats().getDisplayScore();
             participant.updateRatingChange(ratingChange);
 
-            double newRating = calcResult.newStats.getRating();
+            double newMu = calcResult.newStats.getRating();
             gameRating.getGameStats().update(
-                newRating,
+                newMu,
                 calcResult.newStats.getRatingDeviation(),
-                calcResult.newStats.getVolatility()
+                0.0
             );
             gameRating.addPlayCount();
 
@@ -107,10 +107,10 @@ public class MatchService {
                 gameRating.addLoseCount();
             }
 
-            if (newRating > member.getOverallStats().getRating()) {
-                member.getOverallStats().update(newRating,
+            if (newMu > member.getOverallStats().getRating()) {
+                member.getOverallStats().update(newMu,
                     calcResult.newStats.getRatingDeviation(),
-                    calcResult.newStats.getVolatility());
+                    0.0);
                 memberRepository.save(member);
             }
 
@@ -256,13 +256,14 @@ public class MatchService {
                 Long memberId = mp.getMember().getId();
                 PlayerGameRating gr = ratingByMemberId.get(memberId);
 
-                double ratingChange = result.newStats.getRating() - gr.getGameStats().getRating();
+                double ratingChange = result.newStats.getDisplayScore()
+                    - gr.getGameStats().getDisplayScore();
                 mp.updateRatingChange(ratingChange);
 
                 gr.getGameStats().update(
                     result.newStats.getRating(),
                     result.newStats.getRatingDeviation(),
-                    result.newStats.getVolatility()
+                    0.0
                 );
                 gr.addPlayCount();
                 if (mp.getPlacement() == 1) {
@@ -285,18 +286,29 @@ public class MatchService {
             ratingRepository.deleteAll(leftMemberRatings);
         }
 
-        // member.overallStats를 해당 멤버의 전체 최고 rating으로 갱신
+        // member.overallStats를 display score 기준 최고 게임의 μ/σ로 갱신
         for (PlayerGameRating gr : ratingByMemberId.values()) {
             Member member = gr.getMember();
-            double memberMaxRating = ratingRepository.findPlayedByMemberId(member.getId())
+            ratingRepository.findPlayedByMemberId(member.getId())
                 .stream()
-                .mapToDouble(r -> r.getGameStats().getRating())
-                .max()
-                .orElse(1500.0);
-            member.getOverallStats().update(memberMaxRating,
-                member.getOverallStats().getRatingDeviation(),
-                member.getOverallStats().getVolatility());
-            memberRepository.save(member);
+                .max(Comparator.comparingDouble(r -> r.getGameStats().getDisplayScore()))
+                .ifPresent(best -> {
+                    member.getOverallStats().update(
+                        best.getGameStats().getRating(),
+                        best.getGameStats().getRatingDeviation(),
+                        0.0);
+                    memberRepository.save(member);
+                });
+        }
+    }
+
+    @Transactional
+    public void recalculateAllRatings() {
+        List<Object[]> pairs = matchRecordRepository.findDistinctRoomBoardGamePairs();
+        for (Object[] pair : pairs) {
+            Long roomId = (Long) pair[0];
+            Long boardGameId = (Long) pair[1];
+            recalculateRatings(roomId, boardGameId);
         }
     }
 }
