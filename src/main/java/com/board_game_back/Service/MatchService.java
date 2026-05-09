@@ -248,6 +248,8 @@ public class MatchService {
                 ));
             }
 
+            if (calcResults.size() < 2) continue;
+
             glicko2Calculator.calculateMultiplayerRatings(calcResults);
 
             for (int i = 0; i < participants.size(); i++) {
