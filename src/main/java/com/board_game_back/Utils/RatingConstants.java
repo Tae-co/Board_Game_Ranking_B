@@ -9,7 +9,8 @@ public final class RatingConstants {
     // TrueSkill GameInfo parameters
     public static final double BETA = 25.0 / 6.0;
     public static final double DYNAMICS = 25.0 / 300.0;
-    public static final double DRAW_PROBABILITY = 0.0;
+    // 0.0이면 동점 시 TrueSkill이 NaN을 반환하므로 소수값으로 설정
+    public static final double DRAW_PROBABILITY = 0.1;
 
     // displayScore = (μ - 3σ) × 50 + 1500
     public static final double DISPLAY_SCALE = 50.0;
