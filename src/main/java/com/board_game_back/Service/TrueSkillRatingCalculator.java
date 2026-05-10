@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 @Component
-public class Glicko2Calculator implements RatingCalculator {
+public class TrueSkillRatingCalculator implements RatingCalculator {
 
     private static final GameInfo GAME_INFO = new GameInfo(
         RatingConstants.INITIAL_MU,
