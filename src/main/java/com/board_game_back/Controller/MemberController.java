@@ -6,7 +6,6 @@ import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Service.RoomService;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -51,31 +50,15 @@ public class MemberController {
     }
 
     @GetMapping("/{memberId}")
-    @Transactional(readOnly = true)
     public ResponseEntity<?> getMember(@PathVariable Long memberId) {
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 멤버입니다."));
-
-        List<PlayerGameRating> played = playerGameRatingRepository.findPlayedByMemberId(memberId);
-
-        // 게임별 최고 displayScore — 플레이한 적 없으면 overall 기본값 사용
-        PlayerGameRating best = played.stream()
-            .max(Comparator.comparingDouble(r -> r.getGameStats().getDisplayScore()))
-            .orElse(null);
-
-        double displayScore = best != null
-            ? best.getGameStats().getDisplayScore()
-            : member.getOverallStats().getDisplayScore();
-        double rd = best != null
-            ? best.getGameStats().getRatingDeviation()
-            : member.getOverallStats().getRatingDeviation();
-
         return ResponseEntity.ok(
             new MemberDto.ProfileResponse(
                 member.getId(),
                 member.getNickname(),
-                displayScore,
-                rd,
+                member.getBestDisplayScore(),
+                member.getOverallStats().getRatingDeviation(),
                 member.getProfileImage()
             )
         );
