@@ -34,7 +34,8 @@ public class GlickoStats {
 
     // (μ - 3σ) × 50 + 1500 — 신규=1500, 범위 약 1250~2800
     public double getDisplayScore() {
-        return (rating - RatingConstants.DISPLAY_SIGMA_FACTOR * ratingDeviation)
+        double score = (rating - RatingConstants.DISPLAY_SIGMA_FACTOR * ratingDeviation)
             * RatingConstants.DISPLAY_SCALE + RatingConstants.DISPLAY_OFFSET;
+        return Double.isNaN(score) ? RatingConstants.DISPLAY_OFFSET : score;
     }
 }
