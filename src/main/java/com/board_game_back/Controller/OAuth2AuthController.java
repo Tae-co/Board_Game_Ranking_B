@@ -1,8 +1,8 @@
 package com.board_game_back.Controller;
 
 import com.board_game_back.Entity.Member;
-import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Security.JwtTokenProvider;
+import com.board_game_back.Service.AuthService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -14,7 +14,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +27,7 @@ import org.springframework.web.client.RestTemplate;
 @RequiredArgsConstructor
 public class OAuth2AuthController {
 
-    private final MemberRepository memberRepository;
+    private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
 
     @Value("${GOOGLE_CLIENT_ID:}")
@@ -39,6 +38,9 @@ public class OAuth2AuthController {
 
     @Value("${KAKAO_REST_API_KEY:}")
     private String kakaoRestApiKey;
+
+    @Value("${KAKAO_CLIENT_SECRET:}")
+    private String kakaoClientSecret;
 
     @Value("${FRONTEND_URL:https://boardup.pages.dev}")
     private String frontendUrl;
@@ -66,119 +68,147 @@ public class OAuth2AuthController {
         response.sendRedirect(url);
     }
 
-    /** 구글 OAuth2 콜백 */
+    /** 구글 OAuth2 콜백 (웹) */
     @GetMapping("/google/callback")
     @SuppressWarnings({"rawtypes", "unchecked"})
     public void googleCallback(@RequestParam String code, HttpServletResponse response) throws IOException {
         try {
-            RestTemplate restTemplate = new RestTemplate();
-            String redirectUri = backendUrl + "/api/auth/google/callback";
-
-            // 1. 토큰 교환
-            MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-            params.add("grant_type", "authorization_code");
-            params.add("client_id", googleClientId);
-            params.add("client_secret", googleClientSecret);
-            params.add("redirect_uri", redirectUri);
-            params.add("code", code);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-            ResponseEntity<Map> tokenResponse = restTemplate.postForEntity(
-                    GOOGLE_TOKEN_URL, new HttpEntity<>(params, headers), Map.class);
-            String accessToken = (String) tokenResponse.getBody().get("access_token");
-
-            // 2. 사용자 정보 조회
-            HttpHeaders userHeaders = new HttpHeaders();
-            userHeaders.setBearerAuth(accessToken);
-            ResponseEntity<Map> userResponse = restTemplate.exchange(
-                    GOOGLE_USER_URL, HttpMethod.GET, new HttpEntity<>(userHeaders), Map.class);
-            Map<String, Object> userBody = userResponse.getBody();
-
+            Map<String, Object> userBody = fetchGoogleUser(code, backendUrl + "/api/auth/google/callback");
             String socialId = "GOOGLE_" + userBody.get("sub");
             String nickname = (String) userBody.getOrDefault("name", "구글유저");
-
-            redirectWithToken(response, socialId, nickname);
+            redirectWithToken(response, socialId, nickname, false);
         } catch (Exception e) {
             response.sendRedirect(frontendUrl + "/login?error=google");
         }
     }
 
+    /** 네이티브 앱용 구글 로그인 */
+    @GetMapping("/google/native/login")
+    public void googleNativeLogin(HttpServletResponse response) throws IOException {
+        String redirectUri = backendUrl + "/api/auth/google/native/callback";
+        String url = GOOGLE_AUTH_URL
+                + "?client_id=" + googleClientId
+                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + "&response_type=code"
+                + "&scope=profile+email";
+        response.sendRedirect(url);
+    }
+
+    /** 네이티브 앱용 구글 OAuth2 콜백 → yadarank:// 딥링크로 리다이렉트 */
+    @GetMapping("/google/native/callback")
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public void googleNativeCallback(@RequestParam String code, HttpServletResponse response) throws IOException {
+        try {
+            Map<String, Object> userBody = fetchGoogleUser(code, backendUrl + "/api/auth/google/native/callback");
+            String socialId = "GOOGLE_" + userBody.get("sub");
+            String nickname = (String) userBody.getOrDefault("name", "구글유저");
+            redirectWithToken(response, socialId, nickname, true);
+        } catch (Exception e) {
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            response.sendRedirect(frontendUrl + "/login?error=google&msg=" + URLEncoder.encode(msg, StandardCharsets.UTF_8));
+        }
+    }
+
 
     /** 카카오 인증 페이지로 리다이렉트 */
+    /** 웹용 카카오 로그인 */
     @GetMapping("/kakao/login")
-    public void kakaoLogin(
-            @RequestParam(defaultValue = "web") String platform,
-            HttpServletResponse response) throws IOException {
+    public void kakaoLogin(HttpServletResponse response) throws IOException {
         String redirectUri = backendUrl + "/api/auth/kakao/callback";
         String url = KAKAO_AUTH_URL
                 + "?client_id=" + kakaoRestApiKey
                 + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
-                + "&response_type=code"
-                + "&state=" + platform;
+                + "&response_type=code";
         response.sendRedirect(url);
     }
 
-    /** 카카오 OAuth2 콜백 */
+    /** 네이티브 앱용 카카오 로그인 → 항상 yadarank:// 딥링크로 리다이렉트 */
+    @GetMapping("/kakao/native/login")
+    public void kakaoNativeLogin(HttpServletResponse response) throws IOException {
+        String redirectUri = backendUrl + "/api/auth/kakao/native/callback";
+        String url = KAKAO_AUTH_URL
+                + "?client_id=" + kakaoRestApiKey
+                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + "&response_type=code";
+        response.sendRedirect(url);
+    }
+
+    /** 웹용 카카오 OAuth2 콜백 */
     @GetMapping("/kakao/callback")
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public void kakaoCallback(
-            @RequestParam String code,
-            @RequestParam(defaultValue = "web") String state,
-            HttpServletResponse response) throws IOException {
+    public void kakaoCallback(@RequestParam String code, HttpServletResponse response) throws IOException {
         try {
-            RestTemplate restTemplate = new RestTemplate();
-            String redirectUri = backendUrl + "/api/auth/kakao/callback";
-
-            MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-            params.add("grant_type", "authorization_code");
-            params.add("client_id", kakaoRestApiKey);
-            params.add("redirect_uri", redirectUri);
-            params.add("code", code);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-            ResponseEntity<Map> tokenResponse = restTemplate.postForEntity(
-                    KAKAO_TOKEN_URL, new HttpEntity<>(params, headers), Map.class);
-            String accessToken = (String) tokenResponse.getBody().get("access_token");
-
-            HttpHeaders userHeaders = new HttpHeaders();
-            userHeaders.setBearerAuth(accessToken);
-            ResponseEntity<Map> userResponse = restTemplate.exchange(
-                    KAKAO_USER_URL, HttpMethod.GET, new HttpEntity<>(userHeaders), Map.class);
-            Map<String, Object> userBody = userResponse.getBody();
-
+            Map<String, Object> userBody = fetchKakaoUser(code, backendUrl + "/api/auth/kakao/callback");
             String socialId = "kakao_" + userBody.get("id");
-            Map<String, Object> kakaoAccount = (Map<String, Object>) userBody.get("kakao_account");
-            Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
-            String nickname = (String) profile.get("nickname");
-
-            boolean isNative = "native".equals(state);
-            redirectWithToken(response, socialId, nickname, isNative);
+            String nickname = extractKakaoNickname(userBody);
+            redirectWithToken(response, socialId, nickname, false);
         } catch (Exception e) {
             response.sendRedirect(frontendUrl + "/login?error=kakao");
         }
     }
 
-    private void redirectWithToken(HttpServletResponse response, String socialId, String nickname) throws IOException {
-        redirectWithToken(response, socialId, nickname, false);
+    /** 네이티브 앱용 카카오 OAuth2 콜백 → yadarank:// 딥링크로 리다이렉트 */
+    @GetMapping("/kakao/native/callback")
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public void kakaoNativeCallback(@RequestParam String code, HttpServletResponse response) throws IOException {
+        try {
+            Map<String, Object> userBody = fetchKakaoUser(code, backendUrl + "/api/auth/kakao/native/callback");
+            String socialId = "kakao_" + userBody.get("id");
+            String nickname = extractKakaoNickname(userBody);
+            redirectWithToken(response, socialId, nickname, true);
+        } catch (Exception e) {
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            response.sendRedirect(frontendUrl + "/login?error=kakao&msg=" + URLEncoder.encode(msg, StandardCharsets.UTF_8));
+        }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private Map<String, Object> fetchGoogleUser(String code, String redirectUri) {
+        RestTemplate restTemplate = new RestTemplate();
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("grant_type", "authorization_code");
+        params.add("client_id", googleClientId);
+        params.add("client_secret", googleClientSecret);
+        params.add("redirect_uri", redirectUri);
+        params.add("code", code);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        Map tokenBody = restTemplate.postForEntity(GOOGLE_TOKEN_URL, new HttpEntity<>(params, headers), Map.class).getBody();
+        String accessToken = (String) tokenBody.get("access_token");
+        HttpHeaders userHeaders = new HttpHeaders();
+        userHeaders.setBearerAuth(accessToken);
+        return restTemplate.exchange(GOOGLE_USER_URL, HttpMethod.GET, new HttpEntity<>(userHeaders), Map.class).getBody();
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private Map<String, Object> fetchKakaoUser(String code, String redirectUri) {
+        RestTemplate restTemplate = new RestTemplate();
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("grant_type", "authorization_code");
+        params.add("client_id", kakaoRestApiKey);
+        params.add("redirect_uri", redirectUri);
+        params.add("code", code);
+        if (kakaoClientSecret != null && !kakaoClientSecret.isBlank()) {
+            params.add("client_secret", kakaoClientSecret);
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        Map tokenBody = restTemplate.postForEntity(KAKAO_TOKEN_URL, new HttpEntity<>(params, headers), Map.class).getBody();
+        String accessToken = (String) tokenBody.get("access_token");
+        HttpHeaders userHeaders = new HttpHeaders();
+        userHeaders.setBearerAuth(accessToken);
+        return restTemplate.exchange(KAKAO_USER_URL, HttpMethod.GET, new HttpEntity<>(userHeaders), Map.class).getBody();
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractKakaoNickname(Map<String, Object> userBody) {
+        Map<String, Object> kakaoAccount = (Map<String, Object>) userBody.get("kakao_account");
+        Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
+        return (String) profile.get("nickname");
     }
 
     private void redirectWithToken(HttpServletResponse response, String socialId, String nickname, boolean isNative) throws IOException {
-        Member member = memberRepository.findBySocialId(socialId)
-                .orElseGet(() -> {
-                    String uniqueNickname = nickname;
-                    if (memberRepository.existsByNickname(uniqueNickname)) {
-                        uniqueNickname = nickname + "_" + (System.currentTimeMillis() % 10000);
-                    }
-                    return memberRepository.save(
-                            Member.builder()
-                                    .socialId(socialId)
-                                    .nickname(uniqueNickname)
-                                    .role("USER")
-                                    .build()
-                    );
-                });
+        Member member = authService.findOrCreateOAuthMember(socialId, nickname);
 
         String jwtAccessToken = jwtTokenProvider.generateAccessToken(member.getId(), member.getRole());
         String refreshToken = jwtTokenProvider.generateRefreshToken(member.getId());

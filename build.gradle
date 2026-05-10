@@ -1,7 +1,18 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.flywaydb:flyway-database-postgresql:12.5.0'
+        classpath 'org.postgresql:postgresql:42.7.7'
+    }
+}
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.3'
     id 'io.spring.dependency-management' version '1.1.7'
+    id "org.flywaydb.flyway" version "12.5.0"
 }
 
 group = 'com'
@@ -33,6 +44,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    implementation 'de.gesundkrank.jskills:jskills:1.1'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.h2database:h2'
     runtimeOnly 'org.postgresql:postgresql'
@@ -53,4 +67,11 @@ bootRun {
 
 bootJar {
     archiveFileName = 'app.jar'
+}
+
+flyway {
+    url = System.getenv('SPRING_DATASOURCE_URL') ?: 'jdbc:postgresql://127.0.0.1:54322/postgres'
+    user = System.getenv('SPRING_DATASOURCE_USERNAME') ?: 'postgres'
+    password = System.getenv('SPRING_DATASOURCE_PASSWORD') ?: 'postgres'
+    locations = ['filesystem:src/main/resources/db/migration']
 }

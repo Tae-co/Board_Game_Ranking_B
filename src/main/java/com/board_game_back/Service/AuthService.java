@@ -146,26 +146,27 @@ public class AuthService {
         return new LoginResult(member, accessToken, refreshToken);
     }
 
-    /**
-     * 토스 계정 연동 (추후 토스 로그인 도입 시 사용)
-     * 기존 닉네임 계정에 Toss socialId를 연결한다.
-     */
-    @Transactional
-    public LoginResult linkTossAccount(String nickname, String authorizationCode) {
-        Member member = memberRepository.findByNickname(nickname.trim())
-                .orElseThrow(() -> new IllegalArgumentException("해당 닉네임의 계정을 찾을 수 없습니다."));
-
-        if (member.getSocialId() != null) {
-            throw new IllegalArgumentException("이미 토스 계정과 연동된 닉네임입니다.");
-        }
-
-        // TODO: authorizationCode로 Toss socialId 취득 로직 추가 (토스 로그인 도입 시)
-        throw new UnsupportedOperationException("토스 로그인 도입 후 구현 예정");
-    }
-
     /** 닉네임 중복 체크 */
     public boolean isNicknameAvailable(String nickname) {
         return !memberRepository.existsByNickname(nickname);
+    }
+
+    /** OAuth2 콜백용: socialId로 회원 조회 또는 신규 생성 */
+    @Transactional
+    public Member findOrCreateOAuthMember(String socialId, String nickname) {
+        return memberRepository.findBySocialId(socialId).orElseGet(() -> {
+            String uniqueNickname = nickname;
+            if (memberRepository.existsByNickname(uniqueNickname)) {
+                uniqueNickname = nickname + "_" + (System.currentTimeMillis() % 10000);
+            }
+            return memberRepository.save(
+                Member.builder()
+                    .socialId(socialId)
+                    .nickname(uniqueNickname)
+                    .role("USER")
+                    .build()
+            );
+        });
     }
 
     /** 카카오 소셜 로그인 */

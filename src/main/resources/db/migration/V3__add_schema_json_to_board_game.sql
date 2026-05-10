@@ -1,0 +1,1 @@
+ALTER TABLE board_game ADD COLUMN IF NOT EXISTS schema_json TEXT;

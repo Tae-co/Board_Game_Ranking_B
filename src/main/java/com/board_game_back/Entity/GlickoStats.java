@@ -1,5 +1,6 @@
 package com.board_game_back.Entity;
 
+import com.board_game_back.Utils.RatingConstants;
 import jakarta.persistence.Embeddable;
 import lombok.Getter;
 
@@ -7,12 +8,11 @@ import lombok.Getter;
 @Getter
 public class GlickoStats {
 
-    private double rating = 1500.0;          // 기본 레이팅
-    private double ratingDeviation = 350.0;  // 기본 RD (초기에는 신뢰도가 낮으므로 높게 설정)
-    private double volatility = 0.06;        // 기본 변동성
+    private double rating = RatingConstants.INITIAL_MU;
+    private double ratingDeviation = RatingConstants.INITIAL_SIGMA;
+    private double volatility = RatingConstants.INITIAL_VOLATILITY;
 
-    protected GlickoStats() {
-    } // JPA 기본 생성자 @NoArgsConstructor(access = AccessLevel.PROTECTED)와 같은역할
+    protected GlickoStats() {}
 
     public GlickoStats(double rating, double ratingDeviation, double volatility) {
         this.rating = rating;
@@ -20,18 +20,22 @@ public class GlickoStats {
         this.volatility = volatility;
     }
 
-    // 값 업데이트 메서드
     public void update(double rating, double ratingDeviation, double volatility) {
         this.rating = rating;
         this.ratingDeviation = ratingDeviation;
         this.volatility = volatility;
     }
 
-    // 초기값으로 리셋
     public void reset() {
-        this.rating = 1500.0;
-        this.ratingDeviation = 350.0;
-        this.volatility = 0.06;
+        this.rating = RatingConstants.INITIAL_MU;
+        this.ratingDeviation = RatingConstants.INITIAL_SIGMA;
+        this.volatility = RatingConstants.INITIAL_VOLATILITY;
     }
 
+    // (μ - 3σ) × 50 + 1500 — 신규=1500, 범위 약 1250~2800
+    public double getDisplayScore() {
+        double score = (rating - RatingConstants.DISPLAY_SIGMA_FACTOR * ratingDeviation)
+            * RatingConstants.DISPLAY_SCALE + RatingConstants.DISPLAY_OFFSET;
+        return Double.isNaN(score) ? RatingConstants.DISPLAY_OFFSET : score;
+    }
 }

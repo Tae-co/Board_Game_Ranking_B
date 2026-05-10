@@ -33,7 +33,10 @@ public class SecurityConfig {
             "https://yadarank.com",
             "https://www.yadarank.com",
             "https://my-boardup.apps.tossmini.com",
-            "https://my-boardup.private-apps.tossmini.com"
+            "https://my-boardup.private-apps.tossmini.com",
+            "capacitor://localhost",
+            "http://localhost",
+            "https://localhost"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
@@ -53,19 +56,19 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/auth/kakao/**").permitAll()
-                .requestMatchers("/api/auth/google/**").permitAll()
                 .requestMatchers("/oauth2/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/api/health").permitAll()
                 .requestMatchers("/api/images/**").permitAll()
                 .requestMatchers("/api/games/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/matches/**").authenticated()
-                .requestMatchers(HttpMethod.DELETE, "/api/matches/**").authenticated()
-                .anyRequest().permitAll()
+                .anyRequest().authenticated()
             )
+            .exceptionHandling(e -> e.authenticationEntryPoint(
+                (req, res, ex) -> res.sendError(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")
+            ))
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

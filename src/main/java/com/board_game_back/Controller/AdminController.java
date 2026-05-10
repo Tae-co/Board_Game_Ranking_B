@@ -1,9 +1,10 @@
 package com.board_game_back.Controller;
 
 import com.board_game_back.Entity.BoardGame;
-import com.board_game_back.Entity.Member;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.Service.RoomService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -33,6 +34,7 @@ public class AdminController {
 
     private final BoardGameRepository boardGameRepository;
     private final MemberRepository memberRepository;
+    private final RoomService roomService;
 
     @Value("${supabase.url}")
     private String supabaseUrl;
@@ -54,15 +56,34 @@ public class AdminController {
         return ResponseEntity.ok(boardGameRepository.findAll());
     }
 
+    private void validateSchemaJson(String schemaJson) {
+        if (schemaJson == null || schemaJson.isBlank()) return;
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            Map<?, ?> parsed = mapper.readValue(schemaJson, Map.class);
+            String type = (String) parsed.get("type");
+            if (!List.of("flat", "sectioned").contains(type)) {
+                throw new IllegalArgumentException("유효하지 않은 schema type: " + type);
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("schema_json 파싱 오류: " + e.getMessage());
+        }
+    }
+
     /** 보드게임 추가 */
     @PostMapping("/games")
     public ResponseEntity<BoardGame> addGame(@RequestBody Map<String, Object> body) {
         checkAdmin();
+        String schemaJson = (String) body.get("schemaJson");
+        validateSchemaJson(schemaJson);
         BoardGame game = BoardGame.builder()
                 .name((String) body.get("name"))
                 .imageUrl((String) body.getOrDefault("imageUrl", ""))
                 .minPlayers((int) body.getOrDefault("minPlayers", 2))
                 .maxPlayers((int) body.getOrDefault("maxPlayers", 6))
+                .schemaJson(schemaJson)
                 .build();
         return ResponseEntity.ok(boardGameRepository.save(game));
     }
@@ -74,13 +95,16 @@ public class AdminController {
             @PathVariable Long id,
             @RequestBody Map<String, Object> body) {
         checkAdmin();
+        String schemaJson = (String) body.get("schemaJson");
+        validateSchemaJson(schemaJson);
         BoardGame game = boardGameRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임입니다."));
         game.update(
                 (String) body.get("name"),
                 (String) body.getOrDefault("imageUrl", ""),
                 (int) body.getOrDefault("minPlayers", 2),
-                (int) body.getOrDefault("maxPlayers", 6)
+                (int) body.getOrDefault("maxPlayers", 6),
+                schemaJson
         );
         return ResponseEntity.ok(game);
     }
@@ -95,16 +119,24 @@ public class AdminController {
 
     /** 전체 멤버 목록 */
     @GetMapping("/members")
-    public ResponseEntity<List<Member>> getMembers() {
+    public ResponseEntity<List<Map<String, Object>>> getMembers() {
         checkAdmin();
-        return ResponseEntity.ok(memberRepository.findAll());
+        List<Map<String, Object>> result = memberRepository.findAll().stream()
+            .map(m -> Map.<String, Object>of(
+                "memberId", m.getId(),
+                "nickname", m.getNickname() != null ? m.getNickname() : "",
+                "role", m.getRole() != null ? m.getRole() : "",
+                "phoneNumber", m.getPhoneNumber() != null ? m.getPhoneNumber() : ""
+            ))
+            .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(result);
     }
 
     /** 멤버 삭제 */
     @DeleteMapping("/members/{id}")
     public ResponseEntity<String> deleteMember(@PathVariable Long id) {
         checkAdmin();
-        memberRepository.deleteById(id);
+        roomService.deleteMember(id);
         return ResponseEntity.ok("삭제되었습니다.");
     }
 

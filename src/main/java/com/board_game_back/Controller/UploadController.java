@@ -26,52 +26,64 @@ public class UploadController {
     private String profileBucket;
 
     @PostMapping("/image")
-    public ResponseEntity<Map<String, String>> uploadImage(@RequestParam MultipartFile file) {
+    public ResponseEntity<Map<String, String>> uploadImage(
+            @RequestParam MultipartFile file,
+            @RequestParam(required = false) String oldUrl) {
         try {
-            String filename = UUID.randomUUID() + ".jpg";
-            String uploadUrl = supabaseUrl + "/storage/v1/object/" + bucket + "/" + filename;
-
-            RestTemplate restTemplate = new RestTemplate();
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + serviceRoleKey);
-            headers.setContentType(MediaType.IMAGE_JPEG);
-
-            restTemplate.exchange(
-                uploadUrl,
-                HttpMethod.PUT,
-                new HttpEntity<>(file.getBytes(), headers),
-                String.class
-            );
-
-            String publicUrl = supabaseUrl + "/storage/v1/object/public/" + bucket + "/" + filename;
-            return ResponseEntity.ok(Map.of("url", publicUrl));
+            String url = uploadToSupabase(file.getBytes(), bucket);
+            deleteFromSupabase(oldUrl);
+            return ResponseEntity.ok(Map.of("url", url));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
     }
 
     @PostMapping("/profile-image")
-    public ResponseEntity<Map<String, String>> uploadProfileImage(@RequestParam MultipartFile file) {
+    public ResponseEntity<Map<String, String>> uploadProfileImage(
+            @RequestParam MultipartFile file,
+            @RequestParam(required = false) String oldUrl) {
         try {
-            String filename = UUID.randomUUID() + ".jpg";
-            String uploadUrl = supabaseUrl + "/storage/v1/object/" + profileBucket + "/" + filename;
+            String url = uploadToSupabase(file.getBytes(), profileBucket);
+            deleteFromSupabase(oldUrl);
+            return ResponseEntity.ok(Map.of("url", url));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String uploadToSupabase(byte[] bytes, String targetBucket) {
+        String filename = UUID.randomUUID() + ".jpg";
+        String uploadUrl = supabaseUrl + "/storage/v1/object/" + targetBucket + "/" + filename;
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + serviceRoleKey);
+        headers.setContentType(MediaType.IMAGE_JPEG);
+
+        restTemplate.exchange(uploadUrl, HttpMethod.PUT, new HttpEntity<>(bytes, headers), String.class);
+
+        return supabaseUrl + "/storage/v1/object/public/" + targetBucket + "/" + filename;
+    }
+
+    private void deleteFromSupabase(String publicUrl) {
+        if (publicUrl == null || publicUrl.isBlank()) return;
+        try {
+            String marker = "/storage/v1/object/public/";
+            int idx = publicUrl.indexOf(marker);
+            if (idx == -1) return;
+            String objectPath = publicUrl.substring(idx + marker.length());
 
             RestTemplate restTemplate = new RestTemplate();
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + serviceRoleKey);
-            headers.setContentType(MediaType.IMAGE_JPEG);
-
             restTemplate.exchange(
-                uploadUrl,
-                HttpMethod.PUT,
-                new HttpEntity<>(file.getBytes(), headers),
+                supabaseUrl + "/storage/v1/object/" + objectPath,
+                HttpMethod.DELETE,
+                new HttpEntity<>(headers),
                 String.class
             );
-
-            String publicUrl = supabaseUrl + "/storage/v1/object/public/" + profileBucket + "/" + filename;
-            return ResponseEntity.ok(Map.of("url", publicUrl));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        } catch (Exception ignored) {
+            // 삭제 실패는 무시 — 업로드 성공이 우선
         }
     }
 }

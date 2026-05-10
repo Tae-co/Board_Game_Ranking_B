@@ -25,18 +25,23 @@ public class BoardGame {
     private int minPlayers;
     private int maxPlayers;
 
+    @Column(columnDefinition = "TEXT")
+    private String schemaJson;  // flat/sectioned 타입 점수판 스키마 (JSON)
+
     @Builder
-    public BoardGame(String name, String imageUrl, int minPlayers, int maxPlayers) {
+    public BoardGame(String name, String imageUrl, int minPlayers, int maxPlayers, String schemaJson) {
         this.name = name;
         this.imageUrl = imageUrl;
         this.minPlayers = minPlayers;
         this.maxPlayers = maxPlayers;
+        this.schemaJson = schemaJson;
     }
 
-    public void update(String name, String imageUrl, int minPlayers, int maxPlayers) {
+    public void update(String name, String imageUrl, int minPlayers, int maxPlayers, String schemaJson) {
         this.name = name;
         this.imageUrl = imageUrl;
         this.minPlayers = minPlayers;
         this.maxPlayers = maxPlayers;
+        this.schemaJson = schemaJson;
     }
 }
