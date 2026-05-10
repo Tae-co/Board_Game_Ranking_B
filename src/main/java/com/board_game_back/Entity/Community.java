@@ -8,7 +8,6 @@ import java.util.List;
 
 @Entity
 @Getter
-@Setter
 @NoArgsConstructor
 public class Community {
 
@@ -45,5 +44,15 @@ public class Community {
         this.region = region;
         this.imageUrl = imageUrl;
         this.createdBy = createdBy;
+    }
+
+    public void update(String name, String region, String imageUrl) {
+        if (name != null && !name.isBlank()) this.name = name.trim();
+        if (region != null) this.region = region;
+        if (imageUrl != null) this.imageUrl = imageUrl;
+    }
+
+    public void assignInviteCode(String inviteCode) {
+        this.inviteCode = inviteCode;
     }
 }

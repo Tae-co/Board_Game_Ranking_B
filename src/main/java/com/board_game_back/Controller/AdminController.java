@@ -1,9 +1,9 @@
 package com.board_game_back.Controller;
 
 import com.board_game_back.Entity.BoardGame;
-import com.board_game_back.Entity.Member;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.Service.RoomService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +34,7 @@ public class AdminController {
 
     private final BoardGameRepository boardGameRepository;
     private final MemberRepository memberRepository;
+    private final RoomService roomService;
 
     @Value("${supabase.url}")
     private String supabaseUrl;
@@ -118,16 +119,24 @@ public class AdminController {
 
     /** 전체 멤버 목록 */
     @GetMapping("/members")
-    public ResponseEntity<List<Member>> getMembers() {
+    public ResponseEntity<List<Map<String, Object>>> getMembers() {
         checkAdmin();
-        return ResponseEntity.ok(memberRepository.findAll());
+        List<Map<String, Object>> result = memberRepository.findAll().stream()
+            .map(m -> Map.<String, Object>of(
+                "memberId", m.getId(),
+                "nickname", m.getNickname() != null ? m.getNickname() : "",
+                "role", m.getRole() != null ? m.getRole() : "",
+                "phoneNumber", m.getPhoneNumber() != null ? m.getPhoneNumber() : ""
+            ))
+            .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(result);
     }
 
     /** 멤버 삭제 */
     @DeleteMapping("/members/{id}")
     public ResponseEntity<String> deleteMember(@PathVariable Long id) {
         checkAdmin();
-        memberRepository.deleteById(id);
+        roomService.deleteMember(id);
         return ResponseEntity.ok("삭제되었습니다.");
     }
 

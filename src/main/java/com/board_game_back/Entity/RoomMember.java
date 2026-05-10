@@ -1,6 +1,8 @@
 package com.board_game_back.Entity;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -11,14 +13,13 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Entity
 @Table(uniqueConstraints = @UniqueConstraint(columnNames = {"room_id", "member_id"}))
 @Getter
-@Setter
 @NoArgsConstructor
 public class RoomMember {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -31,11 +32,20 @@ public class RoomMember {
     @JoinColumn(name = "member_id")
     private Member member;
 
-    private String role; // 'OWNER' (방장) 또는 'MEMBER'
+    @Enumerated(EnumType.STRING)
+    private MemberRole role;
 
-    public RoomMember(Room room, Member member, String role) {
+    public RoomMember(Room room, Member member, MemberRole role) {
         this.room = room;
         this.member = member;
         this.role = role;
+    }
+
+    public void promoteToHost() {
+        this.role = MemberRole.HOST;
+    }
+
+    public void demoteToMember() {
+        this.role = MemberRole.MEMBER;
     }
 }

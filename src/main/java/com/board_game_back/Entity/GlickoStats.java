@@ -1,5 +1,6 @@
 package com.board_game_back.Entity;
 
+import com.board_game_back.Utils.RatingConstants;
 import jakarta.persistence.Embeddable;
 import lombok.Getter;
 
@@ -7,12 +8,11 @@ import lombok.Getter;
 @Getter
 public class GlickoStats {
 
-    private double rating = 25.0;                   // μ (TrueSkill mean)
-    private double ratingDeviation = 25.0 / 3;     // σ (TrueSkill std deviation ≈ 8.333)
-    private double volatility = 0.0;               // TrueSkill 미사용
+    private double rating = RatingConstants.INITIAL_MU;
+    private double ratingDeviation = RatingConstants.INITIAL_SIGMA;
+    private double volatility = RatingConstants.INITIAL_VOLATILITY;
 
-    protected GlickoStats() {
-    } // JPA 기본 생성자 @NoArgsConstructor(access = AccessLevel.PROTECTED)와 같은역할
+    protected GlickoStats() {}
 
     public GlickoStats(double rating, double ratingDeviation, double volatility) {
         this.rating = rating;
@@ -20,23 +20,21 @@ public class GlickoStats {
         this.volatility = volatility;
     }
 
-    // 값 업데이트 메서드
     public void update(double rating, double ratingDeviation, double volatility) {
         this.rating = rating;
         this.ratingDeviation = ratingDeviation;
         this.volatility = volatility;
     }
 
-    // 초기값으로 리셋
     public void reset() {
-        this.rating = 25.0;
-        this.ratingDeviation = 25.0 / 3;
-        this.volatility = 0.0;
+        this.rating = RatingConstants.INITIAL_MU;
+        this.ratingDeviation = RatingConstants.INITIAL_SIGMA;
+        this.volatility = RatingConstants.INITIAL_VOLATILITY;
     }
 
     // (μ - 3σ) × 50 + 1500 — 신규=1500, 범위 약 1250~2800
     public double getDisplayScore() {
-        return (rating - 3 * ratingDeviation) * 50 + 1500;
+        return (rating - RatingConstants.DISPLAY_SIGMA_FACTOR * ratingDeviation)
+            * RatingConstants.DISPLAY_SCALE + RatingConstants.DISPLAY_OFFSET;
     }
-
 }
