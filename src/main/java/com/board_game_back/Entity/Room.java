@@ -11,11 +11,9 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Entity
 @Getter
-@Setter
 @NoArgsConstructor
 public class Room {
 
@@ -23,23 +21,46 @@ public class Room {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String name; // 방 이름 (예: '우리 가족', '보드게임 동아리')
+    private String name;
 
     @Column(unique = true)
-    private String inviteCode; // 6자리 랜덤 초대 코드
+    private String inviteCode;
 
-    private Long boardGameId; // 방에 고정된 게임
+    private Long boardGameId;
 
     private Long communityId;
 
     private boolean sessionActive = false;
 
-    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RoomMember> roomMembers = new ArrayList<>();
 
     public Room(String name, String inviteCode, Long boardGameId) {
         this.name = name;
         this.inviteCode = inviteCode;
         this.boardGameId = boardGameId;
+    }
+
+    public void rename(String newName) {
+        if (newName == null || newName.isBlank()) {
+            throw new IllegalArgumentException("방 이름은 비워둘 수 없습니다.");
+        }
+        this.name = newName;
+    }
+
+    public void assignBoardGame(Long boardGameId) {
+        this.boardGameId = boardGameId;
+    }
+
+    public void assignCommunity(Long communityId) {
+        this.communityId = communityId;
+    }
+
+    public void activateSession() {
+        this.sessionActive = true;
+    }
+
+    public void deactivateSession() {
+        this.sessionActive = false;
     }
 }

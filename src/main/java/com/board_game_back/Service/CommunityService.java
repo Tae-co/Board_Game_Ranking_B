@@ -42,13 +42,13 @@ public class CommunityService {
     private final PlayerGameRatingRepository playerGameRatingRepository;
 
     @Transactional
-    public CommunityDto.Response createCommunity(CommunityDto.CreateRequest req) {
+    public CommunityDto.Response createCommunity(CommunityDto.CreateRequest req, Long createdBy) {
         String inviteCode = InviteCodeUtil.generate();
-        Community community = new Community(req.name(), req.region(), req.imageUrl(), req.createdBy());
-        community.setInviteCode(inviteCode);
+        Community community = new Community(req.name(), req.region(), req.imageUrl(), createdBy);
+        community.assignInviteCode(inviteCode);
         communityRepository.save(community);
 
-        Member creator = memberRepository.findById(req.createdBy())
+        Member creator = memberRepository.findById(createdBy)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
 
         communityAdminRepository.save(new CommunityAdmin(community, creator));
@@ -56,7 +56,7 @@ public class CommunityService {
 
         if (req.adminMemberIds() != null) {
             for (Long memberId : req.adminMemberIds()) {
-                if (memberId.equals(req.createdBy())) continue;
+                if (memberId.equals(createdBy)) continue;
                 if (communityAdminRepository.countByCommunityId(community.getId()) >= 5) break;
                 memberRepository.findById(memberId).ifPresent(member -> {
                     communityAdminRepository.save(new CommunityAdmin(community, member));
@@ -147,13 +147,15 @@ public class CommunityService {
     }
 
     @Transactional
-    public CommunityDto.Response updateCommunity(Long communityId, CommunityDto.UpdateRequest req) {
+    public CommunityDto.Response updateCommunity(Long communityId, CommunityDto.UpdateRequest req, Long requesterId) {
         Community community = communityRepository.findById(communityId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
 
-        if (req.name() != null && !req.name().isBlank()) community.setName(req.name().trim());
-        if (req.region() != null) community.setRegion(req.region());
-        if (req.imageUrl() != null) community.setImageUrl(req.imageUrl());
+        if (!communityAdminRepository.existsByCommunityIdAndMemberId(communityId, requesterId)) {
+            throw new SecurityException("커뮤니티 어드민만 수정할 수 있습니다.");
+        }
+
+        community.update(req.name(), req.region(), req.imageUrl());
 
         communityAdminRepository.deleteByCommunityId(communityId);
 
@@ -179,19 +181,25 @@ public class CommunityService {
     }
 
     @Transactional
-    public void addRoomToCommunity(Long communityId, Long roomId) {
+    public void addRoomToCommunity(Long communityId, Long roomId, Long requesterId) {
         communityRepository.findById(communityId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
+        if (!communityAdminRepository.existsByCommunityIdAndMemberId(communityId, requesterId)) {
+            throw new SecurityException("커뮤니티 어드민만 그룹을 연결할 수 있습니다.");
+        }
         Room room = roomRepository.findById(roomId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
-        room.setCommunityId(communityId);
+        room.assignCommunity(communityId);
         roomRepository.save(room);
     }
 
     @Transactional
-    public void deleteCommunity(Long communityId) {
+    public void deleteCommunity(Long communityId, Long requesterId) {
         Community community = communityRepository.findById(communityId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
+        if (!community.getCreatedBy().equals(requesterId)) {
+            throw new SecurityException("커뮤니티 생성자만 삭제할 수 있습니다.");
+        }
         communityAdminRepository.deleteByCommunityId(communityId);
         communityMemberRepository.deleteByCommunityId(communityId);
         communityRepository.delete(community);
@@ -209,9 +217,12 @@ public class CommunityService {
     }
 
     @Transactional
-    public void removeCommunityMember(Long communityId, Long memberId) {
+    public void removeCommunityMember(Long communityId, Long memberId, Long requesterId) {
         communityRepository.findById(communityId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
+        if (!communityAdminRepository.existsByCommunityIdAndMemberId(communityId, requesterId)) {
+            throw new SecurityException("커뮤니티 어드민만 멤버를 제거할 수 있습니다.");
+        }
         communityMemberRepository.findByCommunityIdAndMemberId(communityId, memberId)
             .ifPresent(communityMemberRepository::delete);
         List<Room> rooms = roomRepository.findByCommunityId(communityId);

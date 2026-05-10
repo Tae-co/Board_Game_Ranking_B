@@ -2,21 +2,13 @@ package com.board_game_back.DTO;
 
 public class RoomDto {
 
-    // 방 생성 요청
-    public record CreateRequest(String roomName, Long memberId, Long boardGameId, Long communityId) {
+    public record CreateRequest(String roomName, Long boardGameId, Long communityId) {}
 
-    }
+    public record JoinRequest(String inviteCode) {}
 
-    // 방 가입 요청
-    public record JoinRequest(String inviteCode, Long memberId) {
+    public record Response(Long roomId, String roomName, String inviteCode, Long boardGameId) {}
 
-    }
+    public record UpdateRatingRequest(double rating) {}
 
-    // 방 정보 응답
-    public record Response(Long roomId, String roomName, String inviteCode, Long boardGameId) {
-
-    }
-
-    // 초기 LP 설정 요청
-    public record UpdateRatingRequest(Long requesterId, double rating) {}
+    public record RoomMemberResponse(Long memberId, String nickname, boolean isHost, String profileImage) {}
 }

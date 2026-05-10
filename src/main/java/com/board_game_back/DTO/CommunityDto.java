@@ -8,7 +8,6 @@ public class CommunityDto {
         String name,
         String region,
         String imageUrl,
-        Long createdBy,
         List<Long> adminMemberIds
     ) {}
 
@@ -60,10 +59,7 @@ public class CommunityDto {
         long memberCount
     ) {}
 
-    public record JoinRequest(
-        String inviteCode,
-        Long memberId
-    ) {}
+    public record JoinRequest(String inviteCode) {}
 
     public record MemberInfo(
         Long memberId,

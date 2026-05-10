@@ -2,41 +2,27 @@ package com.board_game_back.DTO;
 
 public class AuthDto {
 
-    // 전화번호 존재 여부 확인
     public record CheckPhoneRequest(String phoneNumber) {}
     public record CheckPhoneResponse(boolean exists) {}
 
-    // OTP 발송
     public record PhoneRequest(String phoneNumber) {}
 
-    // OTP 검증 (신규 회원)
     public record VerifyOtpRequest(String phoneNumber, String otpCode) {}
     public record VerifyOtpResponse(Long memberId) {}
 
-    // 신규 회원 가입 (닉네임 + 비밀번호 설정)
     public record RegisterRequest(Long memberId, String nickname, String password) {}
 
-    // 기존 회원 로그인 (전화번호 + 비밀번호)
     public record LoginRequest(String phoneNumber, String password) {}
 
-    // 로그인 성공 응답
     public record LoginResponse(Long memberId, String nickname, String role, String accessToken, String refreshToken) {}
 
-    // Refresh Token 갱신 요청
     public record RefreshRequest(String refreshToken) {}
 
-    // 관리자 로그인
     public record AdminLoginRequest(String username, String password) {}
 
-    // 토큰 갱신 응답
     public record TokenResponse(String accessToken) {}
 
-    // 카카오 소셜 로그인
     public record KakaoLoginRequest(String kakaoAccessToken) {}
 
-    // 닉네임 로그인 (로그인/회원가입 통합)
     public record NicknameLoginRequest(String nickname) {}
-
-    // 토스 계정 연동 (기존 닉네임 계정 → 토스 계정 연결)
-    public record LinkTossRequest(String nickname, String authorizationCode) {}
 }

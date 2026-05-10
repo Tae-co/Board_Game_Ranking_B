@@ -45,7 +45,7 @@ public class DataInitializer implements ApplicationRunner {
                 do {
                     code = InviteCodeUtil.generate();
                 } while (communityRepository.findByInviteCode(code).isPresent());
-                community.setInviteCode(code);
+                community.assignInviteCode(code);
                 communityRepository.save(community);
                 System.out.println("[DataInitializer] 커뮤니티 '" + community.getName() + "' 초대 코드 생성: " + code);
             }

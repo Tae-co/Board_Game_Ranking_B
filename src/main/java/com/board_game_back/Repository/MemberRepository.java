@@ -7,22 +7,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MemberRepository extends JpaRepository<Member, Long> {
 
-    // 로그인 ID(username)로 유저 찾기
     Optional<Member> findByUsername(String username);
 
-    // 로그인 ID(phoneNumber)로 유저 찾기
     Optional<Member> findByPhoneNumber(String phoneNumber);
 
-    // 소셜 로그인 ID로 유저 찾기
     Optional<Member> findBySocialId(String socialId);
 
-    // 닉네임으로 유저 찾기 (닉네임 로그인용)
     Optional<Member> findByNickname(String nickname);
 
-    // 전체 종합 랭킹(overallRating) 순으로 유저 목록 조회 (리더보드용)
     boolean existsByNickname(String nickname);
-
-    List<Member> findAllByOrderByOverallStatsRatingDesc();
 
     List<Member> findByNicknameContainingIgnoreCase(String nickname);
 }

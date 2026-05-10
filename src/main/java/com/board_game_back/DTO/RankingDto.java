@@ -11,16 +11,5 @@ public class RankingDto {
         int playCount,
         int winCount,
         int loseCount
-    ) {
-
-    }
-
-    // 전체 랭킹 응답 (점수만)
-    public record GlobalRankingResponse(
-        int rank,
-        Long memberId,
-        String nickname,
-        String profileImage,
-        double rating
     ) {}
 }

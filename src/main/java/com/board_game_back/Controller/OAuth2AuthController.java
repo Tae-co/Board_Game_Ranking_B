@@ -1,8 +1,8 @@
 package com.board_game_back.Controller;
 
 import com.board_game_back.Entity.Member;
-import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Security.JwtTokenProvider;
+import com.board_game_back.Service.AuthService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -14,7 +14,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +27,7 @@ import org.springframework.web.client.RestTemplate;
 @RequiredArgsConstructor
 public class OAuth2AuthController {
 
-    private final MemberRepository memberRepository;
+    private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
 
     @Value("${GOOGLE_CLIENT_ID:}")
@@ -208,25 +207,8 @@ public class OAuth2AuthController {
         return (String) profile.get("nickname");
     }
 
-    private void redirectWithToken(HttpServletResponse response, String socialId, String nickname) throws IOException {
-        redirectWithToken(response, socialId, nickname, false);
-    }
-
     private void redirectWithToken(HttpServletResponse response, String socialId, String nickname, boolean isNative) throws IOException {
-        Member member = memberRepository.findBySocialId(socialId)
-                .orElseGet(() -> {
-                    String uniqueNickname = nickname;
-                    if (memberRepository.existsByNickname(uniqueNickname)) {
-                        uniqueNickname = nickname + "_" + (System.currentTimeMillis() % 10000);
-                    }
-                    return memberRepository.save(
-                            Member.builder()
-                                    .socialId(socialId)
-                                    .nickname(uniqueNickname)
-                                    .role("USER")
-                                    .build()
-                    );
-                });
+        Member member = authService.findOrCreateOAuthMember(socialId, nickname);
 
         String jwtAccessToken = jwtTokenProvider.generateAccessToken(member.getId(), member.getRole());
         String refreshToken = jwtTokenProvider.generateRefreshToken(member.getId());
