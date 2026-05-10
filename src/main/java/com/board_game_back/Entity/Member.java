@@ -38,6 +38,9 @@ public class Member {
     @Column(name = "profile_image", columnDefinition = "TEXT")
     private String profileImage;
 
+    @Column(name = "best_display_score")
+    private double bestDisplayScore = 1500.0;
+
     @Embedded
     @AttributeOverrides({
         @AttributeOverride(name = "rating", column = @Column(name = "overall_rating")),
@@ -67,6 +70,20 @@ public class Member {
 
     public void updatePassword(String encodedPassword) {
         this.password = encodedPassword;
+    }
+
+    public void updateBestDisplayScore(double newScore) {
+        if (newScore > this.bestDisplayScore) {
+            this.bestDisplayScore = newScore;
+        }
+    }
+
+    public void setBestDisplayScore(double score) {
+        this.bestDisplayScore = score;
+    }
+
+    public void resetBestDisplayScore() {
+        this.bestDisplayScore = 1500.0;
     }
 
     @Builder

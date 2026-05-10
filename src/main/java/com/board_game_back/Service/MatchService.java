@@ -102,10 +102,17 @@ public class MatchService {
             }
 
             double newMu = calcResult.newStats.getRating();
+            double newDisplayScore = calcResult.newStats.getDisplayScore();
+            boolean memberChanged = false;
             if (newMu > member.getOverallStats().getRating()) {
                 member.getOverallStats().update(newMu, calcResult.newStats.getRatingDeviation(), 0.0);
-                memberRepository.save(member);
+                memberChanged = true;
             }
+            if (newDisplayScore > member.getBestDisplayScore()) {
+                member.updateBestDisplayScore(newDisplayScore);
+                memberChanged = true;
+            }
+            if (memberChanged) memberRepository.save(member);
 
             ratingRepository.save(gameRating);
             responseList.add(new MatchDto.ResultResponse(
@@ -267,16 +274,20 @@ public class MatchService {
 
         for (PlayerGameRating gr : ratingByMemberId.values()) {
             Member member = gr.getMember();
-            ratingRepository.findPlayedByMemberId(member.getId())
-                .stream()
+            List<PlayerGameRating> allPlayed = ratingRepository.findPlayedByMemberId(member.getId());
+            allPlayed.stream()
                 .max(Comparator.comparingDouble(r -> r.getGameStats().getDisplayScore()))
-                .ifPresent(best -> {
-                    member.getOverallStats().update(
-                        best.getGameStats().getRating(),
-                        best.getGameStats().getRatingDeviation(),
-                        0.0);
-                    memberRepository.save(member);
-                });
+                .ifPresentOrElse(
+                    best -> {
+                        member.getOverallStats().update(
+                            best.getGameStats().getRating(),
+                            best.getGameStats().getRatingDeviation(),
+                            0.0);
+                        member.setBestDisplayScore(best.getGameStats().getDisplayScore());
+                    },
+                    member::resetBestDisplayScore
+                );
+            memberRepository.save(member);
         }
     }
 
