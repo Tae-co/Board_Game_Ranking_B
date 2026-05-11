@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -123,8 +124,9 @@ public class CommunityService {
             .map(Room::getBoardGameId)
             .filter(id -> id != null)
             .collect(Collectors.toSet());
-        Map<Long, String> imageUrlByBoardGameId = boardGameRepository.findByIdIn(boardGameIds).stream()
-            .collect(Collectors.toMap(BoardGame::getId, BoardGame::getImageUrl));
+        Map<Long, String> imageUrlByBoardGameId = new HashMap<>();
+        boardGameRepository.findByIdIn(boardGameIds)
+            .forEach(bg -> imageUrlByBoardGameId.put(bg.getId(), bg.getImageUrl()));
 
         List<Long> roomIds = rooms.stream()
             .map(Room::getId)
