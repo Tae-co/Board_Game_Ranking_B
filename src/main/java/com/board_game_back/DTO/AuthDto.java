@@ -25,4 +25,6 @@ public class AuthDto {
     public record KakaoLoginRequest(String kakaoAccessToken) {}
 
     public record NicknameLoginRequest(String nickname) {}
+
+    public record AppleLoginRequest(String identityToken, String nickname) {}
 }

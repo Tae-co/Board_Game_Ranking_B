@@ -3,6 +3,9 @@ package com.board_game_back.Service;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Security.JwtTokenProvider;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -167,6 +170,27 @@ public class AuthService {
                     .build()
             );
         });
+    }
+
+    /** Apple 소셜 로그인 */
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public LoginResult appleLogin(String identityToken, String nickname) {
+        try {
+            String[] parts = identityToken.split("\\.");
+            String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+            Map<String, Object> claims = new ObjectMapper().readValue(payload, Map.class);
+            String sub = (String) claims.get("sub");
+            if (sub == null || sub.isBlank()) throw new IllegalArgumentException("Invalid Apple token");
+            Member member = findOrCreateOAuthMember("APPLE_" + sub, nickname);
+            String accessToken = jwtTokenProvider.generateAccessToken(member.getId(), member.getRole());
+            String refreshToken = jwtTokenProvider.generateRefreshToken(member.getId());
+            return new LoginResult(member, accessToken, refreshToken);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Apple 로그인 처리 중 오류가 발생했습니다.");
+        }
     }
 
     /** 카카오 소셜 로그인 */
