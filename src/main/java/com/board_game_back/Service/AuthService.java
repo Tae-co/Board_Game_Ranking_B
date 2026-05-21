@@ -132,8 +132,8 @@ public class AuthService {
             throw new IllegalArgumentException("닉네임을 입력해주세요.");
         }
         String trimmed = nickname.trim();
-        if (trimmed.length() < 2 || trimmed.length() > 12) {
-            throw new IllegalArgumentException("닉네임은 2~12자 사이여야 합니다.");
+        if (trimmed.length() < 2 || trimmed.length() > 20) {
+            throw new IllegalArgumentException("닉네임은 2~20자 사이여야 합니다.");
         }
 
         Member member = memberRepository.findByNickname(trimmed)

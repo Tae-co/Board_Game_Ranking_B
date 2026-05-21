@@ -119,7 +119,7 @@ public class MemberController {
             @AuthenticationPrincipal Long requesterId) {
         if (!id.equals(requesterId)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         String nickname = body.get("nickname");
-        if (nickname == null || nickname.isBlank() || nickname.length() < 2) {
+        if (nickname == null || nickname.isBlank() || nickname.length() < 2 || nickname.length() > 20) {
             return ResponseEntity.badRequest().build();
         }
         Member member = memberRepository.findById(id)
