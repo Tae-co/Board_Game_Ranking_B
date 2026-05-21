@@ -81,8 +81,8 @@ public class AdminController {
         BoardGame game = BoardGame.builder()
                 .name((String) body.get("name"))
                 .imageUrl((String) body.getOrDefault("imageUrl", ""))
-                .minPlayers((int) body.getOrDefault("minPlayers", 2))
-                .maxPlayers((int) body.getOrDefault("maxPlayers", 6))
+                .minPlayers(((Number) body.getOrDefault("minPlayers", 2)).intValue())
+                .maxPlayers(((Number) body.getOrDefault("maxPlayers", 6)).intValue())
                 .schemaJson(schemaJson)
                 .build();
         return ResponseEntity.ok(boardGameRepository.save(game));
@@ -102,8 +102,8 @@ public class AdminController {
         game.update(
                 (String) body.get("name"),
                 (String) body.getOrDefault("imageUrl", ""),
-                (int) body.getOrDefault("minPlayers", 2),
-                (int) body.getOrDefault("maxPlayers", 6),
+                ((Number) body.getOrDefault("minPlayers", 2)).intValue(),
+                ((Number) body.getOrDefault("maxPlayers", 6)).intValue(),
                 schemaJson
         );
         return ResponseEntity.ok(game);
