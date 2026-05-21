@@ -77,6 +77,14 @@ public class AuthController {
         return ResponseEntity.ok(toLoginResponse(result));
     }
 
+    /** Apple 소셜 로그인 */
+    @PostMapping("/apple")
+    public ResponseEntity<AuthDto.LoginResponse> appleLogin(
+            @RequestBody AuthDto.AppleLoginRequest request) {
+        AuthService.LoginResult result = authService.appleLogin(request.identityToken(), request.nickname());
+        return ResponseEntity.ok(toLoginResponse(result));
+    }
+
     /** 관리자 로그인 */
     @PostMapping("/admin-login")
     public ResponseEntity<AuthDto.LoginResponse> adminLogin(
