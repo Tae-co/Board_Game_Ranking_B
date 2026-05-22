@@ -91,6 +91,7 @@ public class OAuth2AuthController {
                 + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
                 + "&response_type=code"
                 + "&scope=profile+email"
+                + "&prompt=select_account"
                 + "&state=" + URLEncoder.encode(encodeState(returnTo), StandardCharsets.UTF_8);
         response.sendRedirect(url);
     }
@@ -119,7 +120,8 @@ public class OAuth2AuthController {
                 + "?client_id=" + googleClientId
                 + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
                 + "&response_type=code"
-                + "&scope=profile+email";
+                + "&scope=profile+email"
+                + "&prompt=select_account";
         response.sendRedirect(url);
     }
 
