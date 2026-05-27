@@ -15,6 +15,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Getter
@@ -44,7 +45,7 @@ public class Member {
     private double bestDisplayScore = 1500.0;
 
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneId.of("Asia/Seoul")).truncatedTo(ChronoUnit.MINUTES);
 
     @Embedded
     @AttributeOverrides({
