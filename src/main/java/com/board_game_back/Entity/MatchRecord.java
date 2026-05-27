@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AccessLevel;
@@ -44,6 +45,6 @@ public class MatchRecord {
     public MatchRecord(BoardGame boardGame, Room room) {
         this.boardGame = boardGame;
         this.room = room;
-        this.playedAt = LocalDateTime.now();
+        this.playedAt = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
     }
 }
