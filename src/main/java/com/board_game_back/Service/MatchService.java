@@ -136,7 +136,7 @@ public class MatchService {
                 m.getId(),
                 m.getBoardGame().getId(),
                 m.getBoardGame().getName(),
-                m.getPlayedAt().toString(),
+                m.getPlayedAt().toString() + "Z",
                 m.getParticipants().stream()
                     .map(p -> new MatchDto.ParticipantHistoryResponse(
                         p.getMember().getId(),

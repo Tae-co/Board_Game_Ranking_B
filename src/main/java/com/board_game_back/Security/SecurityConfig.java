@@ -32,6 +32,7 @@ public class SecurityConfig {
             "https://boardup.pages.dev",
             "https://yadarank.com",
             "https://www.yadarank.com",
+            "https://app.yadarank.com",
             "https://my-boardup.apps.tossmini.com",
             "https://my-boardup.private-apps.tossmini.com",
             "capacitor://localhost",

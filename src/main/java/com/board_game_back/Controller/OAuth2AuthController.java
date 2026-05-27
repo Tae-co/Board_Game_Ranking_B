@@ -55,7 +55,8 @@ public class OAuth2AuthController {
         "http://localhost:5174",
         "https://boardup.pages.dev",
         "https://yadarank.com",
-        "https://www.yadarank.com"
+        "https://www.yadarank.com",
+        "https://app.yadarank.com"
     );
 
     private String encodeState(String returnTo) {
