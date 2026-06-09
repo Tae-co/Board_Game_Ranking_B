@@ -22,7 +22,7 @@ public class RatingDecayScheduler {
     @Scheduled(cron = "0 0 0 * * MON") // 매주 월요일 자정
     @Transactional
     public void applyWeeklyDecay() {
-        LocalDateTime cutoff = LocalDateTime.now().minusWeeks(1);
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(28);
         List<PlayerGameRating> staleRatings = ratingRepository.findStaleActiveRatings(cutoff);
         for (PlayerGameRating rating : staleRatings) {
             rating.applyDecay(DECAY_MU);
