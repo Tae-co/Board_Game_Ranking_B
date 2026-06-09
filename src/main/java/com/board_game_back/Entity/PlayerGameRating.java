@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -41,8 +42,10 @@ public class PlayerGameRating {
     private GlickoStats gameStats = new GlickoStats(); // 이 게임 전용 Glicko-2 랭킹
 
     private int playCount = 0;
-    private int winCount = 0;   // 추가
-    private int loseCount = 0;  // 추가
+    private int winCount = 0;
+    private int loseCount = 0;
+
+    private LocalDateTime lastPlayedAt;
 
     @Builder
     public PlayerGameRating(Member member, BoardGame boardGame, Room room) {
@@ -63,10 +66,20 @@ public class PlayerGameRating {
         this.loseCount++;
     }
 
+    public void updateLastPlayedAt(LocalDateTime time) {
+        this.lastPlayedAt = time;
+    }
+
+    public void applyDecay(double muDecay) {
+        double newMu = this.gameStats.getRating() - muDecay;
+        this.gameStats.update(newMu, this.gameStats.getRatingDeviation(), this.gameStats.getVolatility());
+    }
+
     public void reset() {
         this.playCount = 0;
         this.winCount = 0;
         this.loseCount = 0;
+        this.lastPlayedAt = null;
         this.gameStats.reset();
     }
 
