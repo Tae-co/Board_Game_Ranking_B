@@ -95,6 +95,7 @@ public class MatchService {
                 0.0
             );
             gameRating.addPlayCount();
+            gameRating.updateLastPlayedAt(matchRecord.getPlayedAt());
             if (participant.getPlacement() == 1) {
                 gameRating.addWinCount();
             } else {
@@ -258,6 +259,7 @@ public class MatchService {
 
                 gr.getGameStats().update(result.newStats.getRating(), result.newStats.getRatingDeviation(), 0.0);
                 gr.addPlayCount();
+                gr.updateLastPlayedAt(match.getPlayedAt());
                 if (mp.getPlacement() == 1) gr.addWinCount();
                 else gr.addLoseCount();
             }
