@@ -39,4 +39,6 @@ public interface PlayerGameRatingRepository extends JpaRepository<PlayerGameRati
 
     @Query("SELECT p FROM PlayerGameRating p WHERE p.playCount > 0 AND (p.lastPlayedAt IS NULL OR p.lastPlayedAt < :cutoff)")
     List<PlayerGameRating> findStaleActiveRatings(@Param("cutoff") LocalDateTime cutoff);
+
+    boolean existsByLastPlayedAtIsNullAndPlayCountGreaterThan(int playCount);
 }
