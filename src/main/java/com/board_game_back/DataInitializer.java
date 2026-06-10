@@ -4,6 +4,8 @@ import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Repository.CommunityRepository;
 import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.Repository.PlayerGameRatingRepository;
+import com.board_game_back.Service.MatchService;
 import com.board_game_back.Utils.InviteCodeUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
@@ -21,6 +23,8 @@ public class DataInitializer implements ApplicationRunner {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final CommunityRepository communityRepository;
+    private final PlayerGameRatingRepository ratingRepository;
+    private final MatchService matchService;
 
     @Override
     @Transactional
@@ -49,6 +53,13 @@ public class DataInitializer implements ApplicationRunner {
                 communityRepository.save(community);
                 System.out.println("[DataInitializer] 커뮤니티 '" + community.getName() + "' 초대 코드 생성: " + code);
             }
+        }
+
+        // play_count > 0인데 last_played_at이 없는 레코드 → 이전 버그로 미반영된 기록 재계산
+        if (ratingRepository.existsByLastPlayedAtIsNullAndPlayCountGreaterThan(0)) {
+            System.out.println("[DataInitializer] 미반영 레이팅 감지 → 전체 재계산 시작");
+            matchService.recalculateAllRatings();
+            System.out.println("[DataInitializer] 레이팅 재계산 완료");
         }
     }
 }
