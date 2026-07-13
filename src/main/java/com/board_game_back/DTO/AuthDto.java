@@ -20,7 +20,7 @@ public class AuthDto {
 
     public record AdminLoginRequest(String username, String password) {}
 
-    public record TokenResponse(String accessToken) {}
+    public record TokenResponse(String accessToken, String refreshToken) {}
 
     public record KakaoLoginRequest(String kakaoAccessToken) {}
 

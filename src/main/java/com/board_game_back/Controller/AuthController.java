@@ -101,8 +101,8 @@ public class AuthController {
             return ResponseEntity.status(401).body("Refresh Token이 없습니다.");
         }
         try {
-            String newAccessToken = authService.refresh(refreshToken);
-            return ResponseEntity.ok(new AuthDto.TokenResponse(newAccessToken));
+            AuthService.TokenPair tokens = authService.refresh(refreshToken);
+            return ResponseEntity.ok(new AuthDto.TokenResponse(tokens.accessToken(), tokens.refreshToken()));
         } catch (Exception e) {
             return ResponseEntity.status(401).body("Refresh Token이 만료되었습니다.");
         }
