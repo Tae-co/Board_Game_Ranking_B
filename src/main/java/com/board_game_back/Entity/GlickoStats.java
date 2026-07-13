@@ -32,7 +32,7 @@ public class GlickoStats {
         this.volatility = RatingConstants.INITIAL_VOLATILITY;
     }
 
-    // (μ - 3σ) × 50 + 1500 — 신규=1500, 범위 약 1250~2800
+    // (μ - 3σ) × 50 + 500 — 신규=500, 범위 약 450~1950
     public double getDisplayScore() {
         double score = (rating - RatingConstants.DISPLAY_SIGMA_FACTOR * ratingDeviation)
             * RatingConstants.DISPLAY_SCALE + RatingConstants.DISPLAY_OFFSET;
