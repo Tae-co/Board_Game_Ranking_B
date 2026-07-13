@@ -31,6 +31,8 @@ public class AuthService {
 
     public record LoginResult(Member member, String accessToken, String refreshToken) {}
 
+    public record TokenPair(String accessToken, String refreshToken) {}
+
     /** 전화번호 존재 여부 확인 */
     public boolean checkPhoneExists(String phoneNumber) {
         return memberRepository.findByPhoneNumber(phoneNumber).isPresent();
@@ -114,15 +116,18 @@ public class AuthService {
         return new LoginResult(admin, accessToken, refreshToken);
     }
 
-    /** Access Token 갱신 */
-    public String refresh(String refreshToken) {
+    /** Access/Refresh Token 갱신 - Refresh Token도 새로 발급해 활성 사용자의 세션 만료를 연장한다 */
+    public TokenPair refresh(String refreshToken) {
         if (!jwtTokenProvider.validateToken(refreshToken)) {
             throw new IllegalArgumentException("유효하지 않은 Refresh Token입니다.");
         }
         Long memberId = jwtTokenProvider.getMemberIdFromToken(refreshToken);
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
-        return jwtTokenProvider.generateAccessToken(member.getId(), member.getRole());
+        return new TokenPair(
+                jwtTokenProvider.generateAccessToken(member.getId(), member.getRole()),
+                jwtTokenProvider.generateRefreshToken(member.getId())
+        );
     }
 
     /** 닉네임 로그인 (로그인/회원가입 통합) */
