@@ -2,6 +2,7 @@ package com.board_game_back.Entity;
 
 import static jakarta.persistence.GenerationType.*;
 
+import com.board_game_back.Utils.RatingConstants;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.AttributeOverrides;
 import jakarta.persistence.Column;
@@ -42,7 +43,7 @@ public class Member {
     private String profileImage;
 
     @Column(name = "best_display_score")
-    private double bestDisplayScore = 1500.0;
+    private double bestDisplayScore = RatingConstants.DISPLAY_OFFSET;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now(ZoneId.of("Asia/Seoul")).truncatedTo(ChronoUnit.MINUTES);
@@ -89,7 +90,7 @@ public class Member {
     }
 
     public void resetBestDisplayScore() {
-        this.bestDisplayScore = 1500.0;
+        this.bestDisplayScore = RatingConstants.DISPLAY_OFFSET;
     }
 
     @Builder

@@ -12,10 +12,10 @@ public final class RatingConstants {
     // 0.0이면 동점 시 TrueSkill이 NaN을 반환하므로 소수값으로 설정
     public static final double DRAW_PROBABILITY = 0.1;
 
-    // displayScore = (μ - 3σ) × 50 + 1500
+    // displayScore = (μ - 3σ) × 50 + 500 — 신규=500, 범위 약 450~1950
     public static final double DISPLAY_SCALE = 50.0;
     public static final double DISPLAY_SIGMA_FACTOR = 3.0;
-    public static final double DISPLAY_OFFSET = 1500.0;
+    public static final double DISPLAY_OFFSET = 500.0;
 
     private RatingConstants() {}
 }

@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import com.board_game_back.Utils.InviteCodeUtil;
+import com.board_game_back.Utils.RatingConstants;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -246,7 +247,9 @@ public class RoomService {
         }
 
         double currentSigma = pgr.getGameStats().getRatingDeviation();
-        double newMu = (rating - 1500.0) / 50.0 + 3 * currentSigma;
+        // getDisplayScore()의 역함수 — 상수가 바뀌면 여기도 함께 따라가야 한다
+        double newMu = (rating - RatingConstants.DISPLAY_OFFSET) / RatingConstants.DISPLAY_SCALE
+            + RatingConstants.DISPLAY_SIGMA_FACTOR * currentSigma;
         pgr.updateInitialRating(newMu);
         playerGameRatingRepository.save(pgr);
     }
