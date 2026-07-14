@@ -4,6 +4,8 @@ import com.board_game_back.DTO.BoardGameDto;
 import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.CommunityAdminRepository;
+import com.board_game_back.Repository.MatchRecordRepository;
+import com.board_game_back.Repository.RoomRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,6 +43,8 @@ public class BoardGameController {
 
     private final BoardGameRepository boardGameRepository;
     private final CommunityAdminRepository communityAdminRepository;
+    private final RoomRepository roomRepository;
+    private final MatchRecordRepository matchRecordRepository;
 
     @Value("${supabase.url}")
     private String supabaseUrl;
@@ -109,6 +114,37 @@ public class BoardGameController {
             .build();
 
         return ResponseEntity.ok(boardGameRepository.save(game));
+    }
+
+    // [DELETE] /api/games/{id} - 커스텀 점수판 삭제 (만든 커뮤니티의 어드민만)
+    // 공식 게임은 지울 수 없고, 이미 방이나 플레이 기록이 붙어 있으면 거절한다.
+    // (Room.boardGameId와 MatchRecord.boardGame이 이 행을 참조하므로 지우면 깨진다)
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteCustomGame(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long id) {
+        if (memberId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+        }
+
+        BoardGame game = boardGameRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 게임입니다."));
+
+        if (game.getCommunityId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기본 제공 게임은 삭제할 수 없습니다.");
+        }
+        if (!communityAdminRepository.existsByCommunityIdAndMemberId(game.getCommunityId(), memberId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "커뮤니티 어드민만 삭제할 수 있습니다.");
+        }
+        if (roomRepository.existsByBoardGameId(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이 점수판을 쓰는 그룹이 있어서 삭제할 수 없습니다.");
+        }
+        if (matchRecordRepository.existsByBoardGameId(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "플레이 기록이 있어서 삭제할 수 없습니다.");
+        }
+
+        boardGameRepository.delete(game);
+        return ResponseEntity.noContent().build();
     }
 
     // [POST] /api/games/upload-image - 커스텀 게임 썸네일 업로드 (커뮤니티 어드민만)

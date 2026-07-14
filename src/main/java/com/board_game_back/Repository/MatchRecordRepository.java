@@ -42,6 +42,8 @@ public interface MatchRecordRepository extends JpaRepository<MatchRecord, Long> 
 
     void deleteByRoomId(Long roomId);
 
+    boolean existsByBoardGameId(Long boardGameId);
+
     @Query("SELECT DISTINCT m.room.id, m.boardGame.id FROM MatchRecord m WHERE m.room IS NOT NULL")
     List<Object[]> findDistinctRoomBoardGamePairs();
 }
