@@ -7,6 +7,7 @@ public class BoardGameDto {
         String name,
         Long communityId,
         String schemaJson,
+        String imageUrl,
         Integer minPlayers,
         Integer maxPlayers
     ) {}

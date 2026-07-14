@@ -7,8 +7,14 @@ import com.board_game_back.Repository.CommunityAdminRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -19,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -32,6 +40,12 @@ public class BoardGameController {
 
     private final BoardGameRepository boardGameRepository;
     private final CommunityAdminRepository communityAdminRepository;
+
+    @Value("${supabase.url}")
+    private String supabaseUrl;
+
+    @Value("${supabase.service-role-key}")
+    private String serviceRoleKey;
 
     // [GET] /api/games - 공식 게임 목록. communityId를 주면 그 커뮤니티의 커스텀 게임도 함께 내려준다.
     @GetMapping
@@ -86,7 +100,7 @@ public class BoardGameController {
 
         BoardGame game = BoardGame.builder()
             .name(name)
-            .imageUrl("")
+            .imageUrl(req.imageUrl() != null ? req.imageUrl() : "")
             .minPlayers(minPlayers)
             .maxPlayers(maxPlayers)
             .schemaJson(req.schemaJson())
@@ -95,6 +109,54 @@ public class BoardGameController {
             .build();
 
         return ResponseEntity.ok(boardGameRepository.save(game));
+    }
+
+    // [POST] /api/games/upload-image - 커스텀 게임 썸네일 업로드 (커뮤니티 어드민만)
+    // 어드민 전용 /api/admin/upload-image는 ROLE_ADMIN을 요구해서 커뮤니티 어드민이 쓸 수 없다.
+    @PostMapping("/upload-image")
+    public ResponseEntity<Map<String, String>> uploadGameImage(
+            @AuthenticationPrincipal Long memberId,
+            @RequestParam MultipartFile file,
+            @RequestParam Long communityId) {
+        if (memberId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+        }
+        if (!communityAdminRepository.existsByCommunityIdAndMemberId(communityId, memberId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "커뮤니티 어드민만 이미지를 올릴 수 있습니다.");
+        }
+
+        // 공개 버킷이므로 실제 이미지인지 확인한다
+        String contentType = file.getContentType();
+        if (file.isEmpty() || contentType == null || !contentType.startsWith("image/")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 파일만 올릴 수 있습니다.");
+        }
+
+        try {
+            String extension = switch (contentType) {
+                case "image/png" -> ".png";
+                case "image/webp" -> ".webp";
+                case "image/gif" -> ".gif";
+                default -> ".jpg";
+            };
+            String filename = UUID.randomUUID() + extension;
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + serviceRoleKey);
+            headers.setContentType(MediaType.parseMediaType(contentType));
+
+            new RestTemplate().exchange(
+                supabaseUrl + "/storage/v1/object/game-images/" + filename,
+                HttpMethod.PUT,
+                new HttpEntity<>(file.getBytes(), headers),
+                String.class
+            );
+
+            return ResponseEntity.ok(Map.of(
+                "url", supabaseUrl + "/storage/v1/object/public/game-images/" + filename
+            ));
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다.");
+        }
     }
 
     /** 사용자가 만드는 점수판은 simple(순위만) / flat(항목별 점수) 두 가지만 허용한다. */
