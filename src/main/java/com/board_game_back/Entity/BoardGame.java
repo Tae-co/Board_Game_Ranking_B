@@ -28,13 +28,19 @@ public class BoardGame {
     @Column(columnDefinition = "TEXT")
     private String schemaJson;  // flat/sectioned 타입 점수판 스키마 (JSON)
 
+    private Long communityId;        // null = 공식 게임(모두에게 보임), 값 있으면 해당 커뮤니티 전용
+    private Long createdByMemberId;  // null = 관리자가 만든 게임
+
     @Builder
-    public BoardGame(String name, String imageUrl, int minPlayers, int maxPlayers, String schemaJson) {
+    public BoardGame(String name, String imageUrl, int minPlayers, int maxPlayers, String schemaJson,
+                     Long communityId, Long createdByMemberId) {
         this.name = name;
         this.imageUrl = imageUrl;
         this.minPlayers = minPlayers;
         this.maxPlayers = maxPlayers;
         this.schemaJson = schemaJson;
+        this.communityId = communityId;
+        this.createdByMemberId = createdByMemberId;
     }
 
     public void update(String name, String imageUrl, int minPlayers, int maxPlayers, String schemaJson) {
