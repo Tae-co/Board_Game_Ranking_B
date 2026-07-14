@@ -63,7 +63,7 @@ public class SecurityConfig {
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/api/health").permitAll()
                 .requestMatchers("/api/images/**").permitAll()
-                .requestMatchers("/api/games/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/games/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )

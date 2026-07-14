@@ -10,6 +10,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -53,15 +54,21 @@ public class BoardGameController {
     }
 
     // [POST] /api/games - 커뮤니티 커스텀 점수판 생성 (커뮤니티 어드민만)
+    // memberId는 JWT 토큰에서 꺼낸다. 본문으로 받으면 남의 memberId를 사칭할 수 있다.
     @PostMapping
-    public ResponseEntity<BoardGame> createCustomGame(@RequestBody BoardGameDto.CreateRequest req) {
+    public ResponseEntity<BoardGame> createCustomGame(
+            @AuthenticationPrincipal Long memberId,
+            @RequestBody BoardGameDto.CreateRequest req) {
+        if (memberId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+        }
         if (req.name() == null || req.name().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "게임 이름을 입력해주세요.");
         }
-        if (req.communityId() == null || req.memberId() == null) {
+        if (req.communityId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "커뮤니티 정보가 필요합니다.");
         }
-        if (!communityAdminRepository.existsByCommunityIdAndMemberId(req.communityId(), req.memberId())) {
+        if (!communityAdminRepository.existsByCommunityIdAndMemberId(req.communityId(), memberId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "커뮤니티 어드민만 점수판을 만들 수 있습니다.");
         }
 
@@ -84,7 +91,7 @@ public class BoardGameController {
             .maxPlayers(maxPlayers)
             .schemaJson(req.schemaJson())
             .communityId(req.communityId())
-            .createdByMemberId(req.memberId())
+            .createdByMemberId(memberId)
             .build();
 
         return ResponseEntity.ok(boardGameRepository.save(game));
