@@ -62,7 +62,7 @@ public class AdminController {
             ObjectMapper mapper = new ObjectMapper();
             Map<?, ?> parsed = mapper.readValue(schemaJson, Map.class);
             String type = (String) parsed.get("type");
-            if (!List.of("flat", "sectioned", "conditional").contains(type)) {
+            if (!List.of("flat", "sectioned", "conditional", "simple").contains(type)) {
                 throw new IllegalArgumentException("유효하지 않은 schema type: " + type);
             }
         } catch (IllegalArgumentException e) {
