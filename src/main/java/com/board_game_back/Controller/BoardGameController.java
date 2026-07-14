@@ -2,6 +2,7 @@ package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.BoardGameDto;
 import com.board_game_back.Entity.BoardGame;
+import com.board_game_back.Entity.Room;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.CommunityAdminRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -40,6 +42,7 @@ public class BoardGameController {
 
     private static final int DEFAULT_MIN_PLAYERS = 2;
     private static final int DEFAULT_MAX_PLAYERS = 8;
+    private static final int MAX_ROOM_NAMES_IN_MESSAGE = 3;
 
     private final BoardGameRepository boardGameRepository;
     private final CommunityAdminRepository communityAdminRepository;
@@ -136,11 +139,15 @@ public class BoardGameController {
         if (!communityAdminRepository.existsByCommunityIdAndMemberId(game.getCommunityId(), memberId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "커뮤니티 어드민만 삭제할 수 있습니다.");
         }
-        if (roomRepository.existsByBoardGameId(id)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이 점수판을 쓰는 그룹이 있어서 삭제할 수 없습니다.");
+        // 어떤 그룹이 쓰고 있는지 이름까지 알려준다. "삭제할 수 없다"만 알려주면
+        // 사용자가 무엇을 해야 하는지 알 수 없다.
+        List<Room> roomsUsingGame = roomRepository.findByBoardGameId(id);
+        if (!roomsUsingGame.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, buildRoomsInUseMessage(roomsUsingGame));
         }
         if (matchRecordRepository.existsByBoardGameId(id)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "플레이 기록이 있어서 삭제할 수 없습니다.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "플레이 기록이 남아 있어 삭제할 수 없어요.");
         }
 
         boardGameRepository.delete(game);
@@ -193,6 +200,19 @@ public class BoardGameController {
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다.");
         }
+    }
+
+    /** "삭제할 수 없다"로 끝내지 않고, 어떤 그룹을 지워야 하는지까지 알려준다. */
+    private String buildRoomsInUseMessage(List<Room> rooms) {
+        int shown = Math.min(rooms.size(), MAX_ROOM_NAMES_IN_MESSAGE);
+        String names = rooms.stream()
+            .limit(shown)
+            .map(room -> "'" + room.getName() + "'")
+            .collect(Collectors.joining(", "));
+        String rest = rooms.size() > shown
+            ? " 외 " + (rooms.size() - shown) + "개"
+            : "";
+        return names + rest + " 그룹에서 사용 중이에요.\n그룹을 먼저 삭제한 뒤 점수판을 삭제해주세요.";
     }
 
     /** 사용자가 만드는 점수판은 simple(순위만) / flat(항목별 점수) 두 가지만 허용한다. */

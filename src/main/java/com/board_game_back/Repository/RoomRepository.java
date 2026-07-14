@@ -12,7 +12,7 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     Optional<Room> findByInviteCode(String inviteCode);
     List<Room> findByCommunityId(Long communityId);
     long countByCommunityId(Long communityId);
-    boolean existsByBoardGameId(Long boardGameId);
+    List<Room> findByBoardGameId(Long boardGameId);
 
     @Query("""
         SELECT r.communityId, COUNT(r)
