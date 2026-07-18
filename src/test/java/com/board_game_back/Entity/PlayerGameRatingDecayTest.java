@@ -62,6 +62,39 @@ class PlayerGameRatingDecayTest {
     }
 
     @Test
+    void getDisplayScore_음수_계산결과는_0으로_clamp된다() {
+        // μ를 크게 낮춰 (μ - 3σ)×50 + 500 < 0 이 되게: (-20-15)*50+500 = -1250
+        rating.getGameStats().update(-20.0, 5.0, 0.0);
+
+        assertThat(rating.getGameStats().getDisplayScore()).isZero();
+    }
+
+    @Test
+    void applyDecay_displayScore가_0_밑으로는_깎이지_않는다() {
+        // μ=8, σ=6 → displayScore = (8-18)*50+500 = 0 (floor)
+        rating.getGameStats().update(8.0, 6.0, 0.0);
+        assertThat(rating.getGameStats().getDisplayScore()).isCloseTo(0.0, within(0.001));
+
+        rating.applyDecay(DECAY_MU);
+        rating.applyDecay(DECAY_MU);
+
+        assertThat(rating.getGameStats().getDisplayScore()).isZero();
+        assertThat(rating.getGameStats().getRating()).isCloseTo(8.0, within(0.001)); // floor μ 유지
+    }
+
+    @Test
+    void applyDecay_이미_0_밑이면_μ를_그대로_둔다() {
+        // 연패로 이미 floor 밑 (μ=5, σ=6 → floorMu=8)
+        rating.getGameStats().update(5.0, 6.0, 0.0);
+        double muBefore = rating.getGameStats().getRating();
+
+        rating.applyDecay(DECAY_MU);
+
+        // 더 깎지도, 끌어올리지도 않는다
+        assertThat(rating.getGameStats().getRating()).isEqualTo(muBefore);
+    }
+
+    @Test
     void updateLastPlayedAt_시간이_저장된다() {
         LocalDateTime now = LocalDateTime.now();
         rating.updateLastPlayedAt(now);
