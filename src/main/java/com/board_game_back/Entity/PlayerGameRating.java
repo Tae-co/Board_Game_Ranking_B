@@ -2,6 +2,7 @@ package com.board_game_back.Entity;
 
 import static jakarta.persistence.GenerationType.*;
 
+import com.board_game_back.Utils.RatingConstants;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -71,8 +72,15 @@ public class PlayerGameRating {
     }
 
     public void applyDecay(double muDecay) {
-        double newMu = this.gameStats.getRating() - muDecay;
-        this.gameStats.update(newMu, this.gameStats.getRatingDeviation(), this.gameStats.getVolatility());
+        double currentMu = this.gameStats.getRating();
+        double sigma = this.gameStats.getRatingDeviation();
+        // 표시 점수 0에 해당하는 μ 하한: (μ - 3σ)×50 + 500 = 0 ⟺ μ = 3σ - 500/50
+        double floorMu = RatingConstants.DISPLAY_SIGMA_FACTOR * sigma
+            - RatingConstants.DISPLAY_OFFSET / RatingConstants.DISPLAY_SCALE;
+        double decayedMu = currentMu - muDecay;
+        // decay는 표시 점수 0 밑으론 깎지 않는다. 이미 0 밑이면(연패 등) 그대로 둔다(끌어올리지 않음).
+        double newMu = decayedMu < floorMu ? Math.min(currentMu, floorMu) : decayedMu;
+        this.gameStats.update(newMu, sigma, this.gameStats.getVolatility());
     }
 
     public void reset() {
