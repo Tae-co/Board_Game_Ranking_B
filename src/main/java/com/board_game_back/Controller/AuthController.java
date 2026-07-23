@@ -21,14 +21,6 @@ public class AuthController {
 
     private final AuthService authService;
 
-    /** 카카오 소셜 로그인 */
-    @PostMapping("/kakao")
-    public ResponseEntity<AuthDto.LoginResponse> kakaoLogin(
-            @RequestBody AuthDto.KakaoLoginRequest request) {
-        AuthService.LoginResult result = authService.kakaoLogin(request.kakaoAccessToken());
-        return ResponseEntity.ok(toLoginResponse(result));
-    }
-
     /** Apple 소셜 로그인 */
     @PostMapping("/apple")
     public ResponseEntity<AuthDto.LoginResponse> appleLogin(

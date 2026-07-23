@@ -9,13 +9,9 @@ import java.util.Base64;
 import java.util.Map;
 import java.util.Random;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
 @Service
 @RequiredArgsConstructor
@@ -104,45 +100,6 @@ public class AuthService {
         } catch (Exception e) {
             throw new IllegalArgumentException("Apple 로그인 처리 중 오류가 발생했습니다.");
         }
-    }
-
-    /** 카카오 소셜 로그인 */
-    @Transactional
-    public LoginResult kakaoLogin(String kakaoAccessToken) {
-        // 1. 카카오 사용자 정보 조회
-        RestTemplate restTemplate = new RestTemplate();
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(kakaoAccessToken);
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> body = restTemplate.exchange(
-                "https://kapi.kakao.com/v2/user/me",
-                HttpMethod.GET, entity, Map.class
-        ).getBody();
-        String socialId = "kakao_" + body.get("id");
-
-        // 카카오 닉네임 추출
-        @SuppressWarnings("unchecked")
-        Map<String, Object> kakaoAccount = (Map<String, Object>) body.get("kakao_account");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
-        String kakaoNickname = (String) profile.get("nickname");
-
-        // 2. socialId로 회원 조회 또는 신규 생성
-        Member member = memberRepository.findBySocialId(socialId).orElseGet(() -> {
-            String nickname = resolveUniqueNickname(kakaoNickname);
-            return memberRepository.save(Member.builder()
-                    .socialId(socialId)
-                    .nickname(nickname)
-                    .role("USER")
-                    .build());
-        });
-
-        // 3. JWT 발급
-        String accessToken = jwtTokenProvider.generateAccessToken(member.getId(), member.getRole());
-        String refreshToken = jwtTokenProvider.generateRefreshToken(member.getId());
-        return new LoginResult(member, accessToken, refreshToken);
     }
 
     /** 닉네임 중복 시 랜덤 숫자 붙여 고유 닉네임 생성 */
