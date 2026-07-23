@@ -2,11 +2,8 @@ package com.board_game_back.Service;
 
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.Security.AppleTokenVerifier;
 import com.board_game_back.Security.JwtTokenProvider;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import java.util.Map;
 import java.util.Random;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,6 +17,7 @@ public class AuthService {
     private final MemberRepository memberRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
+    private final AppleTokenVerifier appleTokenVerifier;
 
     public record LoginResult(Member member, String accessToken, String refreshToken) {}
 
@@ -83,23 +81,12 @@ public class AuthService {
 
     /** Apple 소셜 로그인 */
     @Transactional
-    @SuppressWarnings("unchecked")
     public LoginResult appleLogin(String identityToken, String nickname) {
-        try {
-            String[] parts = identityToken.split("\\.");
-            String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
-            Map<String, Object> claims = new ObjectMapper().readValue(payload, Map.class);
-            String sub = (String) claims.get("sub");
-            if (sub == null || sub.isBlank()) throw new IllegalArgumentException("Invalid Apple token");
-            Member member = findOrCreateOAuthMember("APPLE_" + sub, nickname);
-            String accessToken = jwtTokenProvider.generateAccessToken(member.getId(), member.getRole());
-            String refreshToken = jwtTokenProvider.generateRefreshToken(member.getId());
-            return new LoginResult(member, accessToken, refreshToken);
-        } catch (IllegalArgumentException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Apple 로그인 처리 중 오류가 발생했습니다.");
-        }
+        String sub = appleTokenVerifier.verifyAndGetSub(identityToken);
+        Member member = findOrCreateOAuthMember("APPLE_" + sub, nickname);
+        String accessToken = jwtTokenProvider.generateAccessToken(member.getId(), member.getRole());
+        String refreshToken = jwtTokenProvider.generateRefreshToken(member.getId());
+        return new LoginResult(member, accessToken, refreshToken);
     }
 
     /** 닉네임 중복 시 랜덤 숫자 붙여 고유 닉네임 생성 */
