@@ -14,7 +14,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -27,7 +26,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/members")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class MemberController {
 
     private final MemberRepository memberRepository;
@@ -38,9 +36,12 @@ public class MemberController {
     public ResponseEntity<List<Map<String, Object>>> searchMembers(
         @RequestParam(required = false, defaultValue = "") String nickname,
         @RequestParam(required = false) Long excludeId) {
-        List<Member> source = nickname.isBlank()
-            ? memberRepository.findAll()
-            : memberRepository.findByNicknameContainingIgnoreCase(nickname);
+        // 빈 쿼리로 전체 회원 명부(memberId+nickname)를 덤프하지 못하게 한다.
+        // 검색어가 있어야만 결과를 준다 (닉네임으로 특정 유저를 찾는 용도).
+        if (nickname.isBlank()) {
+            return ResponseEntity.ok(List.of());
+        }
+        List<Member> source = memberRepository.findByNicknameContainingIgnoreCase(nickname);
         List<Map<String, Object>> results = source.stream()
             .filter(m -> excludeId == null || !m.getId().equals(excludeId))
             .limit(100)

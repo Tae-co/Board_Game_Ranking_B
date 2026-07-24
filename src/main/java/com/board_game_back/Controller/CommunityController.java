@@ -12,7 +12,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/communities")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class CommunityController {
 
     private final CommunityService communityService;
