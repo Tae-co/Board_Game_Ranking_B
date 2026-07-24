@@ -11,6 +11,8 @@ import java.util.Base64;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -22,12 +24,15 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class OAuth2AuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(OAuth2AuthController.class);
 
     private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
@@ -109,6 +114,7 @@ public class OAuth2AuthController {
             String nickname = (String) userBody.getOrDefault("name", "구글유저");
             redirectWithToken(response, socialId, nickname, false, resolveFrontendUrl(state));
         } catch (Exception e) {
+            logOAuthError("google", e);
             response.sendRedirect(frontendUrl + "/login?error=google");
         }
     }
@@ -178,6 +184,7 @@ public class OAuth2AuthController {
             String nickname = extractKakaoNickname(userBody);
             redirectWithToken(response, socialId, nickname, false, resolveFrontendUrl(state));
         } catch (Exception e) {
+            logOAuthError("kakao", e);
             response.sendRedirect(frontendUrl + "/login?error=kakao");
         }
     }
@@ -233,6 +240,16 @@ public class OAuth2AuthController {
         HttpHeaders userHeaders = new HttpHeaders();
         userHeaders.setBearerAuth(accessToken);
         return restTemplate.exchange(KAKAO_USER_URL, HttpMethod.GET, new HttpEntity<>(userHeaders), Map.class).getBody();
+    }
+
+    /** OAuth 콜백 실패 원인을 로그로 남긴다. 토큰/사용자정보 요청 실패면 공급자가 준 응답 본문까지 찍는다. */
+    private void logOAuthError(String provider, Exception e) {
+        if (e instanceof HttpStatusCodeException httpEx) {
+            log.error("[OAuth:{}] 콜백 실패 status={} body={}",
+                    provider, httpEx.getStatusCode(), httpEx.getResponseBodyAsString(), e);
+        } else {
+            log.error("[OAuth:{}] 콜백 실패: {}", provider, e.toString(), e);
+        }
     }
 
     @SuppressWarnings("unchecked")
