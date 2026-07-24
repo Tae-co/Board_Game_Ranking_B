@@ -6,7 +6,6 @@ import com.board_game_back.Security.AppleTokenVerifier;
 import com.board_game_back.Security.JwtTokenProvider;
 import java.util.Random;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,31 +15,11 @@ public class AuthService {
 
     private final MemberRepository memberRepository;
     private final JwtTokenProvider jwtTokenProvider;
-    private final PasswordEncoder passwordEncoder;
     private final AppleTokenVerifier appleTokenVerifier;
 
     public record LoginResult(Member member, String accessToken, String refreshToken) {}
 
     public record TokenPair(String accessToken, String refreshToken) {}
-
-    /** 관리자 로그인 */
-    @Transactional(readOnly = true)
-    public LoginResult adminLogin(String username, String password) {
-        Member admin = memberRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("아이디 또는 비밀번호가 틀렸습니다."));
-
-        if (!"ADMIN".equals(admin.getRole())) {
-            throw new IllegalArgumentException("아이디 또는 비밀번호가 틀렸습니다.");
-        }
-
-        if (!passwordEncoder.matches(password, admin.getPassword())) {
-            throw new IllegalArgumentException("아이디 또는 비밀번호가 틀렸습니다.");
-        }
-
-        String accessToken = jwtTokenProvider.generateAccessToken(admin.getId(), admin.getRole());
-        String refreshToken = jwtTokenProvider.generateRefreshToken(admin.getId());
-        return new LoginResult(admin, accessToken, refreshToken);
-    }
 
     /** Access/Refresh Token 갱신 - Refresh Token도 새로 발급해 활성 사용자의 세션 만료를 연장한다 */
     public TokenPair refresh(String refreshToken) {

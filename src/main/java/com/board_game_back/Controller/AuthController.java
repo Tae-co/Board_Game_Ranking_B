@@ -29,14 +29,6 @@ public class AuthController {
         return ResponseEntity.ok(toLoginResponse(result));
     }
 
-    /** 관리자 로그인 */
-    @PostMapping("/admin-login")
-    public ResponseEntity<AuthDto.LoginResponse> adminLogin(
-            @RequestBody AuthDto.AdminLoginRequest request) {
-        AuthService.LoginResult result = authService.adminLogin(request.username(), request.password());
-        return ResponseEntity.ok(toLoginResponse(result));
-    }
-
     /** Access Token 갱신 - body에서 refreshToken 수신 (iOS 쿠키 차단 대응) */
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@RequestBody(required = false) AuthDto.RefreshRequest request) {
