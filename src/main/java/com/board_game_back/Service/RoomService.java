@@ -53,7 +53,7 @@ public class RoomService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "커뮤니티 어드민만 그룹을 만들 수 있습니다.");
         }
 
-        String inviteCode = InviteCodeUtil.generate();
+        String inviteCode = InviteCodeUtil.generateUnique(roomRepository::existsByInviteCode);
         Room room = new Room(roomName, inviteCode, boardGameId);
         if (communityId != null) room.assignCommunity(communityId);
         Room savedRoom = roomRepository.save(room);
