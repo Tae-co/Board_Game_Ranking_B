@@ -75,10 +75,6 @@ public class Member {
         this.socialId = socialId;
     }
 
-    public void updatePassword(String encodedPassword) {
-        this.password = encodedPassword;
-    }
-
     public void updateBestDisplayScore(double newScore) {
         if (newScore > this.bestDisplayScore) {
             this.bestDisplayScore = newScore;

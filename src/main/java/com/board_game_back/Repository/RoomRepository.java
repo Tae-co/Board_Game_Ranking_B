@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface RoomRepository extends JpaRepository<Room, Long> {
     Optional<Room> findByInviteCode(String inviteCode);
+    boolean existsByInviteCode(String inviteCode);
     List<Room> findByCommunityId(Long communityId);
     long countByCommunityId(Long communityId);
     List<Room> findByBoardGameId(Long boardGameId);

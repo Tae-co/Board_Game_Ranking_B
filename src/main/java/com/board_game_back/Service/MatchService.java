@@ -60,6 +60,11 @@ public class MatchService {
             Member member = memberRepository.findById(pr.memberId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
 
+            // 참가자는 반드시 이 방의 멤버여야 한다. 요청자만 검증하면 임의 memberId를
+            // 참가자로 넣어 남의 레이팅을 조작할 수 있으므로 각 참가자도 검증한다. (#17)
+            roomMemberRepository.findByRoomIdAndMemberId(request.roomId(), pr.memberId())
+                .orElseThrow(() -> new SecurityException("방 멤버가 아닌 참가자는 등록할 수 없습니다."));
+
             PlayerGameRating gameRating = ratingRepository.findByMemberAndBoardGameAndRoom(member, game, room)
                 .orElseGet(() -> ratingRepository.save(
                     PlayerGameRating.builder().member(member).boardGame(game).room(room).build()
