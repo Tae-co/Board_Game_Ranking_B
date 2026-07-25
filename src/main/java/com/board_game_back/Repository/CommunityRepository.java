@@ -9,4 +9,5 @@ public interface CommunityRepository extends JpaRepository<Community, Long> {
     Optional<Community> findByCreatedBy(Long memberId);
     List<Community> findAllByCreatedBy(Long memberId);
     Optional<Community> findByInviteCode(String inviteCode);
+    boolean existsByInviteCode(String inviteCode);
 }

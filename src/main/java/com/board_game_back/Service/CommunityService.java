@@ -44,7 +44,7 @@ public class CommunityService {
 
     @Transactional
     public CommunityDto.Response createCommunity(CommunityDto.CreateRequest req, Long createdBy) {
-        String inviteCode = InviteCodeUtil.generate();
+        String inviteCode = InviteCodeUtil.generateUnique(communityRepository::existsByInviteCode);
         Community community = new Community(req.name(), req.region(), req.imageUrl(), createdBy);
         community.assignInviteCode(inviteCode);
         communityRepository.save(community);
