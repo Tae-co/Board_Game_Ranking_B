@@ -274,15 +274,22 @@ public class OAuth2AuthController {
         String jwtAccessToken = jwtTokenProvider.generateAccessToken(member.getId(), member.getRole());
         String refreshToken = jwtTokenProvider.generateRefreshToken(member.getId());
 
-        // 토큰을 URL에 싣지 않는다(#12). 1회용 code만 넘기고, 프론트가 code를 교환해 토큰을 받는다.
-        String code = oauthCodeStore.issue(new OAuthCodeStore.TokenBundle(
-                jwtAccessToken, refreshToken, member.getId(), member.getNickname(), member.getRole()));
-        String queryParams = "?code=" + code;
-
         if (isNative) {
+            // 네이티브는 기존 방식(토큰 URL) 유지 — 이미 배포된 구버전 앱과의 호환을 위해서다.
+            // 딥링크 토큰은 서버 로그에 남지 않고(웹과 달리), 로컬 앱 가로채기(#13)는 별도로 skip한 항목.
+            // #12 네이티브 전환은 신버전 앱 확산 후 별도로 진행한다.
+            String encodedNickname = URLEncoder.encode(member.getNickname(), StandardCharsets.UTF_8);
+            String queryParams = "?token=" + jwtAccessToken
+                    + "&userId=" + member.getId()
+                    + "&nickname=" + encodedNickname
+                    + "&role=" + member.getRole()
+                    + "&refreshToken=" + refreshToken;
             response.sendRedirect("yadarank://oauth-callback" + queryParams);
         } else {
-            response.sendRedirect(targetFrontendUrl + "/oauth-callback" + queryParams);
+            // 웹은 토큰을 URL에 싣지 않는다(#12). 1회용 code만 넘기고, 프론트가 교환해 토큰을 받는다.
+            String code = oauthCodeStore.issue(new OAuthCodeStore.TokenBundle(
+                    jwtAccessToken, refreshToken, member.getId(), member.getNickname(), member.getRole()));
+            response.sendRedirect(targetFrontendUrl + "/oauth-callback?code=" + code);
         }
     }
 
