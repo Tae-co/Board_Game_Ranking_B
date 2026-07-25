@@ -34,7 +34,9 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             String auth = accessor.getFirstNativeHeader("Authorization");
             if (auth != null && auth.startsWith("Bearer ")) {
                 String token = auth.substring(7);
-                if (jwtTokenProvider.validateToken(token)) {
+                // access 토큰만 신원으로 인정 (#11) — refresh 토큰으로 presence 등록 불가
+                if (jwtTokenProvider.validateToken(token)
+                        && JwtTokenProvider.TYPE_ACCESS.equals(jwtTokenProvider.getTokenType(token))) {
                     Long memberId = jwtTokenProvider.getMemberIdFromToken(token);
                     // Principal은 함수형 인터페이스(getName) → memberId를 이름으로 사용
                     accessor.setUser(() -> String.valueOf(memberId));

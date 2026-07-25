@@ -26,6 +26,11 @@ public class AuthService {
         if (!jwtTokenProvider.validateToken(refreshToken)) {
             throw new IllegalArgumentException("유효하지 않은 Refresh Token입니다.");
         }
+        // access 토큰으로 refresh를 요청하는 것을 차단 (#11).
+        // 구버전 refresh 토큰(type 없음)은 전환 기간 허용해 강제 재로그인을 피한다.
+        if (JwtTokenProvider.TYPE_ACCESS.equals(jwtTokenProvider.getTokenType(refreshToken))) {
+            throw new IllegalArgumentException("Refresh Token이 아닙니다.");
+        }
         Long memberId = jwtTokenProvider.getMemberIdFromToken(refreshToken);
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));

@@ -13,6 +13,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class JwtTokenProvider {
 
+    public static final String TYPE_ACCESS = "access";
+    public static final String TYPE_REFRESH = "refresh";
+
     private final Key key;
     private final long accessExpiration;
     private final long refreshExpiration;
@@ -30,6 +33,7 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .setSubject(String.valueOf(memberId))
                 .claim("role", role)
+                .claim("type", TYPE_ACCESS)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + accessExpiration))
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -39,6 +43,7 @@ public class JwtTokenProvider {
     public String generateRefreshToken(Long memberId) {
         return Jwts.builder()
                 .setSubject(String.valueOf(memberId))
+                .claim("type", TYPE_REFRESH)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + refreshExpiration))
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -66,5 +71,13 @@ public class JwtTokenProvider {
                 .setSigningKey(key).build()
                 .parseClaimsJws(token).getBody();
         return (String) claims.get("role");
+    }
+
+    /** 토큰의 type claim("access"/"refresh"). 구버전 토큰엔 없어 null을 반환할 수 있다. (#11) */
+    public String getTokenType(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(key).build()
+                .parseClaimsJws(token).getBody();
+        return (String) claims.get("type");
     }
 }
