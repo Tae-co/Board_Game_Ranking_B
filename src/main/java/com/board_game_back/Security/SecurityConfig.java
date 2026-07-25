@@ -25,20 +25,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-            "http://localhost:5173",
-            "http://localhost:5174",
-            "http://localhost:3000",
-            "https://boardup.pages.dev",
-            "https://yadarank.com",
-            "https://www.yadarank.com",
-            "https://app.yadarank.com",
-            "https://my-boardup.apps.tossmini.com",
-            "https://my-boardup.private-apps.tossmini.com",
-            "capacitor://localhost",
-            "http://localhost",
-            "https://localhost"
-        ));
+        config.setAllowedOrigins(com.board_game_back.Config.AllowedOrigins.LIST);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));

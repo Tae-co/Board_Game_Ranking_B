@@ -22,8 +22,13 @@ public class PresenceController {
     @MessageMapping("/presence/join")
     public void join(SimpMessageHeaderAccessor accessor,
                      @Payload Map<String, Object> payload) {
+        // memberId는 페이로드가 아니라 CONNECT 때 검증된 Principal에서 취득한다 (#19).
+        // 인증되지 않은 연결이면 presence 등록을 무시한다(스푸핑 차단).
+        java.security.Principal user = accessor.getUser();
+        if (user == null) return;
+
         String sessionId = accessor.getSessionId();
-        Long memberId = Long.valueOf(payload.get("memberId").toString());
+        Long memberId = Long.valueOf(user.getName());
         String roomId = payload.get("roomId").toString();
 
         presenceService.join(sessionId, memberId, roomId);
