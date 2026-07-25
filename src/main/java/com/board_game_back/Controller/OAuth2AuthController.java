@@ -3,6 +3,7 @@ package com.board_game_back.Controller;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Security.JwtTokenProvider;
 import com.board_game_back.Service.AuthService;
+import com.board_game_back.Service.OAuthCodeStore;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -18,9 +19,12 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,6 +40,7 @@ public class OAuth2AuthController {
 
     private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final OAuthCodeStore oauthCodeStore;
 
     @Value("${GOOGLE_CLIENT_ID:}")
     private String googleClientId;
@@ -269,17 +274,35 @@ public class OAuth2AuthController {
         String jwtAccessToken = jwtTokenProvider.generateAccessToken(member.getId(), member.getRole());
         String refreshToken = jwtTokenProvider.generateRefreshToken(member.getId());
 
-        String encodedNickname = URLEncoder.encode(member.getNickname(), StandardCharsets.UTF_8);
-        String queryParams = "?token=" + jwtAccessToken
-                + "&userId=" + member.getId()
-                + "&nickname=" + encodedNickname
-                + "&role=" + member.getRole()
-                + "&refreshToken=" + refreshToken;
-
         if (isNative) {
+            // 네이티브는 기존 방식(토큰 URL) 유지 — 이미 배포된 구버전 앱과의 호환을 위해서다.
+            // 딥링크 토큰은 서버 로그에 남지 않고(웹과 달리), 로컬 앱 가로채기(#13)는 별도로 skip한 항목.
+            // #12 네이티브 전환은 신버전 앱 확산 후 별도로 진행한다.
+            String encodedNickname = URLEncoder.encode(member.getNickname(), StandardCharsets.UTF_8);
+            String queryParams = "?token=" + jwtAccessToken
+                    + "&userId=" + member.getId()
+                    + "&nickname=" + encodedNickname
+                    + "&role=" + member.getRole()
+                    + "&refreshToken=" + refreshToken;
             response.sendRedirect("yadarank://oauth-callback" + queryParams);
         } else {
-            response.sendRedirect(targetFrontendUrl + "/oauth-callback" + queryParams);
+            // 웹은 토큰을 URL에 싣지 않는다(#12). 1회용 code만 넘기고, 프론트가 교환해 토큰을 받는다.
+            String code = oauthCodeStore.issue(new OAuthCodeStore.TokenBundle(
+                    jwtAccessToken, refreshToken, member.getId(), member.getNickname(), member.getRole()));
+            response.sendRedirect(targetFrontendUrl + "/oauth-callback?code=" + code);
         }
+    }
+
+    public record OAuthExchangeRequest(String code) {}
+
+    /** OAuth 1회용 code를 토큰으로 교환한다(#12). 로그인 직후라 인증 없이 접근 가능(/api/auth/**). */
+    @PostMapping("/oauth/exchange")
+    public ResponseEntity<?> exchangeCode(@RequestBody(required = false) OAuthExchangeRequest request) {
+        String code = request != null ? request.code() : null;
+        OAuthCodeStore.TokenBundle bundle = oauthCodeStore.consume(code);
+        if (bundle == null) {
+            return ResponseEntity.status(401).body("유효하지 않거나 만료된 코드입니다.");
+        }
+        return ResponseEntity.ok(bundle);
     }
 }
