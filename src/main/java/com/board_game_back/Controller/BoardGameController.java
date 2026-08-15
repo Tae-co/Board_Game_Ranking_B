@@ -213,7 +213,7 @@ public class BoardGameController {
         return names + rest + " 그룹에서 사용 중이에요.\n그룹을 먼저 삭제한 뒤 점수판을 삭제해주세요.";
     }
 
-    /** 사용자가 만드는 점수판은 simple(순위만) / flat(항목별 점수) 두 가지만 허용한다. */
+    /** 사용자가 만드는 점수판은 simple(순위만) / flat(항목별 점수) / outcome(승무패만) 세 가지만 허용한다. */
     private void validateUserSchema(String schemaJson) {
         if (schemaJson == null || schemaJson.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "점수판 정보가 없습니다.");
@@ -227,7 +227,7 @@ public class BoardGameController {
         }
 
         String type = parsed.get("type") instanceof String s ? s : null;
-        if (!"simple".equals(type) && !"flat".equals(type)) {
+        if (!"simple".equals(type) && !"flat".equals(type) && !"outcome".equals(type)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "지원하지 않는 점수판 형식입니다.");
         }
         if (!"flat".equals(type)) {
