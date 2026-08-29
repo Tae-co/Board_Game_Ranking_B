@@ -15,7 +15,6 @@ public class GateDto {
     /** 게이트 하나의 집계. 페이크 도어의 핵심 지표는 hits 대비 interests(전환율)다. */
     public record GateStat(
         String gateKey,
-        String axis,
         long hits,
         long hitMembers,
         long interests,
@@ -23,14 +22,6 @@ public class GateDto {
     ) {}
 
     public record SummaryResponse(
-        List<GateStat> gates,
-        List<AxisStat> axes
-    ) {}
-
-    /** 운영 축 vs 랭킹 축 — 전제 3의 답이 여기서 나온다 */
-    public record AxisStat(
-        String axis,
-        long hits,
-        long interests
+        List<GateStat> gates
     ) {}
 }

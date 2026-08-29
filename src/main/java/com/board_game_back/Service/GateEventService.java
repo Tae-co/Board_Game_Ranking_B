@@ -51,28 +51,12 @@ public class GateEventService {
         }
 
         List<GateDto.GateStat> gates = new ArrayList<>();
-        Map<GateKey.Axis, Counts> byAxis = new EnumMap<>(GateKey.Axis.class);
-        for (GateKey.Axis axis : GateKey.Axis.values()) {
-            byAxis.put(axis, new Counts());
-        }
-
         for (Map.Entry<GateKey, Counts> entry : byGate.entrySet()) {
-            GateKey key = entry.getKey();
             Counts c = entry.getValue();
             gates.add(new GateDto.GateStat(
-                key.name(), key.getAxis().name(), c.hits, c.hitMembers, c.interests, c.interestMembers));
-
-            Counts axis = byAxis.get(key.getAxis());
-            axis.hits += c.hits;
-            axis.interests += c.interests;
+                entry.getKey().name(), c.hits, c.hitMembers, c.interests, c.interestMembers));
         }
-
-        List<GateDto.AxisStat> axes = byAxis.entrySet().stream()
-            .map(e -> new GateDto.AxisStat(
-                e.getKey().name(), e.getValue().hits, e.getValue().interests))
-            .toList();
-
-        return new GateDto.SummaryResponse(gates, axes);
+        return new GateDto.SummaryResponse(gates);
     }
 
     private static final class Counts {
