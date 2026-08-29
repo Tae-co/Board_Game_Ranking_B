@@ -1,8 +1,10 @@
 package com.board_game_back.Controller;
 
+import com.board_game_back.DTO.GateDto;
 import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.Service.GateEventService;
 import com.board_game_back.Service.RoomService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
@@ -35,12 +37,20 @@ public class AdminController {
     private final BoardGameRepository boardGameRepository;
     private final MemberRepository memberRepository;
     private final RoomService roomService;
+    private final GateEventService gateEventService;
 
     @Value("${supabase.url}")
     private String supabaseUrl;
 
     @Value("${supabase.service-role-key}")
     private String serviceRoleKey;
+
+    /** 페이크 도어 페이월 집계 — 운영 축 vs 랭킹 축 중 어디에 지불 의사가 있는지 본다. */
+    @GetMapping("/gate-summary")
+    public GateDto.SummaryResponse gateSummary() {
+        checkAdmin();
+        return gateEventService.summary();
+    }
 
     private void checkAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
