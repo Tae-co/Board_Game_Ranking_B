@@ -17,6 +17,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
     }
 
+    /** 정원 초과. 프론트가 언어에 맞게 문구를 만들 수 있도록 코드와 숫자를 같이 보낸다. */
+    @ExceptionHandler(CommunityFullException.class)
+    public ResponseEntity<Map<String, Object>> handleCommunityFull(CommunityFullException e) {
+        return ResponseEntity.status(409).body(Map.of(
+            "message", e.getMessage(),
+            "code", CommunityFullException.CODE,
+            "memberCount", e.getMemberCount(),
+            "limit", e.getLimit()));
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, String>> handleConflict(IllegalStateException e) {
         return ResponseEntity.status(409).body(Map.of("message", e.getMessage()));
