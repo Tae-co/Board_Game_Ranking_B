@@ -89,8 +89,10 @@ public class CommunityService {
             long memberCount = communityMemberRepository.countByCommunityId(community.getId());
             if (memberCount >= PlanLimits.FREE_MEMBERS && !subscriptionService.isCommunityPro(community.getId(), community.getCreatedBy())) {
                 // IllegalStateException은 GlobalExceptionHandler가 409 + message로 내보낸다
+                // 줄바꿈은 프론트가 whiteSpace: pre-line으로 살린다 — 두 문장이 붙어 읽히지 않게
                 throw new IllegalStateException(
-                    "이 모임은 인원이 가득 찼어요 (" + memberCount + "/" + PlanLimits.FREE_MEMBERS + "). 모임장에게 문의해 주세요.");
+                    "이 모임은 인원이 가득 찼어요 (" + memberCount + "/" + PlanLimits.FREE_MEMBERS + ").\n"
+                        + "모임장에게 문의해 주세요.");
             }
             communityMemberRepository.save(new CommunityMember(community, member));
         }
