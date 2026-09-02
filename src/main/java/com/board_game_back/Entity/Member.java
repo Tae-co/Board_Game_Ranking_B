@@ -48,12 +48,50 @@ public class Member {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now(ZoneId.of("Asia/Seoul")).truncatedTo(ChronoUnit.MINUTES);
 
+    /**
+     * 모임장 Pro 만료 시각. null이면 무료. **결제 연동은 없다 — 프로토타입 플래그다.**
+     *
+     * 해지해도 이 값을 앞당기지 않는다. 낸 돈만큼은 쓰게 한다는 원칙이라
+     * 해지는 "갱신 안 함"이고 만료는 이 시각이 지나는 것이다.
+     */
+    @Column(name = "pro_until")
+    private LocalDateTime proUntil;
+
+    /** MONTHLY | YEARLY. 구독 관리 화면의 플랜·금액 표시에만 쓴다. */
+    @Column(name = "pro_billing", length = 10)
+    private String proBilling;
+
+    /** 해지 예약. true여도 proUntil 전까지는 Pro다. */
+    @Column(name = "pro_canceled", nullable = false)
+    private boolean proCanceled = false;
+
     @Embedded
     @AttributeOverrides({
         @AttributeOverride(name = "rating", column = @Column(name = "overall_rating")),
         @AttributeOverride(name = "ratingDeviation", column = @Column(name = "overall_rd")),
         @AttributeOverride(name = "volatility", column = @Column(name = "overall_volatility"))})
     private GlickoStats overallStats = new GlickoStats();
+
+    /** 구독 시작. 프로토타입이라 결제 검증 없이 만료 시각만 심는다. */
+    public void grantPro(String billing, LocalDateTime until) {
+        this.proBilling = billing;
+        this.proUntil = until;
+        this.proCanceled = false;
+    }
+
+    /** 해지 예약. proUntil은 건드리지 않는다 — 남은 기간은 그대로 쓴다. */
+    public void cancelPro() {
+        this.proCanceled = true;
+    }
+
+    /** 해지 취소(이어가기). */
+    public void resumePro() {
+        this.proCanceled = false;
+    }
+
+    public boolean isPro() {
+        return proUntil != null && proUntil.isAfter(LocalDateTime.now(ZoneId.of("Asia/Seoul")));
+    }
 
     public GlickoStats getOverallStats() {
         if (this.overallStats == null) {

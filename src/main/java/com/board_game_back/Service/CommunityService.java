@@ -5,6 +5,7 @@ import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.CommunityAdmin;
 import com.board_game_back.Entity.CommunityMember;
+import com.board_game_back.Utils.PlanLimits;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Repository.BoardGameRepository;
@@ -41,6 +42,7 @@ public class CommunityService {
     private final RoomMemberRepository roomMemberRepository;
     private final BoardGameRepository boardGameRepository;
     private final PlayerGameRatingRepository playerGameRatingRepository;
+    private final SubscriptionService subscriptionService;
 
     @Transactional
     public CommunityDto.Response createCommunity(CommunityDto.CreateRequest req, Long createdBy) {
@@ -80,6 +82,16 @@ public class CommunityService {
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
 
         if (!communityMemberRepository.existsByCommunityIdAndMemberId(community.getId(), memberId)) {
+            // 무료 커뮤니티는 인원 한도가 있다. 다른 사람이 들어오는 동작이라 그 사람 앱을
+            // 믿을 수 없어서 서버가 막는다 (나머지 한도는 운영자 본인 화면에서만 발동).
+            // 여기서는 Pro 얘기를 하지 않는다 — 새로 온 사람 앞에서 페이월이 터지면 안 된다.
+            // 구독 유도는 운영자가 초대를 누를 때 그쪽 화면에서 한다.
+            long memberCount = communityMemberRepository.countByCommunityId(community.getId());
+            if (memberCount >= PlanLimits.FREE_MEMBERS && !subscriptionService.isCommunityPro(community.getId(), community.getCreatedBy())) {
+                // IllegalStateException은 GlobalExceptionHandler가 409 + message로 내보낸다
+                throw new IllegalStateException(
+                    "이 모임은 인원이 가득 찼어요 (" + memberCount + "/" + PlanLimits.FREE_MEMBERS + "). 모임장에게 문의해 주세요.");
+            }
             communityMemberRepository.save(new CommunityMember(community, member));
         }
 
