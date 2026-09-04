@@ -52,6 +52,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/health").permitAll()
                 .requestMatchers("/api/images/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/games/**").permitAll()
+                // 행동 로그: 로그인 전 초대 랜딩 유입까지 측정해야 해서 비로그인도 허용한다.
+                // event_name이 EventName enum 화이트리스트라 임의 문자열은 400으로 거절된다.
+                .requestMatchers(HttpMethod.POST, "/api/events").permitAll()
                 // 관리자 전용
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/matches/admin/**").hasRole("ADMIN")
