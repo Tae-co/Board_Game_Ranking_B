@@ -8,7 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.ZoneOffset;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -60,8 +60,9 @@ public class UserEvent {
     @Column(length = 20)
     private String appVersion;
 
+    /** match_record.played_at과 같은 UTC. 시간대가 다르면 이벤트와 매치를 함께 볼 수 없다. */
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneOffset.UTC);
 
     @Builder
     public UserEvent(Long memberId, String anonId, EventName eventName, Long communityId,
