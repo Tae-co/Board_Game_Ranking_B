@@ -78,11 +78,11 @@ class UserEventServiceTest {
 
     @Test
     void props가_한도를_넘으면_props만_버리고_이벤트는_남긴다() {
-        userEventService.record(request("RANKING_VIEWED", Map.of("blob", "x".repeat(2100))), 7L);
+        userEventService.record(request("GROUP_LOBBY_OPENED", Map.of("blob", "x".repeat(2100))), 7L);
 
         UserEvent saved = captureSaved();
         assertThat(saved.getProps()).isNull();
-        assertThat(saved.getEventName()).isEqualTo(EventName.RANKING_VIEWED);
+        assertThat(saved.getEventName()).isEqualTo(EventName.GROUP_LOBBY_OPENED);
     }
 
     @Test
