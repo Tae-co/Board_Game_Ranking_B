@@ -27,7 +27,7 @@ public class UserEventService {
      * 계측은 제품 기능이 아니다. 실패해도 사용자 흐름에 영향이 없어야 하므로
      * 요청 스레드와 분리하고 예외를 삼킨다.
      */
-    @Async
+    @Async("eventExecutor")
     public void record(EventDto.LogRequest request, Long memberId) {
         if (request == null) return;
         EventName eventName = parseEventName(request.eventName());

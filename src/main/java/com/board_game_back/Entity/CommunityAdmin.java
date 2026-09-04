@@ -3,6 +3,7 @@ package com.board_game_back.Entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Getter
@@ -24,7 +25,7 @@ public class CommunityAdmin {
     private Member member;
 
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
 
     public CommunityAdmin(Community community, Member member) {
         this.community = community;
