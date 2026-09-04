@@ -102,6 +102,49 @@ class UserEventServiceTest {
     }
 
     @Test
+    void 서버전용_이벤트는_클라이언트가_보내도_저장하지_않는다() {
+        // POST /api/events는 permitAll이다. 막지 않으면 누구나 탈퇴 지표를 부풀릴 수 있다.
+        userEventService.record(request("MEMBER_DELETED", null), 7L);
+
+        verify(userEventRepository, never()).save(any());
+    }
+
+    @Test
+    void 서버측_기록은_memberId와_platform_server로_저장된다() {
+        // 탈퇴는 프론트에서 못 찍는다 — 성공 직후 /login으로 넘어가며 요청이 취소된다.
+        userEventService.recordServerSide(EventName.MEMBER_DELETED, 7L);
+
+        UserEvent saved = captureSaved();
+        assertThat(saved.getEventName()).isEqualTo(EventName.MEMBER_DELETED);
+        assertThat(saved.getMemberId()).isEqualTo(7L);
+        assertThat(saved.getPlatform()).isEqualTo("server");
+        assertThat(saved.getAnonId()).isNull();
+        assertThat(saved.getSessionId()).isNull();
+    }
+
+    @Test
+    void 서버측_기록도_저장_실패를_삼킨다() {
+        when(userEventRepository.save(any())).thenThrow(new RuntimeException("DB 장애"));
+
+        // 여기서 예외가 새면 계측이 탈퇴 자체를 실패시킨다.
+        assertThatCode(() -> userEventService.recordServerSide(EventName.MEMBER_DELETED, 7L))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void 프론트가_보내는_모든_이벤트_이름이_화이트리스트를_통과한다() {
+        // 프론트 EVENTS 상수(api/services/events.js)와 1:1이어야 한다. 어긋나면 서버가
+        // 202로 받고 조용히 버려서, 배포 후에도 "0건"인지 "이름 불일치"인지 알 수 없다.
+        for (EventName name : EventName.values()) {
+            if (name == EventName.MEMBER_DELETED) continue; // 서버 전용 (위 테스트가 담당)
+            userEventService.record(request(name.name(), null), 7L);
+        }
+
+        verify(userEventRepository, org.mockito.Mockito.times(EventName.values().length - 1))
+                .save(any());
+    }
+
+    @Test
     void 저장이_실패해도_예외가_호출부로_새지_않는다() {
         when(userEventRepository.save(any())).thenThrow(new RuntimeException("DB 장애"));
 

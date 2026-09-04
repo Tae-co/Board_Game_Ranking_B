@@ -16,9 +16,11 @@ package com.board_game_back.Entity;
  */
 public enum EventName {
 
-    // 활성화 퍼널: 가입 → 커뮤니티 → 방 → 첫 매치 기록
+    // 활성화 퍼널: 로그인 → 커뮤니티 → 방 → 첫 매치 기록
+    LOGIN_STARTED,          // 퍼널 최상단의 분모. member.created_at은 성공한 가입만 남긴다
     COMMUNITY_CREATE_STARTED,
     COMMUNITY_CREATE_COMPLETED,
+    COMMUNITY_JOIN_STARTED, // 초대코드 입력 화면에 도달했다. 이게 없으면 참가 실패가 안 보인다
     COMMUNITY_JOIN_COMPLETED,
     ROOM_CREATE_STARTED,
     ROOM_CREATE_COMPLETED,
@@ -26,10 +28,17 @@ public enum EventName {
     SCORE_SHEET_OPENED,     // 분모: 기록하려고 점수판을 열었다 (수정·조회·미리보기는 제외)
     MATCH_SUBMITTED,        // 분자: 끝까지 기록했다. 둘의 비가 게임별 이탈률
 
+    // 제품 방향: 유저가 직접 만든 점수판이 곧 "다음에 기본 제공할 게임" 목록이다
+    CUSTOM_GAME_CREATED,
+
     // 바이럴 퍼널: 공유 → 초대받은 사람의 랜딩 → 가입
     INVITE_SHARED,          // 공유 시트를 실제로 띄웠다. 화면 진입이 아니라 행동이다
     INVITE_LANDING_OPENED,  // 초대받은 사람이 링크를 열었다 (로그인 전이라 member_id는 NULL)
 
     // 리텐션: 이게 없으면 "앱은 열었는데 아무것도 안 한 유저"를 영영 못 본다
-    APP_OPENED
+    APP_OPENED,
+
+    // 이탈: 탈퇴는 member 행을 하드 삭제하므로(RoomService.deleteMember) 흔적이 통째로
+    // 사라진다. user_event는 FK가 없어 살아남으므로 여기가 유일한 churn 기록이다.
+    MEMBER_DELETED
 }
