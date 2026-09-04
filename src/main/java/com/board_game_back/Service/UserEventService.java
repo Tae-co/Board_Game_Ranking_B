@@ -51,6 +51,25 @@ public class UserEventService {
         }
     }
 
+    /**
+     * 서버가 직접 남기는 이벤트. 프론트에서 찍을 수 없는 순간에 쓴다.
+     *
+     * <p>탈퇴가 그렇다 — 성공 직후 화면이 {@code /login}으로 넘어가면서 브라우저가
+     * 진행 중이던 요청을 취소하고, 토큰도 그 시점에 지워진다.
+     */
+    @Async("eventExecutor")
+    public void recordServerSide(EventName eventName, Long memberId) {
+        try {
+            userEventRepository.save(UserEvent.builder()
+                    .memberId(memberId)
+                    .eventName(eventName)
+                    .platform("server")
+                    .build());
+        } catch (Exception e) {
+            log.warn("서버 이벤트 기록 실패 (무시): {}", eventName, e);
+        }
+    }
+
     private EventName parseEventName(String raw) {
         if (raw == null) return null;
         try {
