@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,6 +46,8 @@ public class MatchRecord {
     public MatchRecord(BoardGame boardGame, Room room) {
         this.boardGame = boardGame;
         this.room = room;
-        this.playedAt = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
+        // 컨테이너 기본 TZ는 UTC다. Member/Community/UserEvent와 같은 KST 벽시계로 맞춰야
+        // 이벤트와 매치를 시간으로 함께 볼 수 있다.
+        this.playedAt = LocalDateTime.now(ZoneId.of("Asia/Seoul")).truncatedTo(ChronoUnit.MINUTES);
     }
 }
