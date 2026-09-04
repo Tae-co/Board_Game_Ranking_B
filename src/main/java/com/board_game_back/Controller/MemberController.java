@@ -9,6 +9,8 @@ import com.board_game_back.Service.RoomService;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import com.board_game_back.Entity.EventName;
+import com.board_game_back.Service.UserEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +33,7 @@ public class MemberController {
     private final MemberRepository memberRepository;
     private final PlayerGameRatingRepository playerGameRatingRepository;
     private final RoomService roomService;
+    private final UserEventService userEventService;
 
     @GetMapping("/search")
     public ResponseEntity<List<Map<String, Object>>> searchMembers(
@@ -94,6 +97,8 @@ public class MemberController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("존재하지 않는 회원입니다.");
         }
         roomService.deleteMember(id);
+        // member 행이 통째로 사라지므로 user_event가 이탈의 유일한 기록이다.
+        userEventService.recordServerSide(EventName.MEMBER_DELETED, id);
         return ResponseEntity.ok("탈퇴되었습니다.");
     }
 

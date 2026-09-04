@@ -45,6 +45,9 @@ public class MatchRecord {
     public MatchRecord(BoardGame boardGame, Room room) {
         this.boardGame = boardGame;
         this.room = room;
+        // UTC로 저장한다. MatchService가 응답에 "Z"를 붙여 절대 시각으로 내보내고,
+        // 프론트가 커뮤니티 region(REGION_TIMEZONE)에 맞춰 현지 시각으로 변환한다.
+        // KST 벽시계로 바꾸면 모든 국가에서 9시간 어긋난다.
         this.playedAt = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
     }
 }
