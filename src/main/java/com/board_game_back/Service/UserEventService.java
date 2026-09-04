@@ -21,6 +21,13 @@ public class UserEventService {
     /** ObjectMapper 빈은 이 프로젝트에 없다 (AdminController도 동일하게 직접 만들어 쓴다). */
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+    /**
+     * 서버만 남길 수 있는 이벤트. {@code POST /api/events}는 permitAll이라 누구나 호출할 수
+     * 있어서, 이 이름들을 클라이언트 경로에서 막지 않으면 탈퇴 지표를 위조할 수 있다.
+     */
+    private static final java.util.Set<EventName> SERVER_ONLY = java.util.EnumSet.of(
+            EventName.MEMBER_DELETED);
+
     private final UserEventRepository userEventRepository;
 
     /**
@@ -32,6 +39,7 @@ public class UserEventService {
         if (request == null) return;
         EventName eventName = parseEventName(request.eventName());
         if (eventName == null) return; // 화이트리스트 밖 — 조용히 버린다
+        if (SERVER_ONLY.contains(eventName)) return; // 클라이언트가 보낼 수 없는 이름
 
         try {
             userEventRepository.save(UserEvent.builder()
