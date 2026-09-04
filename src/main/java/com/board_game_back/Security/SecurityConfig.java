@@ -53,7 +53,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/images/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/games/**").permitAll()
                 // 행동 로그: 로그인 전 초대 랜딩 유입까지 측정해야 해서 비로그인도 허용한다.
-                // event_name이 EventName enum 화이트리스트라 임의 문자열은 400으로 거절된다.
+                // event_name은 EventName enum 화이트리스트다. 화이트리스트 밖 이름과
+                // 서버 전용 이벤트(MEMBER_DELETED)는 202로 받되 저장하지 않는다 —
+                // 구버전 앱이 폐기된 이름을 보내는 건 정상 상황이라 400으로 만들면
+                // 500 에러 로그만 쌓인다. 판정은 UserEventService가 한다.
                 .requestMatchers(HttpMethod.POST, "/api/events").permitAll()
                 // 관리자 전용
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
