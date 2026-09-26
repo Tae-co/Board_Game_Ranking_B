@@ -11,6 +11,13 @@ public interface SeasonRankSnapshotRepository extends JpaRepository<SeasonRankSn
     /** 롤오버 멱등성 판단: 이 시즌·방의 스냅샷이 이미 있으면 다시 찍지 않는다. */
     boolean existsBySeasonKeyAndRoomId(String seasonKey, Long roomId);
 
+    /** 이 방이 한 번이라도 롤오버된 적 있는지 — 없으면 아직 첫 시즌이다(14일 규칙 대상). */
+    boolean existsByRoomId(Long roomId);
+
+    /** 이 방이 마지막으로 끝낸 시즌. season_key가 'yyyy-MM'이라 문자열 MAX가 곧 최신이다. */
+    @Query("SELECT MAX(s.seasonKey) FROM SeasonRankSnapshot s WHERE s.roomId = :roomId")
+    String findLatestSeasonKeyByRoomId(@Param("roomId") Long roomId);
+
     /** 지난 시즌 순위표 (시즌 탭 ③) */
     List<SeasonRankSnapshot> findByRoomIdAndBoardGameIdAndSeasonKeyOrderByRankAsc(
         Long roomId, Long boardGameId, String seasonKey);

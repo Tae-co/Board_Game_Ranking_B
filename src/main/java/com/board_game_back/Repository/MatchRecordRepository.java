@@ -67,6 +67,10 @@ public interface MatchRecordRepository extends JpaRepository<MatchRecord, Long> 
         @Param("from") LocalDateTime from,
         @Param("to") LocalDateTime to);
 
+    /** 방별 첫 경기 시각. Room에 createdAt이 없어 "첫 시즌이 14일 미만인가"를 이걸로 판단한다. */
+    @Query("SELECT m.room.id, MIN(m.playedAt) FROM MatchRecord m WHERE m.room.id IN :roomIds GROUP BY m.room.id")
+    List<Object[]> findFirstPlayedAtByRoom(@Param("roomIds") Collection<Long> roomIds);
+
     /** 커뮤니티 내 멤버별 첫 경기 시각 (다크호스 = 이번 시즌에 처음 뛴 멤버) */
     @Query("""
         SELECT p.member.id, MIN(m.playedAt) FROM MatchRecord m

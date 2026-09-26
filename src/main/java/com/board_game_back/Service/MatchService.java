@@ -16,6 +16,7 @@ import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -38,6 +39,7 @@ public class MatchService {
     private final RatingCalculator ratingCalculator;
     private final RoomRepository roomRepository;
     private final RoomMemberRepository roomMemberRepository;
+    private final SeasonBoundaryService seasonBoundaryService;
 
     @Transactional
     public List<ResultResponse> recordMatchResult(MatchDto.ResultRequest request, Long requesterId) {
@@ -233,7 +235,14 @@ public class MatchService {
         List<MatchRecord> matches = matchRecordRepository
             .findByRoomIdAndBoardGameIdWithParticipantsAsc(roomId, boardGameId);
 
+        // 리셋된 적 있는 방은 현재 시즌 경기만 리플레이한다. 이게 없으면 재계산 한 번에
+        // 지난 시즌 점수가 통째로 부활해 롤오버가 무의미해진다. null = 아직 리셋된 적 없음.
+        LocalDateTime seasonStart = seasonBoundaryService.currentSeasonStartUtc(roomId);
+
         for (MatchRecord match : matches) {
+            if (seasonStart != null && match.getPlayedAt() != null
+                && match.getPlayedAt().isBefore(seasonStart)) continue;
+
             List<RatingCalculator.PlayerResult> calcResults = new ArrayList<>();
             List<MatchParticipant> participants = match.getParticipants();
 

@@ -31,6 +31,10 @@ public interface PlayerGameRatingRepository extends JpaRepository<PlayerGameRati
     @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.boardGame WHERE p.member.id = :memberId AND p.playCount > 0")
     List<PlayerGameRating> findPlayedByMemberId(@Param("memberId") Long memberId);
 
+    /** 롤오버: 방의 모든 게임 레이팅을 한 번에. 스냅샷이 member·boardGame을 모두 읽는다. */
+    @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.member JOIN FETCH p.boardGame WHERE p.room.id = :roomId")
+    List<PlayerGameRating> findByRoomIdWithMemberAndBoardGame(@Param("roomId") Long roomId);
+
     void deleteByRoomId(Long roomId);
 
     void deleteByMember_IdAndRoom_Id(Long memberId, Long roomId);
