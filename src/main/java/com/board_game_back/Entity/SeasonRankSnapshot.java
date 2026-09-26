@@ -7,9 +7,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import com.board_game_back.Utils.RatingConstants;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -22,6 +22,10 @@ import lombok.NoArgsConstructor;
  *
  * <p><b>Room·Member를 연관관계로 잡지 않은 이유:</b> 방이나 멤버가 삭제돼도 시즌 기록은
  * 남아야 한다. FK가 없으므로 고아 행이 생길 수 있고, 조회하는 쪽에서 필터한다.
+ *
+ * <p><b>생성은 {@link #from} 하나로만 한다.</b> displayScore를 μ·σ와 따로 받으면
+ * 서로 어긋난 행이 저장될 수 있다(로컬 테스트에서 실제로 재현했다). 세 값을 모두
+ * {@link PlayerGameRating}에서 유도하면 구조적으로 불일치가 불가능하다.
  */
 @Entity
 @Table(name = "season_rank_snapshot")
@@ -72,20 +76,32 @@ public class SeasonRankSnapshot {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    @Builder
-    public SeasonRankSnapshot(String seasonKey, Long roomId, Long boardGameId, Long memberId,
-                              int rank, double displayScore, double mu, double sigma,
-                              int playCount, int winCount, int loseCount) {
-        this.seasonKey = seasonKey;
-        this.roomId = roomId;
-        this.boardGameId = boardGameId;
-        this.memberId = memberId;
-        this.rank = rank;
-        this.displayScore = displayScore;
-        this.mu = mu;
-        this.sigma = sigma;
-        this.playCount = playCount;
-        this.winCount = winCount;
-        this.loseCount = loseCount;
+    /**
+     * 리셋 직전의 {@link PlayerGameRating}을 그대로 사진 찍는다.
+     * room·boardGame·member·μ·σ·표시 점수·전적을 한 객체에서 뽑으므로 값이 어긋날 수 없다.
+     *
+     * @param rank 같은 방·게임 안에서의 순위 (1부터)
+     */
+    public static SeasonRankSnapshot from(String seasonKey, int rank, PlayerGameRating rating) {
+        GlickoStats stats = rating.getGameStats();
+
+        SeasonRankSnapshot snapshot = new SeasonRankSnapshot();
+        snapshot.seasonKey = seasonKey;
+        snapshot.roomId = rating.getRoom().getId();
+        snapshot.boardGameId = rating.getBoardGame().getId();
+        snapshot.memberId = rating.getMember().getId();
+        snapshot.rank = rank;
+        snapshot.displayScore = stats.getDisplayScore();
+        snapshot.mu = stats.getRating();
+        snapshot.sigma = stats.getRatingDeviation();
+        snapshot.playCount = rating.getPlayCount();
+        snapshot.winCount = rating.getWinCount();
+        snapshot.loseCount = rating.getLoseCount();
+        return snapshot;
+    }
+
+    /** 스냅샷의 μ·σ로 리셋을 되돌릴 때 쓴다. */
+    public GlickoStats toStats() {
+        return new GlickoStats(mu, sigma, RatingConstants.INITIAL_VOLATILITY);
     }
 }
