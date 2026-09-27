@@ -98,8 +98,8 @@ public class SeasonArchiveService {
      * 마감된 시즌 목록, 최신순 (§6 ③의 월 선택).
      *
      * <p>경기 수는 시즌 경계로 자른 {@code match_record}에서 센다. 경계는 달력이 아니라
-     * <b>스냅샷 이력</b>에서 나온다 — 14일 규칙으로 이월된 방은 첫 시즌이 두 달치이므로
-     * 달력으로 자르면 그 방의 첫 시즌 경기 수가 실제보다 적게 나온다.
+     * <b>스냅샷 이력</b>에서 나온다 — 시즌제 도입 전 경기는 소급 마감하지 않고 첫 시즌에 통째로
+     * 들어가므로(§5), 달력으로 자르면 그 방의 첫 시즌 경기 수가 실제보다 적게 나온다.
      */
     public List<SeasonDto.RoomSeasonResponse> getRoomSeasons(Long roomId, Long boardGameId) {
         Long gameId = resolveBoardGameId(roomId, boardGameId);

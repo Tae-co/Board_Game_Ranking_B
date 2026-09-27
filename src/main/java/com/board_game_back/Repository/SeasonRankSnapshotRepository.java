@@ -12,9 +12,6 @@ public interface SeasonRankSnapshotRepository extends JpaRepository<SeasonRankSn
     /** 롤오버 멱등성 판단: 이 시즌·방의 스냅샷이 이미 있으면 다시 찍지 않는다. */
     boolean existsBySeasonKeyAndRoomId(String seasonKey, Long roomId);
 
-    /** 이 방이 한 번이라도 롤오버된 적 있는지 — 없으면 아직 첫 시즌이다(14일 규칙 대상). */
-    boolean existsByRoomId(Long roomId);
-
     /** 커뮤니티에 마감된 시즌이 하나라도 있는지 — 시즌제 예고 배너를 언제 내릴지 판단한다 (§11). */
     boolean existsByRoomIdIn(Collection<Long> roomIds);
 

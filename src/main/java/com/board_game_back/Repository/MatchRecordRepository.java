@@ -68,8 +68,8 @@ public interface MatchRecordRepository extends JpaRepository<MatchRecord, Long> 
         @Param("to") LocalDateTime to);
 
     /**
-     * 방·게임의 경기 시각 전체. 시즌별 경기 수를 낼 때 쓴다 — 시즌 경계가 방마다 다르므로
-     * (14일 규칙으로 첫 시즌이 두 달치인 방이 있다) 경계 계산은 서비스에서 하고 여기선 시각만 준다.
+     * 방·게임의 경기 시각 전체. 시즌별 경기 수를 낼 때 쓴다 — 첫 시즌은 달력 한 달보다 길 수 있으므로
+     * (도입 전 경기가 첫 시즌에 통째로 들어간다) 경계 계산은 서비스에서 하고 여기선 시각만 준다.
      */
     @Query("""
         SELECT m.playedAt FROM MatchRecord m
@@ -77,10 +77,6 @@ public interface MatchRecordRepository extends JpaRepository<MatchRecord, Long> 
         """)
     List<LocalDateTime> findPlayedAtByRoomIdAndBoardGameId(
         @Param("roomId") Long roomId, @Param("boardGameId") Long boardGameId);
-
-    /** 방별 첫 경기 시각. Room에 createdAt이 없어 "첫 시즌이 14일 미만인가"를 이걸로 판단한다. */
-    @Query("SELECT m.room.id, MIN(m.playedAt) FROM MatchRecord m WHERE m.room.id IN :roomIds GROUP BY m.room.id")
-    List<Object[]> findFirstPlayedAtByRoom(@Param("roomIds") Collection<Long> roomIds);
 
     /** 커뮤니티 내 멤버별 첫 경기 시각 (다크호스 = 이번 시즌에 처음 뛴 멤버) */
     @Query("""
