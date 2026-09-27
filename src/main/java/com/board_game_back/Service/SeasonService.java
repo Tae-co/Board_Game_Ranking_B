@@ -37,6 +37,7 @@ public class SeasonService {
     private final CommunityRepository communityRepository;
     private final RoomRepository roomRepository;
     private final MatchRecordRepository matchRecordRepository;
+    private final SeasonArchiveService archiveService;
 
     public List<SeasonDto.PeriodResponse> getPeriods(Long communityId) {
         List<Long> roomIds = roomIdsOf(communityId);
@@ -104,7 +105,8 @@ public class SeasonService {
             matches.size(),
             tallies.size(),
             awards,
-            gameTops
+            gameTops,
+            archiveService.getCommunityPodium(roomIds, month.toString())
         );
     }
 

@@ -22,7 +22,8 @@ public class SeasonDto {
         int totalMatches,
         int totalPlayers,
         List<Award> awards,
-        List<GameTop> gameTops
+        List<GameTop> gameTops,
+        List<PodiumEntry> podium   // 마감된 시즌의 1·2·3등. 아직 안 끝난 달은 빈 목록이다
     ) {}
 
     /** type: MOST_WINS | BIGGEST_CLIMB | DARK_HORSE */
@@ -72,6 +73,14 @@ public class SeasonDto {
         double displayScore,
         int rank,
         int playCount
+    ) {}
+
+    /**
+     * 시즌제 예고 배너를 띄울지 (§11). 첫 롤오버가 일어나면 {@code true}가 되고 배너는 사라진다.
+     * 날짜를 박아두지 않는 이유는 배포일이 미정이고, 박으면 그 날짜가 지나도 배너가 남기 때문이다.
+     */
+    public record SeasonStatusResponse(
+        boolean hasClosedSeason
     ) {}
 
     /** 프로필 트로피 선반 — 1~3위만, 시상 조건을 통과한 것만 */

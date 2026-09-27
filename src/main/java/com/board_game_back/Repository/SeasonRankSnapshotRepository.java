@@ -15,6 +15,9 @@ public interface SeasonRankSnapshotRepository extends JpaRepository<SeasonRankSn
     /** 이 방이 한 번이라도 롤오버된 적 있는지 — 없으면 아직 첫 시즌이다(14일 규칙 대상). */
     boolean existsByRoomId(Long roomId);
 
+    /** 커뮤니티에 마감된 시즌이 하나라도 있는지 — 시즌제 예고 배너를 언제 내릴지 판단한다 (§11). */
+    boolean existsByRoomIdIn(Collection<Long> roomIds);
+
     /** 이 방이 마지막으로 끝낸 시즌. season_key가 'yyyy-MM'이라 문자열 MAX가 곧 최신이다. */
     @Query("SELECT MAX(s.seasonKey) FROM SeasonRankSnapshot s WHERE s.roomId = :roomId")
     String findLatestSeasonKeyByRoomId(@Param("roomId") Long roomId);
@@ -58,6 +61,18 @@ public interface SeasonRankSnapshotRepository extends JpaRepository<SeasonRankSn
         """)
     List<Object[]> findPlayerCountsByRoomIdAndBoardGameId(
         @Param("roomId") Long roomId, @Param("boardGameId") Long boardGameId);
+
+    /**
+     * 결산 카드 시상대 — 커뮤니티에 속한 방들의 한 시즌 스냅샷을 표시 점수 내림차순으로.
+     * 방·게임 축이 섞이지만 단위가 같은 표시 점수라 "이번 시즌 우리 모임에서 제일 높았던 사람"은 정의된다.
+     */
+    @Query("""
+        SELECT s FROM SeasonRankSnapshot s
+        WHERE s.roomId IN :roomIds AND s.seasonKey = :seasonKey
+        ORDER BY s.displayScore DESC
+        """)
+    List<SeasonRankSnapshot> findBySeasonKeyAndRoomIds(
+        @Param("roomIds") Collection<Long> roomIds, @Param("seasonKey") String seasonKey);
 
     /**
      * 시상 자격 판단용 — (시즌, 방, 게임)별 참가자 수 (§4 트로피 인플레이션 가드).

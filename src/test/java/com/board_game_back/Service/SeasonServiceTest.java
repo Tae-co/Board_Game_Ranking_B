@@ -38,6 +38,8 @@ class SeasonServiceTest {
     @Mock private CommunityRepository communityRepository;
     @Mock private RoomRepository roomRepository;
     @Mock private MatchRecordRepository matchRecordRepository;
+    // 결산에 시상대를 얹으면서 생긴 의존. 이 테스트가 보는 건 수상 3종이고, 목은 빈 목록을 준다.
+    @Mock private SeasonArchiveService archiveService;
 
     @InjectMocks private SeasonService seasonService;
 

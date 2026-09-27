@@ -3,6 +3,7 @@ package com.board_game_back.Service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -261,6 +262,53 @@ class SeasonArchiveServiceTest {
         assertThat(trophy.roomName()).isEqualTo("금요모임");
         assertThat(trophy.boardGameName()).isEqualTo("카탄");
         assertThat(trophy.rank()).isEqualTo(2);
+    }
+
+    // ── 결산 카드용 커뮤니티 시상대 ──
+
+    @Test
+    void 커뮤니티_시상대는_한_사람의_가장_높은_행만_쓴다() {
+        PlayerGameRating 태윤카탄 = rating(1L, "태윤", 30.0, 5.0, 5, 4);   // 1250
+        PlayerGameRating 태윤아줄 = rating(1L, "태윤", 28.0, 5.0, 5, 3);   // 1150 — 같은 사람
+        PlayerGameRating 지민 = rating(2L, "지민", 27.0, 5.0, 5, 3);       // 1100
+        PlayerGameRating 현우 = rating(3L, "현우", 26.0, 5.0, 5, 2);       // 1050
+        when(snapshotRepository.findBySeasonKeyAndRoomIds(anyCollection(), eq(SEASON)))
+            .thenReturn(List.of(
+                snapshot(1, 태윤카탄), snapshot(2, 태윤아줄), snapshot(1, 지민), snapshot(2, 현우)));
+        givenMembersExist(태윤카탄, 지민, 현우);
+
+        List<SeasonDto.PodiumEntry> podium =
+            archiveService.getCommunityPodium(List.of(ROOM_ID, 200L), SEASON);
+
+        assertThat(podium).extracting(SeasonDto.PodiumEntry::rank).containsExactly(1, 2, 3);
+        assertThat(podium).extracting(SeasonDto.PodiumEntry::nickname)
+            .containsExactly("태윤", "지민", "현우"); // 태윤이 두 칸을 먹지 않는다
+        assertThat(podium.get(0).displayScore()).isCloseTo(1250.0, within(0.001)); // 낮은 행이 아니라 최고 행
+    }
+
+    @Test
+    void 커뮤니티_참가자가_3명_미만이면_결산에_시상대가_없다() {
+        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 5, 4);
+        PlayerGameRating 지민 = rating(2L, "지민", 27.0, 5.0, 5, 3);
+        when(snapshotRepository.findBySeasonKeyAndRoomIds(anyCollection(), eq(SEASON)))
+            .thenReturn(List.of(snapshot(1, 태윤), snapshot(2, 지민)));
+
+        assertThat(archiveService.getCommunityPodium(List.of(ROOM_ID), SEASON)).isEmpty();
+    }
+
+    @Test
+    void 커뮤니티_시상대도_본인_3경기_미만을_뺀다() {
+        PlayerGameRating 태윤 = rating(1L, "태윤", 31.0, 5.0, 2, 2);  // 2경기 — 1위지만 자격 없음
+        PlayerGameRating 지민 = rating(2L, "지민", 30.0, 5.0, 5, 3);
+        PlayerGameRating 현우 = rating(3L, "현우", 27.0, 5.0, 5, 2);
+        PlayerGameRating 민서 = rating(4L, "민서", 26.0, 5.0, 5, 1);
+        when(snapshotRepository.findBySeasonKeyAndRoomIds(anyCollection(), eq(SEASON)))
+            .thenReturn(List.of(snapshot(1, 태윤), snapshot(2, 지민), snapshot(3, 현우), snapshot(4, 민서)));
+        givenMembersExist(지민, 현우, 민서);
+
+        assertThat(archiveService.getCommunityPodium(List.of(ROOM_ID), SEASON))
+            .extracting(SeasonDto.PodiumEntry::nickname)
+            .containsExactly("지민", "현우", "민서");
     }
 
     // ── fixtures ──

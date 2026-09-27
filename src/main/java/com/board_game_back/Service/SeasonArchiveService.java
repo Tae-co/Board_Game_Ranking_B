@@ -16,8 +16,10 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -225,6 +227,59 @@ public class SeasonArchiveService {
         return trophies;
     }
 
+    /**
+     * 결산 카드용 커뮤니티 시상대 (§6). 방·게임이 섞인 커뮤니티 전체에서 이번 시즌
+     * 표시 점수가 가장 높았던 3명이다.
+     *
+     * <p><b>방별 시상대와 축이 다르다.</b> 방별({@link #getPodium})은 "이 방 이 게임의 1등"이고
+     * 이쪽은 "우리 모임의 1등"이다. 한 사람이 여러 방·게임에 있으면 <b>가장 높은 한 행만</b> 쓴다 —
+     * 안 그러면 잘하는 사람 한 명이 시상대를 독식한다.
+     *
+     * <p>시상 조건(§4)은 방별과 같은 규칙을 쓴다. 참가자는 커뮤니티 전체의 스냅샷 인원으로 센다.
+     */
+    public List<SeasonDto.PodiumEntry> getCommunityPodium(Collection<Long> roomIds, String seasonKey) {
+        if (roomIds.isEmpty() || !isSeasonKey(seasonKey)) return Collections.emptyList();
+
+        List<SeasonRankSnapshot> rows = snapshotRepository.findBySeasonKeyAndRoomIds(roomIds, seasonKey);
+
+        // 사람당 가장 높은 행만 남긴다. 쿼리가 점수 내림차순이라 처음 만난 행이 그 사람의 최고다.
+        Map<Long, SeasonRankSnapshot> bestByMember = new LinkedHashMap<>();
+        for (SeasonRankSnapshot row : rows) bestByMember.putIfAbsent(row.getMemberId(), row);
+        if (bestByMember.size() < MIN_SEASON_PARTICIPANTS) return Collections.emptyList();
+
+        List<SeasonRankSnapshot> qualified = bestByMember.values().stream()
+            .filter(row -> row.getPlayCount() >= MIN_OWN_PLAY_COUNT)
+            .toList();
+        Map<Long, Member> members = membersByIds(
+            qualified.stream().map(SeasonRankSnapshot::getMemberId).collect(Collectors.toSet()));
+
+        List<SeasonDto.PodiumEntry> podium = new ArrayList<>();
+        int rank = 0;
+        double previousScore = Double.NaN;
+        for (int i = 0; i < qualified.size(); i++) {
+            SeasonRankSnapshot row = qualified.get(i);
+            if (row.getDisplayScore() != previousScore) {
+                rank = i + 1;
+                previousScore = row.getDisplayScore();
+            }
+            if (rank > PODIUM_SIZE) break;
+
+            Member member = members.get(row.getMemberId());
+            if (member == null) continue;
+            podium.add(new SeasonDto.PodiumEntry(
+                rank, member.getId(), member.getNickname(), member.getProfileImage(),
+                row.getDisplayScore(), row.getPlayCount(), row.getWinCount()));
+        }
+        return podium;
+    }
+
+    /** 이 커뮤니티가 시즌을 한 번이라도 마감했는지 (§11 예고 배너). */
+    public SeasonDto.SeasonStatusResponse getCommunityStatus(Long communityId) {
+        List<Long> roomIds = roomRepository.findByCommunityId(communityId).stream().map(Room::getId).toList();
+        if (roomIds.isEmpty()) return new SeasonDto.SeasonStatusResponse(false);
+        return new SeasonDto.SeasonStatusResponse(snapshotRepository.existsByRoomIdIn(roomIds));
+    }
+
     // ── 내부 ──
 
     /** 화면이 방을 게임 하나로 다루므로 {@code boardGameId}가 없으면 방의 게임으로 채운다. */
@@ -238,8 +293,11 @@ public class SeasonArchiveService {
     }
 
     private Map<Long, Member> membersOf(List<SeasonRankSnapshot> snapshots) {
-        Set<Long> memberIds =
-            snapshots.stream().map(SeasonRankSnapshot::getMemberId).collect(Collectors.toSet());
+        return membersByIds(
+            snapshots.stream().map(SeasonRankSnapshot::getMemberId).collect(Collectors.toSet()));
+    }
+
+    private Map<Long, Member> membersByIds(Set<Long> memberIds) {
         if (memberIds.isEmpty()) return Collections.emptyMap();
         return memberRepository.findAllById(memberIds).stream()
             .collect(Collectors.toMap(Member::getId, Function.identity()));
