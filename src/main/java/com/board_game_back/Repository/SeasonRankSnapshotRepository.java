@@ -1,6 +1,7 @@
 package com.board_game_back.Repository;
 
 import com.board_game_back.Entity.SeasonRankSnapshot;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -41,13 +42,33 @@ public interface SeasonRankSnapshotRepository extends JpaRepository<SeasonRankSn
     List<SeasonRankSnapshot> findByRoomIdAndBoardGameIdAndSeasonKeyAndRank(
         Long roomId, Long boardGameId, String seasonKey, int rank);
 
-    /** 방별 시즌 목록 (시즌 탭의 월 선택) */
+    /**
+     * 방별 시즌 목록 (시즌 탭의 월 선택) — 시즌별 참가자 수.
+     *
+     * <p>경기 수는 여기서 낼 수 없다. 스냅샷은 사람당 한 행이라 {@code playCount}를 어떻게 합쳐도
+     * 경기 수가 되지 않는다(한 경기에 여러 명이 들어간다). 경기 수는 시즌 경계로 자른
+     * {@code match_record} 쪽에서 센다 — {@code SeasonArchiveService#getRoomSeasons}.
+     */
     @Query("""
-        SELECT s.seasonKey, COUNT(s), MAX(s.playCount)
+        SELECT s.seasonKey, COUNT(s)
         FROM SeasonRankSnapshot s
-        WHERE s.roomId = :roomId
+        WHERE s.roomId = :roomId AND s.boardGameId = :boardGameId
         GROUP BY s.seasonKey
         ORDER BY s.seasonKey DESC
         """)
-    List<Object[]> findSeasonSummariesByRoomId(@Param("roomId") Long roomId);
+    List<Object[]> findPlayerCountsByRoomIdAndBoardGameId(
+        @Param("roomId") Long roomId, @Param("boardGameId") Long boardGameId);
+
+    /**
+     * 시상 자격 판단용 — (시즌, 방, 게임)별 참가자 수 (§4 트로피 인플레이션 가드).
+     * 트로피 선반은 여러 방·시즌을 한 번에 그리므로 행마다 따로 세면 N+1이 된다.
+     */
+    @Query("""
+        SELECT s.seasonKey, s.roomId, s.boardGameId, COUNT(s)
+        FROM SeasonRankSnapshot s
+        WHERE s.roomId IN :roomIds AND s.seasonKey IN :seasonKeys
+        GROUP BY s.seasonKey, s.roomId, s.boardGameId
+        """)
+    List<Object[]> countParticipantsByRoomsAndSeasons(
+        @Param("roomIds") Collection<Long> roomIds, @Param("seasonKeys") Collection<String> seasonKeys);
 }
