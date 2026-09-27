@@ -136,11 +136,12 @@ class UserEventServiceTest {
         // 프론트 EVENTS 상수(api/services/events.js)와 1:1이어야 한다. 어긋나면 서버가
         // 202로 받고 조용히 버려서, 배포 후에도 "0건"인지 "이름 불일치"인지 알 수 없다.
         for (EventName name : EventName.values()) {
-            if (name == EventName.MEMBER_DELETED) continue; // 서버 전용 (위 테스트가 담당)
+            if (UserEventService.SERVER_ONLY.contains(name)) continue; // 위 테스트가 담당
             userEventService.record(request(name.name(), null), 7L);
         }
 
-        verify(userEventRepository, org.mockito.Mockito.times(EventName.values().length - 1))
+        verify(userEventRepository, org.mockito.Mockito.times(
+                        EventName.values().length - UserEventService.SERVER_ONLY.size()))
                 .save(any());
     }
 

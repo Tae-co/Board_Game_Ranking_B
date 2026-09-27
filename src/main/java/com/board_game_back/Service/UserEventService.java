@@ -23,10 +23,14 @@ public class UserEventService {
 
     /**
      * 서버만 남길 수 있는 이벤트. {@code POST /api/events}는 permitAll이라 누구나 호출할 수
-     * 있어서, 이 이름들을 클라이언트 경로에서 막지 않으면 탈퇴 지표를 위조할 수 있다.
+     * 있어서, 이 이름들을 클라이언트 경로에서 막지 않으면 탈퇴 지표나 리셋 대상 수를 위조할 수 있다.
+     *
+     * <p>패키지 공개인 이유: 같은 패키지의 테스트가 "프론트가 보낼 수 있는 이름"을 이 집합의
+     * 여집합으로 구한다. 여기에 이름을 더할 때 테스트를 따로 고치지 않아도 되도록.
      */
-    private static final java.util.Set<EventName> SERVER_ONLY = java.util.EnumSet.of(
-            EventName.MEMBER_DELETED);
+    static final java.util.Set<EventName> SERVER_ONLY = java.util.EnumSet.of(
+            EventName.MEMBER_DELETED,
+            EventName.SEASON_ROLLED_OVER);
 
     private final UserEventRepository userEventRepository;
 
@@ -67,10 +71,26 @@ public class UserEventService {
      */
     @Async("eventExecutor")
     public void recordServerSide(EventName eventName, Long memberId) {
+        saveServerSide(eventName, memberId, null, null);
+    }
+
+    /**
+     * 차원이 붙는 서버 이벤트. 롤오버가 그렇다 — 어느 커뮤니티의 어느 시즌이 몇 명에게
+     * 적용됐는지가 지표의 분모이므로 이름만으로는 쓸 수 없다.
+     */
+    @Async("eventExecutor")
+    public void recordServerSide(EventName eventName, Long communityId, java.util.Map<String, Object> props) {
+        saveServerSide(eventName, null, communityId, props);
+    }
+
+    private void saveServerSide(
+            EventName eventName, Long memberId, Long communityId, java.util.Map<String, Object> props) {
         try {
             userEventRepository.save(UserEvent.builder()
                     .memberId(memberId)
                     .eventName(eventName)
+                    .communityId(communityId)
+                    .props(serializeProps(props))
                     .platform("server")
                     .build());
         } catch (Exception e) {

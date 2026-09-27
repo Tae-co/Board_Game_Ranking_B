@@ -47,6 +47,8 @@ class SeasonRolloverServiceTest {
     @Mock private MatchRecordRepository matchRecordRepository;
     @Mock private PlayerGameRatingRepository ratingRepository;
     @Mock private SeasonRankSnapshotRepository snapshotRepository;
+    // 롤오버가 SEASON_ROLLED_OVER를 남긴다 (§10). 이 테스트가 보는 건 스냅샷·리셋이다.
+    @Mock private UserEventService userEventService;
 
     @InjectMocks private SeasonRolloverService rolloverService;
 

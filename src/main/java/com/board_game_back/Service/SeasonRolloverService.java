@@ -1,6 +1,7 @@
 package com.board_game_back.Service;
 
 import com.board_game_back.Entity.Community;
+import com.board_game_back.Entity.EventName;
 import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Entity.SeasonRankSnapshot;
@@ -17,9 +18,11 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -48,6 +51,7 @@ public class SeasonRolloverService {
     private final MatchRecordRepository matchRecordRepository;
     private final PlayerGameRatingRepository ratingRepository;
     private final SeasonRankSnapshotRepository snapshotRepository;
+    private final UserEventService userEventService;
 
     /**
      * 커뮤니티의 한 시즌을 마감한다.
@@ -70,26 +74,40 @@ public class SeasonRolloverService {
         Map<Long, LocalDateTime> firstPlayedByRoom = firstPlayedAtByRoom(rooms);
 
         int rolled = 0;
+        Set<Long> affectedMembers = new HashSet<>();
         for (Room room : rooms) {
-            if (rolloverRoom(room, seasonKey, seasonEndUtc, firstPlayedByRoom.get(room.getId()))) rolled++;
+            List<SeasonRankSnapshot> written =
+                rolloverRoom(room, seasonKey, seasonEndUtc, firstPlayedByRoom.get(room.getId()));
+            if (written.isEmpty()) continue;
+            rolled++;
+            written.forEach(snapshot -> affectedMembers.add(snapshot.getMemberId()));
         }
 
-        log.info("시즌 롤오버 community={} season={} 마감된 방={}/{}", communityId, seasonKey, rolled, rooms.size());
+        log.info("시즌 롤오버 community={} season={} 마감된 방={}/{} 대상={}명",
+            communityId, seasonKey, rolled, rooms.size(), affectedMembers.size());
+
+        // 리셋이 리텐션을 올렸는지 판정할 때 이 이벤트가 분모가 된다 (§10).
+        // 한 판도 마감되지 않았으면(멱등 재실행·14일 이월) 남길 사건이 없다.
+        if (rolled > 0) {
+            userEventService.recordServerSide(EventName.SEASON_ROLLED_OVER, communityId,
+                Map.of("season_key", seasonKey, "playerCount", affectedMembers.size()));
+        }
         return rolled;
     }
 
-    private boolean rolloverRoom(
+    /** @return 실제로 쓴 스냅샷. 비어 있으면 이 방은 마감되지 않았다. */
+    private List<SeasonRankSnapshot> rolloverRoom(
         Room room, String seasonKey, LocalDateTime seasonEndUtc, LocalDateTime firstPlayedAt) {
 
         Long roomId = room.getId();
 
         // 멱등성: 이 방의 이 시즌은 이미 마감됐다.
-        if (snapshotRepository.existsBySeasonKeyAndRoomId(seasonKey, roomId)) return false;
+        if (snapshotRepository.existsBySeasonKeyAndRoomId(seasonKey, roomId)) return List.of();
 
         // 14일 규칙은 첫 시즌에만 적용한다. 한 번이라도 마감한 방은 이미 매월 주기에 올라탔다.
         if (!snapshotRepository.existsByRoomId(roomId)) {
-            if (firstPlayedAt == null) return false; // 경기가 없으면 찍을 사진도 없다
-            if (Duration.between(firstPlayedAt, seasonEndUtc).toDays() < MIN_FIRST_SEASON_DAYS) return false;
+            if (firstPlayedAt == null) return List.of(); // 경기가 없으면 찍을 사진도 없다
+            if (Duration.between(firstPlayedAt, seasonEndUtc).toDays() < MIN_FIRST_SEASON_DAYS) return List.of();
         }
 
         List<PlayerGameRating> ratings = ratingRepository.findByRoomIdWithMemberAndBoardGame(roomId);
@@ -99,12 +117,12 @@ public class SeasonRolloverService {
         }
 
         // 참가자가 없으면 스냅샷도 리셋도 의미가 없다. 이미 초기값인 방을 건드리지 않는다.
-        if (snapshots.isEmpty()) return false;
+        if (snapshots.isEmpty()) return List.of();
 
         snapshotRepository.saveAll(snapshots);
         ratings.forEach(PlayerGameRating::reset);
         ratingRepository.saveAll(ratings);
-        return true;
+        return snapshots;
     }
 
     /** 한 게임의 최종 순위를 사진으로 남긴다. 동점은 같은 순위를 받는다 (1,2,2,4). */
