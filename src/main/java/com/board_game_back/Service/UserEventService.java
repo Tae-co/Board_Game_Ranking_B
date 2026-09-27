@@ -1,0 +1,104 @@
+package com.board_game_back.Service;
+
+import com.board_game_back.DTO.EventDto;
+import com.board_game_back.Entity.EventName;
+import com.board_game_back.Entity.UserEvent;
+import com.board_game_back.Repository.UserEventRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class UserEventService {
+
+    /** 비로그인도 호출할 수 있는 엔드포인트라 문자열 길이를 서버에서 자른다. */
+    private static final int MAX_PROPS_LENGTH = 2000;
+
+    /** ObjectMapper 빈은 이 프로젝트에 없다 (AdminController도 동일하게 직접 만들어 쓴다). */
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    /**
+     * 서버만 남길 수 있는 이벤트. {@code POST /api/events}는 permitAll이라 누구나 호출할 수
+     * 있어서, 이 이름들을 클라이언트 경로에서 막지 않으면 탈퇴 지표를 위조할 수 있다.
+     */
+    private static final java.util.Set<EventName> SERVER_ONLY = java.util.EnumSet.of(
+            EventName.MEMBER_DELETED);
+
+    private final UserEventRepository userEventRepository;
+
+    /**
+     * 계측은 제품 기능이 아니다. 실패해도 사용자 흐름에 영향이 없어야 하므로
+     * 요청 스레드와 분리하고 예외를 삼킨다.
+     */
+    @Async("eventExecutor")
+    public void record(EventDto.LogRequest request, Long memberId) {
+        if (request == null) return;
+        EventName eventName = parseEventName(request.eventName());
+        if (eventName == null) return; // 화이트리스트 밖 — 조용히 버린다
+        if (SERVER_ONLY.contains(eventName)) return; // 클라이언트가 보낼 수 없는 이름
+
+        try {
+            userEventRepository.save(UserEvent.builder()
+                    .memberId(memberId)
+                    .anonId(truncate(request.anonId(), 64))
+                    .eventName(eventName)
+                    .communityId(request.communityId())
+                    .roomId(request.roomId())
+                    .boardGameId(request.boardGameId())
+                    .props(serializeProps(request.props()))
+                    .sessionId(truncate(request.sessionId(), 64))
+                    .platform(truncate(request.platform(), 16))
+                    .appVersion(truncate(request.appVersion(), 20))
+                    .build());
+        } catch (Exception e) {
+            log.warn("이벤트 기록 실패 (무시): {}", eventName, e);
+        }
+    }
+
+    /**
+     * 서버가 직접 남기는 이벤트. 프론트에서 찍을 수 없는 순간에 쓴다.
+     *
+     * <p>탈퇴가 그렇다 — 성공 직후 화면이 {@code /login}으로 넘어가면서 브라우저가
+     * 진행 중이던 요청을 취소하고, 토큰도 그 시점에 지워진다.
+     */
+    @Async("eventExecutor")
+    public void recordServerSide(EventName eventName, Long memberId) {
+        try {
+            userEventRepository.save(UserEvent.builder()
+                    .memberId(memberId)
+                    .eventName(eventName)
+                    .platform("server")
+                    .build());
+        } catch (Exception e) {
+            log.warn("서버 이벤트 기록 실패 (무시): {}", eventName, e);
+        }
+    }
+
+    private EventName parseEventName(String raw) {
+        if (raw == null) return null;
+        try {
+            return EventName.valueOf(raw);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String serializeProps(Object props) {
+        if (props == null) return null;
+        try {
+            String json = OBJECT_MAPPER.writeValueAsString(props);
+            return json.length() > MAX_PROPS_LENGTH ? null : json;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String truncate(String value, int max) {
+        if (value == null) return null;
+        return value.length() <= max ? value : value.substring(0, max);
+    }
+}
