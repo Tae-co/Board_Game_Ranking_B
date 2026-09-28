@@ -19,29 +19,19 @@ public class SeasonDto {
         String communityImageUrl,
         String inviteCode,
         String period,
-        int totalMatches,
-        int totalPlayers,
+        int totalRooms,       // 커뮤니티의 현재 방 수 (시즌 시점의 값이 아니다)
+        long totalMembers,    // 커뮤니티의 현재 인원 (같음)
         List<Award> awards,
-        List<GameTop> gameTops,
         List<PodiumEntry> podium   // 마감된 시즌의 1·2·3등. 아직 안 끝난 달은 빈 목록이다
     ) {}
 
-    /** type: MOST_WINS | BIGGEST_CLIMB | DARK_HORSE */
+    /** type: MOST_WINS | LONGEST_STREAK | DARK_HORSE */
     public record Award(
         String type,
         Long memberId,
         String nickname,
         String profileImage,
         double value
-    ) {}
-
-    public record GameTop(
-        Long boardGameId,
-        String boardGameName,
-        String boardGameImageUrl,
-        Long memberId,
-        String nickname,
-        int wins
     ) {}
 
     // ── 방별 시즌 기록 (리셋 스냅샷에서 나온다. 위쪽 결산과 달리 방 단위다) ──

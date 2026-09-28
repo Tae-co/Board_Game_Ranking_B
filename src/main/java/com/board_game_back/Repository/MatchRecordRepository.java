@@ -60,7 +60,7 @@ public interface MatchRecordRepository extends JpaRepository<MatchRecord, Long> 
         JOIN FETCH m.participants p
         JOIN FETCH p.member
         WHERE m.room.id IN :roomIds AND m.playedAt >= :from AND m.playedAt < :to
-        ORDER BY m.playedAt ASC
+        ORDER BY m.playedAt ASC, m.id ASC
         """)
     List<MatchRecord> findByRoomIdsAndPlayedAtRange(
         @Param("roomIds") Collection<Long> roomIds,

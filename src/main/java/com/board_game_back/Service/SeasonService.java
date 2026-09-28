@@ -1,12 +1,12 @@
 package com.board_game_back.Service;
 
 import com.board_game_back.DTO.SeasonDto;
-import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.MatchParticipant;
 import com.board_game_back.Entity.MatchRecord;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.Room;
+import com.board_game_back.Repository.CommunityMemberRepository;
 import com.board_game_back.Repository.CommunityRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
 import com.board_game_back.Repository.RoomRepository;
@@ -35,9 +35,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class SeasonService {
 
     private final CommunityRepository communityRepository;
+    private final CommunityMemberRepository communityMemberRepository;
     private final RoomRepository roomRepository;
     private final MatchRecordRepository matchRecordRepository;
     private final SeasonArchiveService archiveService;
+
+    /** 연승은 2부터 상이 된다. 1연승은 그냥 1승이라 아무 정보가 아니다. */
+    private static final int MIN_STREAK = 2;
 
     public List<SeasonDto.PeriodResponse> getPeriods(Long communityId) {
         List<Long> roomIds = roomIdsOf(communityId);
@@ -68,33 +72,16 @@ public class SeasonService {
             ? Collections.emptyList()
             : matchRecordRepository.findByRoomIdsAndPlayedAtRange(roomIds, from, to);
 
+        // 연승을 세므로 시간순이 중요하다 — 쿼리가 playedAt, id 오름차순으로 준다.
         Map<Long, PlayerTally> tallies = new LinkedHashMap<>();
-        Map<Long, Map<Long, Integer>> winsByGameByMember = new LinkedHashMap<>();
-        Map<Long, BoardGame> gamesById = new LinkedHashMap<>();
-
         for (MatchRecord match : matches) {
-            BoardGame game = match.getBoardGame();
-            if (game != null) gamesById.putIfAbsent(game.getId(), game);
-
             for (MatchParticipant p : match.getParticipants()) {
                 Member member = p.getMember();
                 if (member == null) continue;
-
-                PlayerTally tally = tallies.computeIfAbsent(member.getId(), id -> new PlayerTally(member));
-                tally.climb += p.getRatingChange();
-                if (p.getPlacement() == 1) {
-                    tally.wins++;
-                    if (game != null) {
-                        winsByGameByMember
-                            .computeIfAbsent(game.getId(), id -> new HashMap<>())
-                            .merge(member.getId(), 1, Integer::sum);
-                    }
-                }
+                tallies.computeIfAbsent(member.getId(), id -> new PlayerTally(member))
+                    .record(p.getPlacement(), p.getRatingChange());
             }
         }
-
-        List<SeasonDto.Award> awards = buildAwards(tallies, roomIds, from, to);
-        List<SeasonDto.GameTop> gameTops = buildGameTops(gamesById, winsByGameByMember, tallies);
 
         return new SeasonDto.SummaryResponse(
             community.getId(),
@@ -102,10 +89,9 @@ public class SeasonService {
             community.getImageUrl(),
             community.getInviteCode(),
             month.toString(),
-            matches.size(),
-            tallies.size(),
-            awards,
-            gameTops,
+            roomIds.size(),
+            communityMemberRepository.countByCommunityId(communityId),
+            buildAwards(tallies, roomIds, from, to),
             archiveService.getCommunityPodium(roomIds, month.toString())
         );
     }
@@ -127,13 +113,14 @@ public class SeasonService {
             awarded.add(mostWins.member.getId());
         }
 
-        PlayerTally biggestClimb = tallies.values().stream()
-            .filter(t -> t.climb > 0 && !awarded.contains(t.member.getId()))
-            .max(Comparator.comparingDouble(t -> t.climb))
+        // 동점은 총 승수로 가른다. 5연승 1회와 5연승 + 3승은 후자가 더 한 시즌을 이끌었다.
+        PlayerTally longestStreak = tallies.values().stream()
+            .filter(t -> t.maxStreak >= MIN_STREAK && !awarded.contains(t.member.getId()))
+            .max(Comparator.<PlayerTally>comparingInt(t -> t.maxStreak).thenComparingInt(t -> t.wins))
             .orElse(null);
-        if (biggestClimb != null) {
-            awards.add(award("BIGGEST_CLIMB", biggestClimb, Math.round(biggestClimb.climb)));
-            awarded.add(biggestClimb.member.getId());
+        if (longestStreak != null) {
+            awards.add(award("LONGEST_STREAK", longestStreak, longestStreak.maxStreak));
+            awarded.add(longestStreak.member.getId());
         }
 
         // 다크호스: 커뮤니티에서 이번 시즌에 처음 뛴 멤버 중 상승폭 1위
@@ -162,32 +149,6 @@ public class SeasonService {
         return newcomers;
     }
 
-    private List<SeasonDto.GameTop> buildGameTops(
-        Map<Long, BoardGame> gamesById,
-        Map<Long, Map<Long, Integer>> winsByGameByMember,
-        Map<Long, PlayerTally> tallies) {
-
-        List<SeasonDto.GameTop> tops = new ArrayList<>();
-        for (BoardGame game : gamesById.values()) {
-            Map<Long, Integer> wins = winsByGameByMember.get(game.getId());
-            if (wins == null || wins.isEmpty()) continue;
-
-            Map.Entry<Long, Integer> best = wins.entrySet().stream()
-                .max(Map.Entry.<Long, Integer>comparingByValue()
-                    .thenComparingDouble(e -> tallies.get(e.getKey()).climb))
-                .orElse(null);
-            if (best == null) continue;
-
-            Member member = tallies.get(best.getKey()).member;
-            tops.add(new SeasonDto.GameTop(
-                game.getId(), game.getName(), game.getImageUrl(),
-                member.getId(), member.getNickname(), best.getValue()
-            ));
-        }
-        tops.sort(Comparator.comparingInt(SeasonDto.GameTop::wins).reversed());
-        return tops;
-    }
-
     private SeasonDto.Award award(String type, PlayerTally tally, double value) {
         return new SeasonDto.Award(
             type, tally.member.getId(), tally.member.getNickname(), tally.member.getProfileImage(), value);
@@ -209,9 +170,29 @@ public class SeasonService {
         final Member member;
         int wins;
         double climb;
+        int currentStreak;
+        int maxStreak;
 
         PlayerTally(Member member) {
             this.member = member;
+        }
+
+        /**
+         * 시간순으로 한 판씩 먹인다. 1등이면 연승이 이어지고 아니면 끊긴다.
+         *
+         * <p>본인이 참가하지 않은 경기는 여기 들어오지 않으므로 연승을 끊지 않는다.
+         * 방·게임이 섞이는 것은 의도다 — 결산은 커뮤니티 단위이고 "그 달 우리 모임에서
+         * 몇 판을 내리 이겼나"가 세는 값이다.
+         */
+        void record(int placement, double ratingChange) {
+            climb += ratingChange;
+            if (placement == 1) {
+                wins++;
+                currentStreak++;
+                maxStreak = Math.max(maxStreak, currentStreak);
+            } else {
+                currentStreak = 0;
+            }
         }
     }
 }
