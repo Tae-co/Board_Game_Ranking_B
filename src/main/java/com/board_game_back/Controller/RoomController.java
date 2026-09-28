@@ -4,9 +4,11 @@ import com.board_game_back.DTO.MatchDto;
 import com.board_game_back.DTO.RankingDto;
 import com.board_game_back.DTO.RoomDto;
 import com.board_game_back.DTO.RoomDto.Response;
+import com.board_game_back.DTO.SeasonDto;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Service.MatchService;
 import com.board_game_back.Service.RankingService;
+import com.board_game_back.Service.SeasonArchiveService;
 import com.board_game_back.Service.RoomService;
 import java.util.Collections;
 import java.util.List;
@@ -33,6 +35,7 @@ public class RoomController {
     private final RoomService roomService;
     private final RankingService rankingService;
     private final MatchService matchService;
+    private final SeasonArchiveService seasonArchiveService;
 
     @PostMapping
     public ResponseEntity<RoomDto.Response> createRoom(
@@ -72,15 +75,40 @@ public class RoomController {
             new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode(), room.getBoardGameId()));
     }
 
+    /**
+     * season(yyyy-MM)을 주면 마감된 그 시즌의 스냅샷을, 안 주면 지금까지처럼 현재 랭킹을 돌려준다.
+     * 응답 스키마가 같아서 프론트 테이블은 그대로 쓴다 (기획 §8).
+     */
     @GetMapping("/{roomId}/rankings")
     public ResponseEntity<List<RankingDto.GameRankingResponse>> getRoomRankings(
             @PathVariable Long roomId,
-            @RequestParam(required = false) Long boardGameId) {
+            @RequestParam(required = false) Long boardGameId,
+            @RequestParam(required = false) String season) {
+        if (season != null) {
+            return ResponseEntity.ok(seasonArchiveService.getSeasonRanking(roomId, boardGameId, season));
+        }
         Long gameId = boardGameId != null ? boardGameId : roomService.getRoomById(roomId).getBoardGameId();
         if (gameId == null) {
             return ResponseEntity.ok(Collections.emptyList());
         }
         return ResponseEntity.ok(rankingService.getRoomRanking(roomId, gameId));
+    }
+
+    /** 마감된 시즌 목록 (시즌 탭의 월 선택). 진행 중인 시즌은 들어가지 않는다. */
+    @GetMapping("/{roomId}/seasons")
+    public ResponseEntity<List<SeasonDto.RoomSeasonResponse>> getRoomSeasons(
+            @PathVariable Long roomId,
+            @RequestParam(required = false) Long boardGameId) {
+        return ResponseEntity.ok(seasonArchiveService.getRoomSeasons(roomId, boardGameId));
+    }
+
+    /** 1·2·3등 시상대. 시상 조건(참가자 3명 이상·본인 3경기 이상)을 통과한 행만 나온다. */
+    @GetMapping("/{roomId}/seasons/{seasonKey}/podium")
+    public ResponseEntity<List<SeasonDto.PodiumEntry>> getSeasonPodium(
+            @PathVariable Long roomId,
+            @PathVariable String seasonKey,
+            @RequestParam(required = false) Long boardGameId) {
+        return ResponseEntity.ok(seasonArchiveService.getPodium(roomId, boardGameId, seasonKey));
     }
 
     @DeleteMapping("/{roomId}/members/{memberId}")

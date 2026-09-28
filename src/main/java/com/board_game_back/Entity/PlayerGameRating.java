@@ -74,11 +74,12 @@ public class PlayerGameRating {
     public void applyDecay(double muDecay) {
         double currentMu = this.gameStats.getRating();
         double sigma = this.gameStats.getRatingDeviation();
-        // 표시 점수 0에 해당하는 μ 하한: (μ - 3σ)×50 + 500 = 0 ⟺ μ = 3σ - 500/50
-        double floorMu = RatingConstants.DISPLAY_SIGMA_FACTOR * sigma
-            - RatingConstants.DISPLAY_OFFSET / RatingConstants.DISPLAY_SCALE;
+        // 표시 점수 500(= 시작 점수)에 해당하는 μ 하한: (μ - 3σ)×50 + 500 = 500 ⟺ μ = 3σ
+        // 리셋 직후는 μ=25, σ=25/3이라 3σ = 25 = μ — 갓 리셋된 사람은 하한에 정확히 걸려
+        // decay가 아예 닿지 않는다. "500 위로 올라간 사람만 깎는다"가 공식 하나로 성립한다.
+        double floorMu = RatingConstants.DISPLAY_SIGMA_FACTOR * sigma;
         double decayedMu = currentMu - muDecay;
-        // decay는 표시 점수 0 밑으론 깎지 않는다. 이미 0 밑이면(연패 등) 그대로 둔다(끌어올리지 않음).
+        // decay는 벌어들인 것을 반납시킬 뿐 빚을 지우지 않는다. 이미 하한 밑이면(연패 등) 그대로 둔다.
         double newMu = decayedMu < floorMu ? Math.min(currentMu, floorMu) : decayedMu;
         this.gameStats.update(newMu, sigma, this.gameStats.getVolatility());
     }

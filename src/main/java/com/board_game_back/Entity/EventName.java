@@ -38,6 +38,12 @@ public enum EventName {
     // 리텐션: 이게 없으면 "앱은 열었는데 아무것도 안 한 유저"를 영영 못 본다
     APP_OPENED,
 
+    // 시즌제: 리셋이 리텐션 장치라는 주장을 검증할 유일한 근거다 (plan-season-reset §10).
+    // SEASON_ROLLED_OVER가 없으면 "리셋이 언제 몇 명에게 일어났는지"의 분모를 만들 수 없다.
+    SEASON_RESULT_OPENED,   // 시즌이 끝난 뒤 결과를 보러 들어갔다 (배너·헤더 경유)
+    SEASON_PAST_VIEWED,     // 지난 시즌 순위표를 조회했다 — "기록은 영원히 남는다"를 실제로 쓰는가
+    SEASON_ROLLED_OVER,     // 서버가 직접. 프론트가 관측할 수 없는 사건이다
+
     // 이탈: 탈퇴는 member 행을 하드 삭제하므로(RoomService.deleteMember) 흔적이 통째로
     // 사라진다. user_event는 FK가 없어 살아남으므로 여기가 유일한 churn 기록이다.
     MEMBER_DELETED
