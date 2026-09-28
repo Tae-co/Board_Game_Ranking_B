@@ -54,7 +54,8 @@ public class SeasonDto {
         String profileImage,
         double displayScore,
         int playCount,
-        int winCount
+        int winCount,
+        String roomName     // 결산 시상대에서 그 점수를 낸 방. 방별 시상대는 모두 같은 방이라 null
     ) {}
 
     /** 시즌별 내 점수 추이 (시즌 탭 ④) */
