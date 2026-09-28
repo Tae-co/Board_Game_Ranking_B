@@ -287,6 +287,21 @@ class SeasonArchiveServiceTest {
     }
 
     @Test
+    void 커뮤니티_시상대는_그_점수를_낸_방_이름을_싣는다() {
+        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 5, 4);
+        PlayerGameRating 지민 = rating(2L, "지민", 27.0, 5.0, 5, 3);
+        PlayerGameRating 현우 = rating(3L, "현우", 26.0, 5.0, 5, 2);
+        when(snapshotRepository.findBySeasonKeyAndRoomIds(anyCollection(), eq(SEASON)))
+            .thenReturn(List.of(snapshot(1, 태윤), snapshot(2, 지민), snapshot(3, 현우)));
+        givenMembersExist(태윤, 지민, 현우);
+        when(roomRepository.findAllById(anyCollection())).thenReturn(List.of(room));
+
+        assertThat(archiveService.getCommunityPodium(List.of(ROOM_ID), SEASON))
+            .extracting(SeasonDto.PodiumEntry::roomName)
+            .containsExactly("금요모임", "금요모임", "금요모임");
+    }
+
+    @Test
     void 커뮤니티_참가자가_3명_미만이면_결산에_시상대가_없다() {
         PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 5, 4);
         PlayerGameRating 지민 = rating(2L, "지민", 27.0, 5.0, 5, 3);

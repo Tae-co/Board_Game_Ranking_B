@@ -160,7 +160,8 @@ public class SeasonArchiveService {
                 member.getProfileImage(),
                 snapshot.getDisplayScore(),
                 snapshot.getPlayCount(),
-                snapshot.getWinCount()));
+                snapshot.getWinCount(),
+                null));
         }
         return podium;
     }
@@ -252,6 +253,9 @@ public class SeasonArchiveService {
             .toList();
         Map<Long, Member> members = membersByIds(
             qualified.stream().map(SeasonRankSnapshot::getMemberId).collect(Collectors.toSet()));
+        Map<Long, String> roomNames = roomRepository.findAllById(
+                qualified.stream().map(SeasonRankSnapshot::getRoomId).collect(Collectors.toSet()))
+            .stream().collect(Collectors.toMap(Room::getId, Room::getName));
 
         List<SeasonDto.PodiumEntry> podium = new ArrayList<>();
         int rank = 0;
@@ -268,7 +272,8 @@ public class SeasonArchiveService {
             if (member == null) continue;
             podium.add(new SeasonDto.PodiumEntry(
                 rank, member.getId(), member.getNickname(), member.getProfileImage(),
-                row.getDisplayScore(), row.getPlayCount(), row.getWinCount()));
+                row.getDisplayScore(), row.getPlayCount(), row.getWinCount(),
+                roomNames.get(row.getRoomId())));
         }
         return podium;
     }
