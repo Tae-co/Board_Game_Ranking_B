@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.board_game_back.DTO.SeasonDto;
@@ -17,6 +19,7 @@ import com.board_game_back.Repository.CommunityMemberRepository;
 import com.board_game_back.Repository.CommunityRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
 import com.board_game_back.Repository.RoomRepository;
+import com.board_game_back.Utils.RegionTimeZones;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +45,7 @@ class SeasonServiceTest {
     @Mock private MatchRecordRepository matchRecordRepository;
     // 결산에 시상대를 얹으면서 생긴 의존. 이 테스트가 보는 건 수상 3종이고, 목은 빈 목록을 준다.
     @Mock private SeasonArchiveService archiveService;
+    @Mock private SeasonBoundaryService boundaryService;
 
     @InjectMocks private SeasonService seasonService;
 
@@ -66,6 +70,7 @@ class SeasonServiceTest {
     @Test
     void getPeriods_경기가_있는_달만_최신순으로_반환한다() {
         when(roomRepository.findByCommunityId(1L)).thenReturn(List.of(room));
+        when(boundaryService.zoneOfCommunity(1L)).thenReturn(RegionTimeZones.DEFAULT);
         when(matchRecordRepository.findPlayedAtByRoomIds(anyList())).thenReturn(List.of(
             LocalDateTime.of(2026, 8, 3, 20, 0),
             LocalDateTime.of(2026, 8, 17, 20, 0),
@@ -77,6 +82,34 @@ class SeasonServiceTest {
         assertThat(periods).extracting(SeasonDto.PeriodResponse::period)
             .containsExactly("2026-08", "2026-06");
         assertThat(periods.get(0).matchCount()).isEqualTo(2);
+    }
+
+    @Test
+    void getPeriods_달은_커뮤니티_타임존으로_가른다() {
+        when(roomRepository.findByCommunityId(1L)).thenReturn(List.of(room));
+        when(boundaryService.zoneOfCommunity(1L)).thenReturn(RegionTimeZones.DEFAULT);
+        // playedAt은 UTC 벽시계. UTC 8/31 15:30 = KST 9/1 00:30 → 9월, UTC 8/31 14:59 = KST 8/31 23:59 → 8월
+        when(matchRecordRepository.findPlayedAtByRoomIds(anyList())).thenReturn(List.of(
+            LocalDateTime.of(2026, 8, 31, 15, 30),
+            LocalDateTime.of(2026, 8, 31, 14, 59)
+        ));
+
+        List<SeasonDto.PeriodResponse> periods = seasonService.getPeriods(1L);
+
+        assertThat(periods).extracting(SeasonDto.PeriodResponse::period)
+            .containsExactly("2026-09", "2026-08");
+    }
+
+    @Test
+    void getSummary_조회_범위는_커뮤니티_타임존의_1일_00시를_UTC로_옮긴_값이다() {
+        givenCommunityWithRoom();
+        when(matchRecordRepository.findByRoomIdsAndPlayedAtRange(anyList(), any(), any())).thenReturn(List.of());
+
+        seasonService.getSummary(1L, PERIOD);
+
+        // KST 8/1 00:00 = UTC 7/31 15:00, KST 9/1 00:00 = UTC 8/31 15:00
+        verify(matchRecordRepository).findByRoomIdsAndPlayedAtRange(
+            anyList(), eq(LocalDateTime.of(2026, 7, 31, 15, 0)), eq(LocalDateTime.of(2026, 8, 31, 15, 0)));
     }
 
     @Test

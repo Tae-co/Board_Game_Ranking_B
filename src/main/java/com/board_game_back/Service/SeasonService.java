@@ -10,8 +10,11 @@ import com.board_game_back.Repository.CommunityMemberRepository;
 import com.board_game_back.Repository.CommunityRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
 import com.board_game_back.Repository.RoomRepository;
+import com.board_game_back.Utils.RegionTimeZones;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,6 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 커뮤니티 월간 결산. 시즌 엔티티 없이 MatchRecord.playedAt의 연-월로 집계한다.
+ *
+ * <p>playedAt은 UTC 벽시계지만 달은 커뮤니티 region 타임존으로 가른다 — 시즌 경계
+ * ({@link SeasonBoundaryService})와 같은 기준이어야 한국 1일 새벽 경기가 지난달 결산에 섞이지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -39,6 +45,7 @@ public class SeasonService {
     private final RoomRepository roomRepository;
     private final MatchRecordRepository matchRecordRepository;
     private final SeasonArchiveService archiveService;
+    private final SeasonBoundaryService boundaryService;
 
     /** 연승은 2부터 상이 된다. 1연승은 그냥 1승이라 아무 정보가 아니다. */
     private static final int MIN_STREAK = 2;
@@ -47,10 +54,11 @@ public class SeasonService {
         List<Long> roomIds = roomIdsOf(communityId);
         if (roomIds.isEmpty()) return Collections.emptyList();
 
+        ZoneId zone = boundaryService.zoneOfCommunity(communityId);
         Map<YearMonth, Integer> countByMonth = new HashMap<>();
         for (LocalDateTime playedAt : matchRecordRepository.findPlayedAtByRoomIds(roomIds)) {
             if (playedAt == null) continue;
-            countByMonth.merge(YearMonth.from(playedAt), 1, Integer::sum);
+            countByMonth.merge(YearMonth.from(playedAt.atOffset(ZoneOffset.UTC).atZoneSameInstant(zone)), 1, Integer::sum);
         }
 
         return countByMonth.entrySet().stream()
@@ -64,8 +72,9 @@ public class SeasonService {
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
 
         YearMonth month = parsePeriod(period);
-        LocalDateTime from = month.atDay(1).atStartOfDay();
-        LocalDateTime to = month.plusMonths(1).atDay(1).atStartOfDay();
+        ZoneId zone = RegionTimeZones.of(community.getRegion());
+        LocalDateTime from = SeasonBoundaryService.startOfSeasonUtc(zone, month);
+        LocalDateTime to = SeasonBoundaryService.startOfSeasonUtc(zone, month.plusMonths(1));
 
         List<Long> roomIds = roomIdsOf(communityId);
         List<MatchRecord> matches = roomIds.isEmpty()
