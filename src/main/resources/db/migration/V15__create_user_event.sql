@@ -22,3 +22,7 @@ CREATE TABLE IF NOT EXISTS user_event (
 CREATE INDEX IF NOT EXISTS idx_user_event_name_created ON user_event (event_name, created_at);
 CREATE INDEX IF NOT EXISTS idx_user_event_member_created ON user_event (member_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_user_event_anon_created ON user_event (anon_id, created_at);
+
+-- 다른 테이블과 같이 RLS를 켠다. 꺼져 있으면 anon 키로 PostgREST를 통해 읽고 쓸 수 있다.
+-- 백엔드는 postgres 롤로 접속해 RLS를 우회하므로 정책은 두지 않는다.
+ALTER TABLE user_event ENABLE ROW LEVEL SECURITY;
