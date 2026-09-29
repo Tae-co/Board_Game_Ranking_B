@@ -67,7 +67,7 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 스냅샷은_현재_랭킹과_같은_필드로_나온다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 12, 8); // (30-15)×50+500 = 1250
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 12, 8);
         givenSnapshots(snapshot(1, 태윤));
         givenMembersExist(태윤);
 
@@ -79,7 +79,7 @@ class SeasonArchiveServiceTest {
         assertThat(row.rank()).isEqualTo(1);
         assertThat(row.memberId()).isEqualTo(1L);
         assertThat(row.nickname()).isEqualTo("태윤");
-        assertThat(row.rating()).isCloseTo(1250.0, within(0.001)); // μ/σ가 아니라 표시 점수다
+        assertThat(row.rating()).isCloseTo(1250.0, within(0.001)); // 표시 점수다
         assertThat(row.playCount()).isEqualTo(12);
         assertThat(row.winCount()).isEqualTo(8);
         assertThat(row.loseCount()).isEqualTo(4);
@@ -94,8 +94,8 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 탈퇴한_멤버의_스냅샷_행은_버린다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 3, 2);
-        PlayerGameRating 유령 = rating(99L, "탈퇴자", 27.0, 6.0, 3, 1);
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 3, 2);
+        PlayerGameRating 유령 = rating(99L, "탈퇴자", 950.0, 3, 1);
         givenSnapshots(snapshot(1, 태윤), snapshot(2, 유령));
         givenMembersExist(태윤); // 유령은 member 테이블에 없다
 
@@ -148,9 +148,9 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 시상대는_동점을_같은_순위로_두_칸_낸다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 5, 4);
-        PlayerGameRating 지민 = rating(2L, "지민", 27.0, 6.0, 5, 3);
-        PlayerGameRating 현우 = rating(3L, "현우", 27.0, 6.0, 5, 3); // 지민과 동점
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 5, 4);
+        PlayerGameRating 지민 = rating(2L, "지민", 950.0, 5, 3);
+        PlayerGameRating 현우 = rating(3L, "현우", 950.0, 5, 3); // 지민과 동점
         givenSnapshots(snapshot(1, 태윤), snapshot(2, 지민), snapshot(2, 현우));
         givenMembersExist(태윤, 지민, 현우);
 
@@ -162,8 +162,8 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 참가자가_3명_미만이면_시상하지_않는다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 5, 4);
-        PlayerGameRating 지민 = rating(2L, "지민", 27.0, 6.0, 5, 1);
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 5, 4);
+        PlayerGameRating 지민 = rating(2L, "지민", 950.0, 5, 1);
         givenSnapshots(snapshot(1, 태윤), snapshot(2, 지민));
 
         assertThat(archiveService.getPodium(ROOM_ID, GAME_ID, SEASON)).isEmpty();
@@ -171,9 +171,9 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 본인_3경기_미만이면_시상대에서_빠진다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 2, 2); // 2경기뿐
-        PlayerGameRating 지민 = rating(2L, "지민", 27.0, 6.0, 5, 3);
-        PlayerGameRating 현우 = rating(3L, "현우", 22.0, 7.0, 5, 1);
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 2, 2); // 2경기뿐
+        PlayerGameRating 지민 = rating(2L, "지민", 950.0, 5, 3);
+        PlayerGameRating 현우 = rating(3L, "현우", 550.0, 5, 1);
         givenSnapshots(snapshot(1, 태윤), snapshot(2, 지민), snapshot(3, 현우));
         givenMembersExist(지민, 현우);
 
@@ -184,10 +184,10 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 시상대는_4위부터를_보지_않는다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 5, 4);
-        PlayerGameRating 지민 = rating(2L, "지민", 28.0, 5.0, 5, 3);
-        PlayerGameRating 현우 = rating(3L, "현우", 26.0, 5.0, 5, 2);
-        PlayerGameRating 민서 = rating(4L, "민서", 24.0, 5.0, 5, 1);
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 5, 4);
+        PlayerGameRating 지민 = rating(2L, "지민", 1150.0, 5, 3);
+        PlayerGameRating 현우 = rating(3L, "현우", 1050.0, 5, 2);
+        PlayerGameRating 민서 = rating(4L, "민서", 950.0, 5, 1);
         givenSnapshots(snapshot(1, 태윤), snapshot(2, 지민), snapshot(3, 현우), snapshot(4, 민서));
         givenMembersExist(태윤, 지민, 현우, 민서);
 
@@ -198,7 +198,7 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 점수_추이는_과거순이고_게임을_안_주면_방의_게임을_쓴다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 5, 4);
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 5, 4);
         when(roomRepository.findById(ROOM_ID)).thenReturn(Optional.of(room));
         when(snapshotRepository.findByMemberIdAndRoomIdAndBoardGameIdOrderBySeasonKeyAsc(1L, ROOM_ID, GAME_ID))
             .thenReturn(List.of(snapshot("2026-07", 3, 태윤), snapshot("2026-08", 1, 태윤)));
@@ -215,7 +215,7 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 트로피는_참가자_3명_미만_시즌을_제외한다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 5, 4);
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 5, 4);
         when(snapshotRepository.findTrophiesByMemberId(1L))
             .thenReturn(List.of(snapshot("2026-08", 1, 태윤), snapshot("2026-07", 1, 태윤)));
         when(snapshotRepository.countParticipantsByRoomsAndSeasons(anyCollection(), anyCollection()))
@@ -231,7 +231,7 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 트로피는_본인_3경기_미만_시즌을_제외한다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 2, 2);
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 2, 2);
         when(snapshotRepository.findTrophiesByMemberId(1L)).thenReturn(List.of(snapshot("2026-08", 1, 태윤)));
 
         assertThat(archiveService.getTrophies(1L)).isEmpty();
@@ -240,7 +240,7 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 트로피는_삭제된_방의_행을_버린다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 5, 4);
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 5, 4);
         when(snapshotRepository.findTrophiesByMemberId(1L)).thenReturn(List.of(snapshot("2026-08", 1, 태윤)));
         when(snapshotRepository.countParticipantsByRoomsAndSeasons(anyCollection(), anyCollection()))
             .thenReturn(List.<Object[]>of(new Object[]{"2026-08", ROOM_ID, GAME_ID, 4L}));
@@ -252,7 +252,7 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 트로피에는_방_이름과_게임_이름이_붙는다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 5, 4);
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 5, 4);
         when(snapshotRepository.findTrophiesByMemberId(1L)).thenReturn(List.of(snapshot("2026-08", 2, 태윤)));
         when(snapshotRepository.countParticipantsByRoomsAndSeasons(anyCollection(), anyCollection()))
             .thenReturn(List.<Object[]>of(new Object[]{"2026-08", ROOM_ID, GAME_ID, 4L}));
@@ -268,10 +268,10 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 커뮤니티_시상대는_한_사람의_가장_높은_행만_쓴다() {
-        PlayerGameRating 태윤카탄 = rating(1L, "태윤", 30.0, 5.0, 5, 4);   // 1250
-        PlayerGameRating 태윤아줄 = rating(1L, "태윤", 28.0, 5.0, 5, 3);   // 1150 — 같은 사람
-        PlayerGameRating 지민 = rating(2L, "지민", 27.0, 5.0, 5, 3);       // 1100
-        PlayerGameRating 현우 = rating(3L, "현우", 26.0, 5.0, 5, 2);       // 1050
+        PlayerGameRating 태윤카탄 = rating(1L, "태윤", 1250.0, 5, 4);   // 1250
+        PlayerGameRating 태윤아줄 = rating(1L, "태윤", 1150.0, 5, 3);   // 1150 — 같은 사람
+        PlayerGameRating 지민 = rating(2L, "지민", 1100.0, 5, 3);       // 1100
+        PlayerGameRating 현우 = rating(3L, "현우", 1050.0, 5, 2);       // 1050
         when(snapshotRepository.findBySeasonKeyAndRoomIds(anyCollection(), eq(SEASON)))
             .thenReturn(List.of(
                 snapshot(1, 태윤카탄), snapshot(2, 태윤아줄), snapshot(1, 지민), snapshot(2, 현우)));
@@ -288,9 +288,9 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 커뮤니티_시상대는_그_점수를_낸_방_이름을_싣는다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 5, 4);
-        PlayerGameRating 지민 = rating(2L, "지민", 27.0, 5.0, 5, 3);
-        PlayerGameRating 현우 = rating(3L, "현우", 26.0, 5.0, 5, 2);
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 5, 4);
+        PlayerGameRating 지민 = rating(2L, "지민", 1100.0, 5, 3);
+        PlayerGameRating 현우 = rating(3L, "현우", 1050.0, 5, 2);
         when(snapshotRepository.findBySeasonKeyAndRoomIds(anyCollection(), eq(SEASON)))
             .thenReturn(List.of(snapshot(1, 태윤), snapshot(2, 지민), snapshot(3, 현우)));
         givenMembersExist(태윤, 지민, 현우);
@@ -303,8 +303,8 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 커뮤니티_참가자가_3명_미만이면_결산에_시상대가_없다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 30.0, 5.0, 5, 4);
-        PlayerGameRating 지민 = rating(2L, "지민", 27.0, 5.0, 5, 3);
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 5, 4);
+        PlayerGameRating 지민 = rating(2L, "지민", 1100.0, 5, 3);
         when(snapshotRepository.findBySeasonKeyAndRoomIds(anyCollection(), eq(SEASON)))
             .thenReturn(List.of(snapshot(1, 태윤), snapshot(2, 지민)));
 
@@ -313,10 +313,10 @@ class SeasonArchiveServiceTest {
 
     @Test
     void 커뮤니티_시상대도_본인_3경기_미만을_뺀다() {
-        PlayerGameRating 태윤 = rating(1L, "태윤", 31.0, 5.0, 2, 2);  // 2경기 — 1위지만 자격 없음
-        PlayerGameRating 지민 = rating(2L, "지민", 30.0, 5.0, 5, 3);
-        PlayerGameRating 현우 = rating(3L, "현우", 27.0, 5.0, 5, 2);
-        PlayerGameRating 민서 = rating(4L, "민서", 26.0, 5.0, 5, 1);
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1300.0, 2, 2);  // 2경기 — 1위지만 자격 없음
+        PlayerGameRating 지민 = rating(2L, "지민", 1250.0, 5, 3);
+        PlayerGameRating 현우 = rating(3L, "현우", 1100.0, 5, 2);
+        PlayerGameRating 민서 = rating(4L, "민서", 1050.0, 5, 1);
         when(snapshotRepository.findBySeasonKeyAndRoomIds(anyCollection(), eq(SEASON)))
             .thenReturn(List.of(snapshot(1, 태윤), snapshot(2, 지민), snapshot(3, 현우), snapshot(4, 민서)));
         givenMembersExist(지민, 현우, 민서);
@@ -359,14 +359,14 @@ class SeasonArchiveServiceTest {
     }
 
     private PlayerGameRating rating(
-        Long memberId, String nickname, double mu, double sigma, int playCount, int winCount) {
+        Long memberId, String nickname, double score, int playCount, int winCount) {
 
         Member member = Member.builder().nickname(nickname).build();
         ReflectionTestUtils.setField(member, "id", memberId);
 
         PlayerGameRating rating = PlayerGameRating.builder()
             .member(member).boardGame(카탄).room(room).build();
-        rating.getGameStats().update(mu, sigma, 0.0);
+        rating.getGameStats().update(score, 0.0, 0.0);
         for (int i = 0; i < playCount; i++) rating.addPlayCount();
         for (int i = 0; i < winCount; i++) rating.addWinCount();
         for (int i = 0; i < playCount - winCount; i++) rating.addLoseCount();

@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import com.board_game_back.Utils.InviteCodeUtil;
-import com.board_game_back.Utils.RatingConstants;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -246,11 +245,7 @@ public class RoomService {
             throw new IllegalStateException("매치 기록이 있는 멤버의 점수는 수정할 수 없습니다.");
         }
 
-        double currentSigma = pgr.getGameStats().getRatingDeviation();
-        // getDisplayScore()의 역함수 — 상수가 바뀌면 여기도 함께 따라가야 한다
-        double newMu = (rating - RatingConstants.DISPLAY_OFFSET) / RatingConstants.DISPLAY_SCALE
-            + RatingConstants.DISPLAY_SIGMA_FACTOR * currentSigma;
-        pgr.updateInitialRating(newMu);
+        pgr.updateInitialRating(rating);
         playerGameRatingRepository.save(pgr);
     }
 }

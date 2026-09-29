@@ -65,9 +65,9 @@ class SeasonRolloverServiceTest {
         room.assignCommunity(COMMUNITY_ID);
 
         카탄 = boardGame(10L, "카탄");
-        태윤 = rating(1L, "태윤", 카탄, 30.0, 5.0);   // (30 - 15)×50 + 500 = 1250
-        지민 = rating(2L, "지민", 카탄, 27.0, 6.0);   // (27 - 18)×50 + 500 =  950
-        현우 = rating(3L, "현우", 카탄, 22.0, 7.0);   // (22 - 21)×50 + 500 =  550
+        태윤 = rating(1L, "태윤", 카탄, 1250.0);
+        지민 = rating(2L, "지민", 카탄, 950.0);
+        현우 = rating(3L, "현우", 카탄, 550.0);
     }
 
     @Test
@@ -108,8 +108,8 @@ class SeasonRolloverServiceTest {
         rolloverService.rollover(COMMUNITY_ID, SEASON);
 
         for (PlayerGameRating rating : List.of(태윤, 지민, 현우)) {
-            assertThat(rating.getGameStats().getRating()).isEqualTo(RatingConstants.INITIAL_MU);
-            assertThat(rating.getGameStats().getRatingDeviation()).isEqualTo(RatingConstants.INITIAL_SIGMA);
+            assertThat(rating.getGameStats().getRating()).isEqualTo(RatingConstants.INITIAL_RATING);
+            assertThat(rating.getGameStats().getRatingDeviation()).isEqualTo(RatingConstants.INITIAL_DEVIATION);
             assertThat(rating.getPlayCount()).isZero();
             assertThat(rating.getGameStats().getDisplayScore()).isCloseTo(500.0, within(0.001));
         }
@@ -138,7 +138,7 @@ class SeasonRolloverServiceTest {
         assertThat(rolled).isEqualTo(1);
         verify(snapshotRepository).saveAll(snapshotCaptor.capture());
         assertThat(snapshotCaptor.getValue()).hasSize(1);
-        assertThat(태윤.getGameStats().getRating()).isEqualTo(RatingConstants.INITIAL_MU);
+        assertThat(태윤.getGameStats().getRating()).isEqualTo(RatingConstants.INITIAL_RATING);
     }
 
     @Test
@@ -153,7 +153,7 @@ class SeasonRolloverServiceTest {
 
         verify(snapshotRepository).saveAll(snapshotCaptor.capture());
         SeasonRankSnapshot snapshot = snapshotCaptor.getValue().get(0);
-        assertThat(태윤.getGameStats().getRating()).isEqualTo(RatingConstants.INITIAL_MU); // 리셋됐다
+        assertThat(태윤.getGameStats().getRating()).isEqualTo(RatingConstants.INITIAL_RATING); // 리셋됐다
 
         태윤.getGameStats().update(
             snapshot.toStats().getRating(),
@@ -187,13 +187,13 @@ class SeasonRolloverServiceTest {
         return game;
     }
 
-    private PlayerGameRating rating(Long memberId, String nickname, BoardGame game, double mu, double sigma) {
+    private PlayerGameRating rating(Long memberId, String nickname, BoardGame game, double score) {
         Member member = Member.builder().nickname(nickname).build();
         ReflectionTestUtils.setField(member, "id", memberId);
 
         PlayerGameRating rating = PlayerGameRating.builder()
             .member(member).boardGame(game).room(room).build();
-        rating.getGameStats().update(mu, sigma, 0.0);
+        rating.getGameStats().update(score, 0.0, 0.0);
         rating.addPlayCount();
         return rating;
     }
