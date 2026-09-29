@@ -55,6 +55,14 @@ public class RoomController {
             new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode(), room.getBoardGameId()));
     }
 
+    /** 초대 코드로 방만 찾는다. 참가는 방 화면의 참가하기 버튼(/join)에서 따로 한다. */
+    @GetMapping("/code/{inviteCode}")
+    public ResponseEntity<RoomDto.Response> getRoomByInviteCode(@PathVariable String inviteCode) {
+        Room room = roomService.getRoomByInviteCode(inviteCode);
+        return ResponseEntity.ok(
+            new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode(), room.getBoardGameId()));
+    }
+
     @GetMapping("/my/{memberId}")
     public ResponseEntity<List<Response>> getMyRooms(@PathVariable Long memberId) {
         List<RoomDto.Response> responses = roomService.getMyRooms(memberId).stream()

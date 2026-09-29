@@ -138,6 +138,11 @@ public class RoomService {
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
     }
 
+    public Room getRoomByInviteCode(String inviteCode) {
+        return roomRepository.findByInviteCode(inviteCode)
+            .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 초대 코드입니다."));
+    }
+
     @Transactional
     public void leaveRoom(Long roomId, Long memberId, Long requesterId) {
         if (!requesterId.equals(memberId)) {
