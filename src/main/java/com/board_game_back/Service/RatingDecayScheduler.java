@@ -3,7 +3,6 @@ package com.board_game_back.Service;
 import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Repository.MatchParticipantRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
-import com.board_game_back.Utils.RatingConstants;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -59,7 +58,7 @@ public class RatingDecayScheduler {
         for (PlayerGameRating rating : staleRatings) {
             double displayDecay = displayDecayOf(rating, winAvgByPlayer, winAvgByRoomGame);
             if (displayDecay <= 0) continue;
-            rating.applyDecay(displayDecay / RatingConstants.DISPLAY_SCALE);
+            rating.applyDecay(displayDecay);
         }
         ratingRepository.saveAll(staleRatings);
     }

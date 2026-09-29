@@ -73,7 +73,7 @@ public class MatchService {
                 ));
 
             calcResults.add(new RatingCalculator.PlayerResult(
-                member.getId(), pr.placement(), gameRating.getGameStats()
+                member.getId(), pr.placement(), gameRating.getPlayCount(), gameRating.getGameStats()
             ));
 
             MatchParticipant mp = new MatchParticipant(matchRecord, member, pr.placement());
@@ -254,7 +254,7 @@ public class MatchService {
                     return ratingRepository.save(nr);
                 });
                 calcResults.add(new RatingCalculator.PlayerResult(
-                    memberId, mp.getPlacement(), gr.getGameStats()
+                    memberId, mp.getPlacement(), gr.getPlayCount(), gr.getGameStats()
                 ));
             }
 

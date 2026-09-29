@@ -43,7 +43,7 @@ public class Member {
     private String profileImage;
 
     @Column(name = "best_display_score")
-    private double bestDisplayScore = RatingConstants.DISPLAY_OFFSET;
+    private double bestDisplayScore = RatingConstants.INITIAL_RATING;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now(ZoneId.of("Asia/Seoul")).truncatedTo(ChronoUnit.MINUTES);
@@ -86,7 +86,7 @@ public class Member {
     }
 
     public void resetBestDisplayScore() {
-        this.bestDisplayScore = RatingConstants.DISPLAY_OFFSET;
+        this.bestDisplayScore = RatingConstants.INITIAL_RATING;
     }
 
     @Builder
