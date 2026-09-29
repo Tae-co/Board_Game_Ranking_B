@@ -17,6 +17,8 @@ public final class RatingConstants {
     public static final double K_PLACEMENT = 500.0; // 처음 PLACEMENT_GAMES판 — 빨리 제자리를 찾게
     public static final double K_REGULAR = 200.0;
     public static final int PLACEMENT_GAMES = 10;
+    // 3인 이상에서 꼴등이 2등에게 추가로 넘기는 몫 (K 대비). 배치고사 50, 이후 20.
+    public static final double SECOND_PLACE_SHARE = 0.1;
 
     private RatingConstants() {}
 }
