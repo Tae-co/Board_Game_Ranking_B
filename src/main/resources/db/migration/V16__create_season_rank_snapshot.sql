@@ -42,3 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_season_rank_snapshot_lookup
 -- 프로필 트로피 선반 · 시즌별 내 점수 추이 조회
 CREATE INDEX IF NOT EXISTS idx_season_rank_snapshot_member
     ON season_rank_snapshot (member_id, season_key);
+
+-- 다른 테이블과 같이 RLS를 켠다. 꺼져 있으면 anon 키로 PostgREST를 통해 읽고 쓸 수 있다.
+-- 백엔드는 postgres 롤로 접속해 RLS를 우회하므로 정책은 두지 않는다.
+ALTER TABLE season_rank_snapshot ENABLE ROW LEVEL SECURITY;
