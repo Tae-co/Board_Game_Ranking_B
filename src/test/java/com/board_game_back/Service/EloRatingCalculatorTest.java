@@ -19,7 +19,49 @@ class EloRatingCalculatorTest {
 
         calculator.calculateMultiplayerRatings(results);
 
-        assertThat(changes(results)).containsExactly(250.0, 83.3, -83.3, -250.0);
+        // 기본 +250, +83.3, -83.3, -250에 꼴등 → 2등 50 이전
+        assertThat(changes(results)).containsExactly(250.0, 133.3, -83.3, -300.0);
+    }
+
+    @Test
+    void 동점자_3인전에서_2등도_점수를_받고_꼴등이_그만큼_더_잃는다() {
+        List<RatingCalculator.PlayerResult> results = players(0, 1000, 1000, 1000);
+
+        calculator.calculateMultiplayerRatings(results);
+
+        assertThat(changes(results)).containsExactly(250.0, 50.0, -300.0);
+    }
+
+    @Test
+    void 배치고사_이후엔_2등_몫도_줄어든다() {
+        List<RatingCalculator.PlayerResult> results = players(RatingConstants.PLACEMENT_GAMES, 1000, 1000, 1000);
+
+        calculator.calculateMultiplayerRatings(results);
+
+        assertThat(changes(results)).containsExactly(100.0, 20.0, -120.0);
+    }
+
+    @Test
+    void 이인전은_2등이_곧_꼴등이라_이전이_없다() {
+        List<RatingCalculator.PlayerResult> results = players(0, 1000, 1000);
+
+        calculator.calculateMultiplayerRatings(results);
+
+        assertThat(changes(results)).containsExactly(250.0, -250.0);
+    }
+
+    @Test
+    void 공동_꼴등이면_나눠서_낸다() {
+        List<RatingCalculator.PlayerResult> results = new ArrayList<>();
+        results.add(new RatingCalculator.PlayerResult(1L, 1, 0, new GlickoStats(1000, 0, 0)));
+        results.add(new RatingCalculator.PlayerResult(2L, 2, 0, new GlickoStats(1000, 0, 0)));
+        results.add(new RatingCalculator.PlayerResult(3L, 3, 0, new GlickoStats(1000, 0, 0)));
+        results.add(new RatingCalculator.PlayerResult(4L, 3, 0, new GlickoStats(1000, 0, 0)));
+
+        calculator.calculateMultiplayerRatings(results);
+
+        assertThat(changes(results).stream().mapToDouble(Double::doubleValue).sum()).isCloseTo(0.0, within(0.5));
+        assertThat(changes(results).get(2)).isEqualTo(changes(results).get(3));
     }
 
     @Test
