@@ -1,11 +1,13 @@
 package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.MemberDto;
+import com.board_game_back.DTO.SeasonDto;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Service.RoomService;
+import com.board_game_back.Service.SeasonArchiveService;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -33,6 +35,7 @@ public class MemberController {
     private final MemberRepository memberRepository;
     private final PlayerGameRatingRepository playerGameRatingRepository;
     private final RoomService roomService;
+    private final SeasonArchiveService seasonArchiveService;
     private final UserEventService userEventService;
 
     @GetMapping("/search")
@@ -84,6 +87,22 @@ public class MemberController {
             .collect(Collectors.toList());
 
         return ResponseEntity.ok(new MemberDto.StatsResponse(totalPlay, totalWin, totalLose, games));
+    }
+
+    /** 시즌별 내 점수 추이 (시즌 탭 ④). boardGameId를 주지 않으면 방의 게임으로 채운다. */
+    @GetMapping("/{memberId}/season-history")
+    public ResponseEntity<List<SeasonDto.SeasonHistoryItem>> getSeasonHistory(
+            @PathVariable Long memberId,
+            @RequestParam Long roomId,
+            @RequestParam(required = false) Long boardGameId) {
+        return ResponseEntity.ok(
+            seasonArchiveService.getMemberSeasonHistory(memberId, roomId, boardGameId));
+    }
+
+    /** 프로필 트로피 선반. 시상 조건(참가자 3명 이상·본인 3경기 이상)을 통과한 1~3위만 나온다. */
+    @GetMapping("/{memberId}/trophies")
+    public ResponseEntity<List<SeasonDto.TrophyResponse>> getTrophies(@PathVariable Long memberId) {
+        return ResponseEntity.ok(seasonArchiveService.getTrophies(memberId));
     }
 
     @DeleteMapping("/{id}")

@@ -11,12 +11,14 @@ public interface RatingCalculator {
 
         public Long memberId;
         public int placement;
+        public int playCount; // 이번 판 전까지 이 방·게임에서 한 판 수
         public GlickoStats currentStats;
         public GlickoStats newStats;
 
-        public PlayerResult(Long memberId, int placement, GlickoStats currentStats) {
+        public PlayerResult(Long memberId, int placement, int playCount, GlickoStats currentStats) {
             this.memberId = memberId;
             this.placement = placement;
+            this.playCount = playCount;
             this.currentStats = currentStats;
         }
     }

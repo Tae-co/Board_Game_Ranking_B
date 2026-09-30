@@ -8,8 +8,8 @@ import lombok.Getter;
 @Getter
 public class GlickoStats {
 
-    private double rating = RatingConstants.INITIAL_MU;
-    private double ratingDeviation = RatingConstants.INITIAL_SIGMA;
+    private double rating = RatingConstants.INITIAL_RATING;
+    private double ratingDeviation = RatingConstants.INITIAL_DEVIATION;
     private double volatility = RatingConstants.INITIAL_VOLATILITY;
 
     protected GlickoStats() {}
@@ -27,18 +27,16 @@ public class GlickoStats {
     }
 
     public void reset() {
-        this.rating = RatingConstants.INITIAL_MU;
-        this.ratingDeviation = RatingConstants.INITIAL_SIGMA;
+        this.rating = RatingConstants.INITIAL_RATING;
+        this.ratingDeviation = RatingConstants.INITIAL_DEVIATION;
         this.volatility = RatingConstants.INITIAL_VOLATILITY;
     }
 
-    // (μ - 3σ) × 50 + 500 — 신규=500, 0 미만은 0으로 clamp (음수 점수 노출 방지)
+    // rating이 곧 Elo 점수다. 0 미만은 0으로 clamp (음수 점수 노출 방지)
     public double getDisplayScore() {
-        double score = (rating - RatingConstants.DISPLAY_SIGMA_FACTOR * ratingDeviation)
-            * RatingConstants.DISPLAY_SCALE + RatingConstants.DISPLAY_OFFSET;
-        if (Double.isNaN(score)) {
-            return RatingConstants.DISPLAY_OFFSET;
+        if (Double.isNaN(rating)) {
+            return RatingConstants.INITIAL_RATING;
         }
-        return Math.max(0.0, score);
+        return Math.max(0.0, rating);
     }
 }

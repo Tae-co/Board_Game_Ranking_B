@@ -61,6 +61,7 @@ public class SecurityConfig {
                 // 관리자 전용
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/matches/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/seasons/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
             .exceptionHandling(e -> e.authenticationEntryPoint(
