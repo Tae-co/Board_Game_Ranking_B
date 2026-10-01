@@ -54,7 +54,11 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
         @Param("roomId") Long roomId, @Param("boardGameId") Long boardGameId,
         @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
-    /** 멤버별 순위 횟수. 인덱스 0 = 1등. from·to가 null이면 그쪽 경계 없음. */
+    /**
+     * 멤버별 순위 횟수. 인덱스 0 = 1등. from·to가 null이면 그쪽 경계 없음.
+     * 모든 목록을 이 범위의 최하위 순위까지 0으로 채운다 — 프론트는 한 페이지씩 받으므로
+     * 페이지마다 칸 수가 달라지지 않게 서버가 길이를 맞춘다.
+     */
     default Map<Long, List<Integer>> placementCountsByMember(
         Long roomId, Long boardGameId, LocalDateTime from, LocalDateTime to) {
         Map<Long, List<Integer>> counts = new HashMap<>();
@@ -66,6 +70,10 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
             List<Integer> list = counts.computeIfAbsent((Long) row[0], id -> new ArrayList<>());
             while (list.size() < placement) list.add(0);
             list.set(placement - 1, ((Number) row[2]).intValue());
+        }
+        int maxPlace = counts.values().stream().mapToInt(List::size).max().orElse(0);
+        for (List<Integer> list : counts.values()) {
+            while (list.size() < maxPlace) list.add(0);
         }
         return counts;
     }
