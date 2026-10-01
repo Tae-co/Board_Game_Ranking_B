@@ -10,6 +10,8 @@ import com.board_game_back.Repository.RoomRepository;
 import com.board_game_back.Repository.RoomSeasonRepository;
 import com.board_game_back.Repository.SeasonRankSnapshotRepository;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -72,7 +74,8 @@ public class SeasonRolloverService {
 
         if (room.isEmpty()) return Optional.empty();
 
-        RoomSeason next = seasonRepository.save(season.next(boundaryService.zoneOfRoom(season.getRoomId()), now));
+        ZoneId zone = boundaryService.zoneOfRoom(season.getRoomId());
+        RoomSeason next = seasonRepository.save(season.next(zone, now));
 
         log.info("시즌 롤오버 room={} season#{} → #{} 대상={}명",
             season.getRoomId(), season.getSeasonNumber(), next.getSeasonNumber(), playerCount);
@@ -80,6 +83,9 @@ public class SeasonRolloverService {
         // 리셋이 리텐션을 올렸는지 판정할 때 이 이벤트가 분모가 된다 (§10). 경기 없는 방은 남길 사건이 없다.
         if (playerCount > 0) {
             Map<String, Object> props = new HashMap<>();
+            // season_key: 월간 시절(2026-09) 이벤트와 같은 축으로 묶어 보려고 남긴다 — 종료일이 속한 달.
+            // 방마다 시즌이 달라 같은 키에 여러 방이 들어오므로, 방 단위 분석은 room_season_id로 한다.
+            props.put("season_key", YearMonth.from(season.endDate(zone)).toString());
             props.put("room_id", season.getRoomId());
             props.put("room_season_id", season.getId());
             props.put("season_number", season.getSeasonNumber());
