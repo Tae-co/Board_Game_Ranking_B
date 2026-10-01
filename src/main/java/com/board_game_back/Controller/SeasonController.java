@@ -1,9 +1,7 @@
 package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.SeasonDto;
-import com.board_game_back.Service.SeasonArchiveService;
 import com.board_game_back.Service.SeasonService;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,29 +10,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/communities/{communityId}/seasons")
+@RequestMapping("/api/communities/{communityId}/status")
 @RequiredArgsConstructor
 public class SeasonController {
 
     private final SeasonService seasonService;
-    private final SeasonArchiveService archiveService;
 
+    /** 커뮤니티 현황 — 최근 30일. 조회할 때마다 계산한다 (기획 §22). */
     @GetMapping
-    public ResponseEntity<List<SeasonDto.PeriodResponse>> getPeriods(@PathVariable Long communityId) {
-        return ResponseEntity.ok(seasonService.getPeriods(communityId));
-    }
-
-    /** 시즌제 예고 배너용 — 이 커뮤니티가 시즌을 한 번이라도 마감했는지 (§11) */
-    @GetMapping("/status")
-    public ResponseEntity<SeasonDto.SeasonStatusResponse> getStatus(@PathVariable Long communityId) {
-        return ResponseEntity.ok(archiveService.getCommunityStatus(communityId));
-    }
-
-    /** period 형식: yyyy-MM (예: 2026-08) */
-    @GetMapping("/{period}")
-    public ResponseEntity<SeasonDto.SummaryResponse> getSummary(
-            @PathVariable Long communityId,
-            @PathVariable String period) {
-        return ResponseEntity.ok(seasonService.getSummary(communityId, period));
+    public ResponseEntity<SeasonDto.StatusResponse> getStatus(@PathVariable Long communityId) {
+        return ResponseEntity.ok(seasonService.getStatus(communityId));
     }
 }

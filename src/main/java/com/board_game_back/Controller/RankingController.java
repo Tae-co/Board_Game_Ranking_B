@@ -27,16 +27,19 @@ public class RankingController {
     }
 
     /**
-     * season(yyyy-MM)을 주면 마감된 그 시즌의 스냅샷을, 안 주면 지금까지처럼 현재 랭킹을 돌려준다.
+     * seasonId를 주면 마감된 그 시즌의 스냅샷을, 안 주면 지금까지처럼 현재 랭킹을 돌려준다.
      * 응답 스키마는 양쪽이 같다 (기획 §8).
      */
     @GetMapping("/room/{roomId}/game/{boardGameId}")
     public ResponseEntity<List<RankingDto.GameRankingResponse>> getRoomRanking(
             @PathVariable Long roomId,
             @PathVariable Long boardGameId,
+            @RequestParam(required = false) String seasonId,
             @RequestParam(required = false) String season) {
-        if (season != null) {
-            return ResponseEntity.ok(seasonArchiveService.getSeasonRanking(roomId, boardGameId, season));
+        // season(yyyy-MM)은 구버전 앱(1.10.x)이 보낸다. 새 앱은 seasonId를 쓴다.
+        String seasonRef = seasonId != null ? seasonId : season;
+        if (seasonRef != null) {
+            return ResponseEntity.ok(seasonArchiveService.getSeasonRanking(roomId, boardGameId, seasonRef));
         }
         return ResponseEntity.ok(rankingService.getRoomRanking(roomId, boardGameId));
     }
