@@ -85,7 +85,7 @@ class SeasonRolloverServiceTest {
         when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID))
             .thenReturn(List.of(지민, 현우, 태윤)); // 일부러 순서를 섞어 넣는다
 
-        rolloverService.rollover(SEASON_ID);
+        rolloverService.rolloverIfDue(ROOM_ID);
 
         verify(snapshotRepository).saveAll(snapshotCaptor.capture());
         List<SeasonRankSnapshot> snapshots = snapshotCaptor.getValue();
@@ -101,7 +101,7 @@ class SeasonRolloverServiceTest {
         givenRolloverableRoom();
         when(snapshotRepository.existsByRoomSeasonId(SEASON_ID)).thenReturn(true);
 
-        rolloverService.rollover(SEASON_ID);
+        rolloverService.rolloverIfDue(ROOM_ID);
 
         verify(snapshotRepository, never()).saveAll(anyList());
         verify(ratingRepository, never()).saveAll(anyList());
@@ -113,7 +113,7 @@ class SeasonRolloverServiceTest {
         when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID))
             .thenReturn(List.of(태윤, 지민, 현우));
 
-        rolloverService.rollover(SEASON_ID);
+        rolloverService.rolloverIfDue(ROOM_ID);
 
         for (PlayerGameRating rating : List.of(태윤, 지민, 현우)) {
             assertThat(rating.getGameStats().getRating()).isEqualTo(RatingConstants.INITIAL_RATING);
@@ -129,7 +129,7 @@ class SeasonRolloverServiceTest {
         givenRolloverableRoom();
         when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID)).thenReturn(List.of(태윤));
 
-        RoomSeason next = rolloverService.rollover(SEASON_ID).orElseThrow();
+        RoomSeason next = rolloverService.rolloverIfDue(ROOM_ID).orElseThrow();
 
         assertThat(season.isClosed()).isTrue();
         assertThat(next.getSeasonNumber()).isEqualTo(3);
@@ -143,7 +143,7 @@ class SeasonRolloverServiceTest {
         givenRolloverableRoom();
         when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID)).thenReturn(List.of());
 
-        RoomSeason next = rolloverService.rollover(SEASON_ID).orElseThrow();
+        RoomSeason next = rolloverService.rolloverIfDue(ROOM_ID).orElseThrow();
 
         assertThat(season.isClosed()).isTrue();
         assertThat(next.getSeasonNumber()).isEqualTo(3);
@@ -153,19 +153,30 @@ class SeasonRolloverServiceTest {
     @Test
     void rollover_종료_전_시즌은_건드리지_않는다() {
         RoomSeason 진행중 = RoomSeason.open(ROOM_ID, 1, "시즌", LocalDateTime.now(), LocalDate.now(서울).plusDays(3), 서울);
-        when(seasonRepository.findById(SEASON_ID)).thenReturn(Optional.of(진행중));
+        when(seasonRepository.findOpenForUpdate(ROOM_ID)).thenReturn(Optional.of(진행중));
 
-        assertThat(rolloverService.rollover(SEASON_ID)).isEmpty();
+        assertThat(rolloverService.rolloverIfDue(ROOM_ID)).isEmpty();
         assertThat(진행중.isClosed()).isFalse();
         verify(ratingRepository, never()).saveAll(anyList());
     }
 
     @Test
+    void rollover_이미_다른_경로가_넘겼으면_아무것도_하지_않는다() {
+        // 잠금을 기다린 뒤에는 닫힌 행이 조건에서 빠져 진행 중 시즌이 다음 시즌(아직 안 끝남)이다
+        RoomSeason 다음 = RoomSeason.open(ROOM_ID, 3, null, LocalDateTime.now(), LocalDate.now(서울).plusDays(27), 서울);
+        when(seasonRepository.findOpenForUpdate(ROOM_ID)).thenReturn(Optional.of(다음));
+
+        assertThat(rolloverService.rolloverIfDue(ROOM_ID)).isEmpty();
+        verify(snapshotRepository, never()).saveAll(anyList());
+        verify(seasonRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void rollover_방이_삭제됐으면_시즌만_닫고_다음_시즌은_없다() {
-        when(seasonRepository.findById(SEASON_ID)).thenReturn(Optional.of(season));
+        when(seasonRepository.findOpenForUpdate(ROOM_ID)).thenReturn(Optional.of(season));
         when(roomRepository.findById(ROOM_ID)).thenReturn(Optional.empty());
 
-        assertThat(rolloverService.rollover(SEASON_ID)).isEmpty();
+        assertThat(rolloverService.rolloverIfDue(ROOM_ID)).isEmpty();
         assertThat(season.isClosed()).isTrue();
         verify(seasonRepository, never()).save(any());
     }
@@ -178,7 +189,7 @@ class SeasonRolloverServiceTest {
         double sigmaBefore = 태윤.getGameStats().getRatingDeviation();
         double displayBefore = 태윤.getGameStats().getDisplayScore();
 
-        rolloverService.rollover(SEASON_ID);
+        rolloverService.rolloverIfDue(ROOM_ID);
 
         verify(snapshotRepository).saveAll(snapshotCaptor.capture());
         SeasonRankSnapshot snapshot = snapshotCaptor.getValue().get(0);
@@ -198,7 +209,7 @@ class SeasonRolloverServiceTest {
 
     /** 종료 시각이 지난 시즌과 그 방. */
     private void givenRolloverableRoom() {
-        when(seasonRepository.findById(SEASON_ID)).thenReturn(Optional.of(season));
+        when(seasonRepository.findOpenForUpdate(ROOM_ID)).thenReturn(Optional.of(season));
         when(roomRepository.findById(ROOM_ID)).thenReturn(Optional.of(room));
         when(boundaryService.zoneOfRoom(ROOM_ID)).thenReturn(서울);
         when(seasonRepository.save(any(RoomSeason.class))).thenAnswer(inv -> inv.getArgument(0));

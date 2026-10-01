@@ -61,7 +61,12 @@ public class RoomSeasonService {
         return SeasonDto.RoomSeasonResponse.of(season, boundaryService.zoneOfRoom(roomId), 0, 0);
     }
 
-    /** 호스트가 진행 중 시즌의 이름·종료일을 바꾼다. 끝난 시즌은 기록이라 고칠 수 없다. */
+    /**
+     * 호스트가 진행 중 시즌의 이름·종료일을 바꾼다. 끝난 시즌은 기록이라 고칠 수 없다.
+     *
+     * @param name null이면 이름은 그대로 둔다 — 자동 연장 시즌("시즌 N" 표시)의 날짜만 바꿀 때
+     *             화면 문구가 이름으로 박히지 않게 하려는 것이다. 빈 문자열은 거부한다.
+     */
     @Transactional
     public SeasonDto.RoomSeasonResponse updateCurrentSeason(
         Long roomId, Long requesterId, String name, LocalDate endDate) {
@@ -71,14 +76,14 @@ public class RoomSeasonService {
         if (rm.getRole() != MemberRole.HOST) {
             throw new IllegalStateException("방장만 수정할 수 있습니다.");
         }
-        if (name == null || name.isBlank()) throw new IllegalArgumentException("시즌 이름을 입력해주세요.");
+        if (name != null && name.isBlank()) throw new IllegalArgumentException("시즌 이름을 입력해주세요.");
         if (endDate == null) throw new IllegalArgumentException("시즌 종료일을 입력해주세요.");
 
         RoomSeason season = getCurrentSeason(roomId);
         ZoneId zone = boundaryService.zoneOfRoom(roomId);
         validateEndDate(endDate, zone);
 
-        season.rename(name);
+        if (name != null) season.rename(name);
         season.changeEndDate(endDate, zone);
         return SeasonDto.RoomSeasonResponse.of(season, zone, 0, 0);
     }

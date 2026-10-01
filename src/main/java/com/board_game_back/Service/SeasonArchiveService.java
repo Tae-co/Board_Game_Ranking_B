@@ -14,6 +14,7 @@ import com.board_game_back.Repository.RoomRepository;
 import com.board_game_back.Repository.RoomSeasonRepository;
 import com.board_game_back.Repository.SeasonRankSnapshotRepository;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -68,8 +69,9 @@ public class SeasonArchiveService {
      * 지난 시즌 순위표 (§6 ③). 응답 스키마가 현재 랭킹과 <b>같아야</b> 프론트 테이블을
      * 그대로 재사용할 수 있다 — 그래서 스냅샷에 {@code lose_count}까지 들어 있다(§3).
      */
-    public List<RankingDto.GameRankingResponse> getSeasonRanking(Long roomId, Long boardGameId, Long seasonId) {
+    public List<RankingDto.GameRankingResponse> getSeasonRanking(Long roomId, Long boardGameId, String seasonRef) {
         Long gameId = resolveBoardGameId(roomId, boardGameId);
+        Long seasonId = resolveSeasonId(roomId, seasonRef);
         if (gameId == null || !belongsToRoom(seasonId, roomId)) return Collections.emptyList();
 
         List<SeasonRankSnapshot> snapshots =
@@ -117,7 +119,7 @@ public class SeasonArchiveService {
             if (row == null) continue;
             LocalDateTime from = season.getSeasonNumber() == 1 ? null : season.getStartAt();
             seasons.add(SeasonDto.RoomSeasonResponse.of(
-                season, zone, (String) row[1],
+                season, zone, legacyKey(season, (String) row[1], zone),
                 countInRange(playedAt, from, season.getEndAt()), ((Number) row[2]).intValue()));
         }
         return seasons;
@@ -127,8 +129,9 @@ public class SeasonArchiveService {
      * 1·2·3등 시상대 (§6 ②). 시상 조건(§4)을 통과한 행만 나오므로 참가자가 3명 미만인
      * 시즌은 빈 목록이고, 본인 경기 수가 모자란 사람은 순위가 비어 보인다.
      */
-    public List<SeasonDto.PodiumEntry> getPodium(Long roomId, Long boardGameId, Long seasonId) {
+    public List<SeasonDto.PodiumEntry> getPodium(Long roomId, Long boardGameId, String seasonRef) {
         Long gameId = resolveBoardGameId(roomId, boardGameId);
+        Long seasonId = resolveSeasonId(roomId, seasonRef);
         if (gameId == null || !belongsToRoom(seasonId, roomId)) return Collections.emptyList();
 
         List<SeasonRankSnapshot> snapshots =
@@ -164,12 +167,14 @@ public class SeasonArchiveService {
         List<SeasonRankSnapshot> snapshots =
             snapshotRepository.findByMemberIdAndRoomIdAndBoardGameIdOrderByRoomSeasonIdAsc(memberId, roomId, gameId);
         Map<Long, RoomSeason> seasons = seasonsOf(snapshots);
+        ZoneId zone = boundaryService.zoneOfRoom(roomId);
 
         List<SeasonDto.SeasonHistoryItem> history = new ArrayList<>();
         for (SeasonRankSnapshot s : snapshots) {
             RoomSeason season = seasons.get(s.getRoomSeasonId());
             if (season == null) continue;
             history.add(new SeasonDto.SeasonHistoryItem(
+                legacyKey(season, s.getSeasonKey(), zone),
                 season.getId(), season.getSeasonNumber(), season.getName(),
                 s.getDisplayScore(), s.getRank(), s.getPlayCount()));
         }
@@ -203,6 +208,7 @@ public class SeasonArchiveService {
         Map<Long, String> gameNames = boardGameRepository.findByIdIn(gameIds).stream()
             .collect(Collectors.toMap(BoardGame::getId, BoardGame::getName));
 
+        Map<Long, ZoneId> zones = new HashMap<>();
         List<SeasonDto.TrophyResponse> trophies = new ArrayList<>();
         for (SeasonRankSnapshot snapshot : candidates) {
             String key = awardKey(snapshot.getRoomSeasonId(), snapshot.getBoardGameId());
@@ -213,7 +219,9 @@ public class SeasonArchiveService {
             String gameName = gameNames.get(snapshot.getBoardGameId());
             if (season == null || roomName == null || gameName == null) continue;
 
+            ZoneId zone = zones.computeIfAbsent(snapshot.getRoomId(), boundaryService::zoneOfRoom);
             trophies.add(new SeasonDto.TrophyResponse(
+                legacyKey(season, snapshot.getSeasonKey(), zone),
                 season.getId(), season.getSeasonNumber(), season.getName(),
                 snapshot.getRoomId(), roomName,
                 snapshot.getBoardGameId(), gameName,
@@ -228,6 +236,45 @@ public class SeasonArchiveService {
     private Long resolveBoardGameId(Long roomId, Long boardGameId) {
         if (boardGameId != null) return boardGameId;
         return roomRepository.findById(roomId).map(Room::getBoardGameId).orElse(null);
+    }
+
+    /**
+     * 구버전 앱(1.10.x)이 받는 "yyyy-MM". 월간 시즌 시절 시즌은 스냅샷의 원래 키, 이후 시즌은
+     * 종료일이 속한 달이다. 한 달에 시즌이 둘 끝나면 키가 겹치지만 구버전 화면은 라벨만 겹칠 뿐 죽지 않는다.
+     */
+    private static String legacyKey(RoomSeason season, String snapshotKey, ZoneId zone) {
+        if (snapshotKey != null) return snapshotKey;
+        return YearMonth.from(season.endDate(zone)).toString();
+    }
+
+    /**
+     * 시즌 참조 해석. 새 앱은 시즌 id(숫자), 구버전 앱은 "yyyy-MM"을 보낸다.
+     * "yyyy-MM"은 그 키({@link #legacyKey})를 가진 이 방의 가장 최근 마감 시즌으로 푼다.
+     *
+     * @return 해석할 수 없으면 null — 조회 결과는 빈 목록이 된다
+     */
+    private Long resolveSeasonId(Long roomId, String seasonRef) {
+        if (seasonRef == null || seasonRef.isBlank()) return null;
+        if (seasonRef.chars().allMatch(Character::isDigit)) {
+            try {
+                return Long.valueOf(seasonRef);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        YearMonth month;
+        try {
+            month = YearMonth.parse(seasonRef);
+        } catch (java.time.format.DateTimeParseException e) {
+            return null;
+        }
+        String key = month.toString();
+        ZoneId zone = boundaryService.zoneOfRoom(roomId);
+        for (RoomSeason season : seasonRepository.findByRoomIdAndClosedAtIsNotNullOrderBySeasonNumberDesc(roomId)) {
+            String snapshotKey = snapshotRepository.findSeasonKeyByRoomSeasonId(season.getId());
+            if (key.equals(legacyKey(season, snapshotKey, zone))) return season.getId();
+        }
+        return null;
     }
 
     /** 경로로 들어온 시즌 id라 믿을 수 없다. 다른 방의 시즌이면 조회하지 않는다. */

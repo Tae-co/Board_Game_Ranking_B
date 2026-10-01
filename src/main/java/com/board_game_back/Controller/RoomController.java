@@ -94,9 +94,12 @@ public class RoomController {
     public ResponseEntity<List<RankingDto.GameRankingResponse>> getRoomRankings(
             @PathVariable Long roomId,
             @RequestParam(required = false) Long boardGameId,
-            @RequestParam(required = false) Long seasonId) {
-        if (seasonId != null) {
-            return ResponseEntity.ok(seasonArchiveService.getSeasonRanking(roomId, boardGameId, seasonId));
+            @RequestParam(required = false) String seasonId,
+            @RequestParam(required = false) String season) {
+        // season(yyyy-MM)은 구버전 앱(1.10.x)이 보낸다. 새 앱은 seasonId를 쓴다.
+        String seasonRef = seasonId != null ? seasonId : season;
+        if (seasonRef != null) {
+            return ResponseEntity.ok(seasonArchiveService.getSeasonRanking(roomId, boardGameId, seasonRef));
         }
         Long gameId = boardGameId != null ? boardGameId : roomService.getRoomById(roomId).getBoardGameId();
         if (gameId == null) {
@@ -130,12 +133,13 @@ public class RoomController {
     }
 
     /** 1·2·3등 시상대. 시상 조건(참가자 3명 이상·본인 3경기 이상)을 통과한 행만 나온다. */
-    @GetMapping("/{roomId}/seasons/{seasonId}/podium")
+    /** seasonRef: 시즌 id. 구버전 앱(1.10.x)은 "yyyy-MM"을 보낸다. */
+    @GetMapping("/{roomId}/seasons/{seasonRef}/podium")
     public ResponseEntity<List<SeasonDto.PodiumEntry>> getSeasonPodium(
             @PathVariable Long roomId,
-            @PathVariable Long seasonId,
+            @PathVariable String seasonRef,
             @RequestParam(required = false) Long boardGameId) {
-        return ResponseEntity.ok(seasonArchiveService.getPodium(roomId, boardGameId, seasonId));
+        return ResponseEntity.ok(seasonArchiveService.getPodium(roomId, boardGameId, seasonRef));
     }
 
     @DeleteMapping("/{roomId}/members/{memberId}")

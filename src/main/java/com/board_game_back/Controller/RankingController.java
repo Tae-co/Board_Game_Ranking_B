@@ -34,9 +34,12 @@ public class RankingController {
     public ResponseEntity<List<RankingDto.GameRankingResponse>> getRoomRanking(
             @PathVariable Long roomId,
             @PathVariable Long boardGameId,
-            @RequestParam(required = false) Long seasonId) {
-        if (seasonId != null) {
-            return ResponseEntity.ok(seasonArchiveService.getSeasonRanking(roomId, boardGameId, seasonId));
+            @RequestParam(required = false) String seasonId,
+            @RequestParam(required = false) String season) {
+        // season(yyyy-MM)은 구버전 앱(1.10.x)이 보낸다. 새 앱은 seasonId를 쓴다.
+        String seasonRef = seasonId != null ? seasonId : season;
+        if (seasonRef != null) {
+            return ResponseEntity.ok(seasonArchiveService.getSeasonRanking(roomId, boardGameId, seasonRef));
         }
         return ResponseEntity.ok(rankingService.getRoomRanking(roomId, boardGameId));
     }

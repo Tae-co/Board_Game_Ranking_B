@@ -84,7 +84,7 @@ class SeasonArchiveServiceTest {
         givenMembersExist(태윤);
 
         List<RankingDto.GameRankingResponse> ranking =
-            archiveService.getSeasonRanking(ROOM_ID, GAME_ID, SEASON);
+            archiveService.getSeasonRanking(ROOM_ID, GAME_ID, String.valueOf(SEASON));
 
         assertThat(ranking).hasSize(1);
         RankingDto.GameRankingResponse row = ranking.get(0);
@@ -103,7 +103,7 @@ class SeasonArchiveServiceTest {
         ReflectionTestUtils.setField(남의시즌, "roomId", 555L);
         when(seasonRepository.findById(99L)).thenReturn(Optional.of(남의시즌));
 
-        assertThat(archiveService.getSeasonRanking(ROOM_ID, GAME_ID, 99L)).isEmpty();
+        assertThat(archiveService.getSeasonRanking(ROOM_ID, GAME_ID, "99")).isEmpty();
         verify(snapshotRepository, never()).findByRoomSeasonIdAndBoardGameIdOrderByRankAsc(anyLong(), anyLong());
     }
 
@@ -114,7 +114,7 @@ class SeasonArchiveServiceTest {
         givenSnapshots(snapshot(1, 태윤), snapshot(2, 유령));
         givenMembersExist(태윤); // 유령은 member 테이블에 없다
 
-        assertThat(archiveService.getSeasonRanking(ROOM_ID, GAME_ID, SEASON))
+        assertThat(archiveService.getSeasonRanking(ROOM_ID, GAME_ID, String.valueOf(SEASON)))
             .extracting(RankingDto.GameRankingResponse::memberId)
             .containsExactly(1L);
     }
@@ -145,7 +145,8 @@ class SeasonArchiveServiceTest {
 
         assertThat(seasons).extracting(SeasonDto.RoomSeasonResponse::seasonId).containsExactly(SEASON_2, SEASON_1);
         assertThat(seasons).extracting(SeasonDto.RoomSeasonResponse::name).containsExactly("여름 리그", null);
-        assertThat(seasons).extracting(SeasonDto.RoomSeasonResponse::seasonKey).containsExactly(null, "2026-07");
+        // 구버전 앱 호환: 월간 시절 시즌은 원래 키, 이후 시즌은 종료일이 속한 달 — null이면 구버전 앱이 죽는다
+        assertThat(seasons).extracting(SeasonDto.RoomSeasonResponse::seasonKey).containsExactly("2026-08", "2026-07");
         assertThat(seasons).extracting(SeasonDto.RoomSeasonResponse::matchCount).containsExactly(2, 3);
         assertThat(seasons).extracting(SeasonDto.RoomSeasonResponse::playerCount).containsExactly(4, 3);
         assertThat(seasons.get(0).endDate()).isEqualTo(LocalDate.of(2026, 8, 31));
@@ -174,6 +175,47 @@ class SeasonArchiveServiceTest {
         verify(matchRecordRepository, never()).findPlayedAtByRoomIdAndBoardGameId(anyLong(), anyLong());
     }
 
+    // ── 구버전 앱(1.10.x) 호환 ──
+
+    @Test
+    void 구버전_앱이_보낸_yyyy_MM은_그_키를_가진_시즌으로_푼다() {
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 5, 4);
+        when(boundaryService.zoneOfRoom(ROOM_ID)).thenReturn(서울);
+        when(seasonRepository.findByRoomIdAndClosedAtIsNotNullOrderBySeasonNumberDesc(ROOM_ID))
+            .thenReturn(List.of(시즌2, 시즌1));
+        when(snapshotRepository.findSeasonKeyByRoomSeasonId(SEASON_2)).thenReturn(null);       // 방별 시즌 → 종료월 2026-08
+        when(snapshotRepository.findSeasonKeyByRoomSeasonId(SEASON_1)).thenReturn("2026-07"); // 월간 시절 원래 키
+        when(seasonRepository.findById(SEASON_1)).thenReturn(Optional.of(시즌1));
+        when(snapshotRepository.findByRoomSeasonIdAndBoardGameIdOrderByRankAsc(SEASON_1, GAME_ID))
+            .thenReturn(List.of(snapshot(SEASON_1, 1, 태윤)));
+        givenMembersExist(태윤);
+
+        assertThat(archiveService.getSeasonRanking(ROOM_ID, GAME_ID, "2026-07")).hasSize(1);
+    }
+
+    @Test
+    void 해석할_수_없는_시즌_참조는_빈_목록이다() {
+        assertThat(archiveService.getSeasonRanking(ROOM_ID, GAME_ID, "2026-8월")).isEmpty();
+        assertThat(archiveService.getPodium(ROOM_ID, GAME_ID, "null")).isEmpty();
+        verify(snapshotRepository, never()).findByRoomSeasonIdAndBoardGameIdOrderByRankAsc(anyLong(), anyLong());
+    }
+
+    @Test
+    void 트로피와_점수_추이에도_구버전_앱용_seasonKey가_항상_있다() {
+        PlayerGameRating 태윤 = rating(1L, "태윤", 1250.0, 5, 4);
+        when(boundaryService.zoneOfRoom(ROOM_ID)).thenReturn(서울);
+        SeasonRankSnapshot 월간 = snapshot(SEASON_1, 1, 태윤);
+        ReflectionTestUtils.setField(월간, "seasonKey", "2026-07");
+        when(snapshotRepository.findTrophiesByMemberId(1L)).thenReturn(List.of(snapshot(SEASON_2, 1, 태윤), 월간));
+        givenSeasonsExist();
+        when(snapshotRepository.countParticipantsBySeasons(anyCollection()))
+            .thenReturn(List.<Object[]>of(new Object[]{SEASON_2, GAME_ID, 4L}, new Object[]{SEASON_1, GAME_ID, 4L}));
+        givenRoomAndGameNamesExist();
+
+        assertThat(archiveService.getTrophies(1L))
+            .extracting(SeasonDto.TrophyResponse::seasonKey).containsExactly("2026-08", "2026-07");
+    }
+
     // ── ② 시상대 + 시상 조건 (§4) ──
 
     @Test
@@ -184,7 +226,7 @@ class SeasonArchiveServiceTest {
         givenSnapshots(snapshot(1, 태윤), snapshot(2, 지민), snapshot(2, 현우));
         givenMembersExist(태윤, 지민, 현우);
 
-        List<SeasonDto.PodiumEntry> podium = archiveService.getPodium(ROOM_ID, GAME_ID, SEASON);
+        List<SeasonDto.PodiumEntry> podium = archiveService.getPodium(ROOM_ID, GAME_ID, String.valueOf(SEASON));
 
         assertThat(podium).extracting(SeasonDto.PodiumEntry::rank).containsExactly(1, 2, 2);
         assertThat(podium).extracting(SeasonDto.PodiumEntry::nickname).containsExactly("태윤", "지민", "현우");
@@ -196,7 +238,7 @@ class SeasonArchiveServiceTest {
         PlayerGameRating 지민 = rating(2L, "지민", 950.0, 5, 1);
         givenSnapshots(snapshot(1, 태윤), snapshot(2, 지민));
 
-        assertThat(archiveService.getPodium(ROOM_ID, GAME_ID, SEASON)).isEmpty();
+        assertThat(archiveService.getPodium(ROOM_ID, GAME_ID, String.valueOf(SEASON))).isEmpty();
     }
 
     @Test
@@ -207,7 +249,7 @@ class SeasonArchiveServiceTest {
         givenSnapshots(snapshot(1, 태윤), snapshot(2, 지민), snapshot(3, 현우));
         givenMembersExist(지민, 현우);
 
-        assertThat(archiveService.getPodium(ROOM_ID, GAME_ID, SEASON))
+        assertThat(archiveService.getPodium(ROOM_ID, GAME_ID, String.valueOf(SEASON)))
             .extracting(SeasonDto.PodiumEntry::nickname)
             .containsExactly("지민", "현우");
     }
@@ -221,7 +263,7 @@ class SeasonArchiveServiceTest {
         givenSnapshots(snapshot(1, 태윤), snapshot(2, 지민), snapshot(3, 현우), snapshot(4, 민서));
         givenMembersExist(태윤, 지민, 현우, 민서);
 
-        assertThat(archiveService.getPodium(ROOM_ID, GAME_ID, SEASON)).hasSize(3);
+        assertThat(archiveService.getPodium(ROOM_ID, GAME_ID, String.valueOf(SEASON))).hasSize(3);
     }
 
     // ── ④ 내 점수 추이 ──
@@ -309,6 +351,7 @@ class SeasonArchiveServiceTest {
 
     private void givenSeasonsExist() {
         when(seasonRepository.findByIdIn(anyCollection())).thenReturn(List.of(시즌1, 시즌2));
+        org.mockito.Mockito.lenient().when(boundaryService.zoneOfRoom(ROOM_ID)).thenReturn(서울);
     }
 
     private RoomSeason closedSeason(Long id, int number, String name, LocalDateTime startAt, LocalDate endDate) {

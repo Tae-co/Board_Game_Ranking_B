@@ -31,6 +31,8 @@ ALTER TABLE room_season ENABLE ROW LEVEL SECURITY;
 
 -- ── 기존 월간 스냅샷을 방별 닫힌 시즌으로 옮긴다 ──
 -- 운영에는 2026-09 한 시즌(방 16개)이 있다. 월 경계는 KST 1일 00:00이었다 (§22: 경기 있는 방은 전부 한국).
+--
+-- 운영은 이 파일을 SQL Editor로 손으로 적용한다(§3). 두 번 실행해도 결과가 같도록 모든 쓰기에 가드를 둔다.
 
 INSERT INTO room_season (room_id, season_number, name, start_at, end_at, closed_at)
 SELECT s.room_id,
@@ -43,6 +45,7 @@ SELECT s.room_id,
        (((to_date(s.season_key, 'YYYY-MM') + INTERVAL '1 month')::timestamp) AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'UTC',
        MAX(s.created_at)
 FROM season_rank_snapshot s
+WHERE NOT EXISTS (SELECT 1 FROM room_season rs WHERE rs.room_id = s.room_id)
 GROUP BY s.room_id, s.season_key;
 
 -- 두 번째 이후 닫힌 시즌의 시작은 직전 시즌의 끝이다.
@@ -56,7 +59,8 @@ ALTER TABLE season_rank_snapshot ADD COLUMN IF NOT EXISTS room_season_id BIGINT;
 UPDATE season_rank_snapshot s
 SET room_season_id = rs.room_season_id
 FROM room_season rs
-WHERE rs.room_id = s.room_id
+WHERE s.room_season_id IS NULL
+  AND rs.room_id = s.room_id
   AND rs.end_at = (((to_date(s.season_key, 'YYYY-MM') + INTERVAL '1 month')::timestamp) AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'UTC';
 
 ALTER TABLE season_rank_snapshot ALTER COLUMN room_season_id SET NOT NULL;

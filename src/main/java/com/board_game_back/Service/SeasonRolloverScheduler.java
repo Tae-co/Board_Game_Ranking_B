@@ -27,8 +27,7 @@ public class SeasonRolloverScheduler {
         int rolled = 0;
         for (RoomSeason season : seasonRepository.findDue(SeasonBoundaryService.nowUtc())) {
             try {
-                rolloverService.rollover(season.getId());
-                rolled++;
+                if (rolloverService.rolloverIfDue(season.getRoomId()).isPresent()) rolled++;
             } catch (Exception e) {
                 // 한 방이 실패해도 나머지는 마감돼야 한다. 다음 정각에 다시 시도된다.
                 log.error("시즌 롤오버 실패 room={} season={}", season.getRoomId(), season.getId(), e);

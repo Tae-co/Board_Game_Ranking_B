@@ -45,25 +45,20 @@ public class SeasonRolloverService {
     private final UserEventService userEventService;
 
     /**
-     * 경기 등록 직전에 부른다. 스케줄러는 매시 정각에만 돌기 때문에 이게 없으면 종료 후 최대 1시간 동안
-     * 등록된 경기가 지난 시즌 점수에 섞인다.
+     * 이 방의 진행 중 시즌이 끝났으면 넘긴다. 정각 스케줄러, 경기 등록 직전, 시즌 조회가 모두 이것 하나로 들어온다
+     * — 스케줄러만 믿으면 종료 후 최대 1시간 동안 등록된 경기가 지난 시즌 점수에 섞인다.
+     *
+     * <p>진행 중 시즌을 <b>잠그고</b> 읽는다. 두 경로가 동시에 들어오면 둘째는 첫째가 커밋할 때까지 기다렸다가
+     * 이미 닫힌 행을 보고(조건에서 빠져) 그냥 지나간다.
+     *
+     * @return 새로 연 다음 시즌. 넘길 게 없었거나 방이 삭제돼 시즌만 닫았으면 빈 값.
      */
     @Transactional
-    public void rolloverIfDue(Long roomId) {
+    public Optional<RoomSeason> rolloverIfDue(Long roomId) {
         LocalDateTime now = SeasonBoundaryService.nowUtc();
-        seasonRepository.findByRoomIdAndClosedAtIsNull(roomId)
+        return seasonRepository.findOpenForUpdate(roomId)
             .filter(season -> season.isDue(now))
-            .ifPresent(season -> rollover(season, now));
-    }
-
-    /** @return 다음 시즌. 방이 삭제됐으면 시즌만 닫고 빈 값. */
-    @Transactional
-    public Optional<RoomSeason> rollover(Long roomSeasonId) {
-        RoomSeason season = seasonRepository.findById(roomSeasonId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 시즌입니다."));
-        LocalDateTime now = SeasonBoundaryService.nowUtc();
-        if (!season.isDue(now)) return Optional.empty();
-        return rollover(season, now);
+            .flatMap(season -> rollover(season, now));
     }
 
     private Optional<RoomSeason> rollover(RoomSeason season, LocalDateTime now) {

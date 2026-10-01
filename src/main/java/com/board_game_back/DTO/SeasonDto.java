@@ -58,7 +58,9 @@ public class SeasonDto {
      * 프론트가 그대로 비교한다. {@code endAt}은 배타적이다 (종료일 다음 날 00:00).
      * 날짜({@code startDate}·{@code endDate})는 커뮤니티 타임존 기준이고 화면 표시·수정 폼용이다.
      *
-     * <p>{@code seasonKey}는 월간 시즌 시절 스냅샷의 "2026-09"다. 구버전 앱이 월 라벨로 쓰므로 남긴다.
+     * <p>{@code seasonKey}는 <b>구버전 앱(1.10.x) 호환용</b>이다. 그 앱은 이 값을 "yyyy-MM"으로 파싱해
+     * 월 라벨을 만들고, null이면 화면 전체가 하얗게 죽는다. 월간 시즌 시절 시즌은 원래 키("2026-09"),
+     * 이후 시즌은 종료일이 속한 달로 채운다 ({@code SeasonArchiveService#legacyKey}). 새 앱은 쓰지 않는다.
      */
     public record RoomSeasonResponse(
         Long seasonId,
@@ -109,6 +111,7 @@ public class SeasonDto {
 
     /** 시즌별 내 점수 추이 (시즌 탭 ④) */
     public record SeasonHistoryItem(
+        String seasonKey,     // 구버전 앱 호환 — RoomSeasonResponse.seasonKey 참고
         Long seasonId,
         int seasonNumber,
         String seasonName,
@@ -119,6 +122,7 @@ public class SeasonDto {
 
     /** 프로필 트로피 선반 — 1~3위만, 시상 조건을 통과한 것만 */
     public record TrophyResponse(
+        String seasonKey,     // 구버전 앱 호환 — RoomSeasonResponse.seasonKey 참고
         Long seasonId,
         int seasonNumber,
         String seasonName,

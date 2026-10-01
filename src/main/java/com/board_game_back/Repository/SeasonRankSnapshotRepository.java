@@ -12,6 +12,10 @@ public interface SeasonRankSnapshotRepository extends JpaRepository<SeasonRankSn
     /** 롤오버 멱등성 판단: 이 시즌의 스냅샷이 이미 있으면 다시 찍지 않는다. */
     boolean existsByRoomSeasonId(Long roomSeasonId);
 
+    /** 월간 시즌 시절 스냅샷의 원래 키. 방별 시즌 이후 행은 null이다. */
+    @Query("SELECT MAX(s.seasonKey) FROM SeasonRankSnapshot s WHERE s.roomSeasonId = :roomSeasonId")
+    String findSeasonKeyByRoomSeasonId(@Param("roomSeasonId") Long roomSeasonId);
+
     /** 지난 시즌 순위표 (시즌 탭 ③) · 시상대 */
     List<SeasonRankSnapshot> findByRoomSeasonIdAndBoardGameIdOrderByRankAsc(Long roomSeasonId, Long boardGameId);
 
