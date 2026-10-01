@@ -8,6 +8,7 @@ import com.board_game_back.Entity.Room;
 import com.board_game_back.Entity.RoomSeason;
 import com.board_game_back.Entity.SeasonRankSnapshot;
 import com.board_game_back.Repository.BoardGameRepository;
+import com.board_game_back.Repository.MatchParticipantRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.RoomRepository;
@@ -60,6 +61,7 @@ public class SeasonArchiveService {
     private final SeasonRankSnapshotRepository snapshotRepository;
     private final RoomSeasonRepository seasonRepository;
     private final MatchRecordRepository matchRecordRepository;
+    private final MatchParticipantRepository participantRepository;
     private final RoomRepository roomRepository;
     private final MemberRepository memberRepository;
     private final BoardGameRepository boardGameRepository;
@@ -77,6 +79,11 @@ public class SeasonArchiveService {
         List<SeasonRankSnapshot> snapshots =
             snapshotRepository.findByRoomSeasonIdAndBoardGameIdOrderByRankAsc(seasonId, gameId);
         Map<Long, Member> members = membersOf(snapshots);
+        // 순위 분포는 스냅샷에 없어서 시즌 기간으로 자른 경기에서 센다. 첫 시즌은 시작 경계 없음(§5)
+        Map<Long, List<Integer>> placements = seasonRepository.findById(seasonId)
+            .map(season -> participantRepository.placementCountsByMember(roomId, gameId,
+                season.getSeasonNumber() == 1 ? null : season.getStartAt(), season.getEndAt()))
+            .orElse(Map.of());
 
         List<RankingDto.GameRankingResponse> responses = new ArrayList<>();
         for (SeasonRankSnapshot snapshot : snapshots) {
@@ -88,7 +95,8 @@ public class SeasonArchiveService {
                 member.getNickname(),
                 member.getProfileImage(),
                 snapshot.getDisplayScore(),
-                snapshot.getPlayCount(), snapshot.getWinCount(), snapshot.getLoseCount()));
+                snapshot.getPlayCount(), snapshot.getWinCount(), snapshot.getLoseCount(),
+                placements.get(member.getId())));
         }
         return responses;
     }

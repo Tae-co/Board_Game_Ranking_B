@@ -17,6 +17,7 @@ import com.board_game_back.Entity.Room;
 import com.board_game_back.Entity.RoomSeason;
 import com.board_game_back.Entity.SeasonRankSnapshot;
 import com.board_game_back.Repository.BoardGameRepository;
+import com.board_game_back.Repository.MatchParticipantRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.RoomRepository;
@@ -50,6 +51,7 @@ class SeasonArchiveServiceTest {
     @Mock private SeasonRankSnapshotRepository snapshotRepository;
     @Mock private RoomSeasonRepository seasonRepository;
     @Mock private MatchRecordRepository matchRecordRepository;
+    @Mock private MatchParticipantRepository participantRepository;
     @Mock private RoomRepository roomRepository;
     @Mock private MemberRepository memberRepository;
     @Mock private BoardGameRepository boardGameRepository;
