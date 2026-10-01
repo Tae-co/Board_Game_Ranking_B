@@ -19,6 +19,7 @@ import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,9 +43,11 @@ public class RoomService {
     private final CommunityAdminRepository communityAdminRepository;
     private final CommunityMemberRepository communityMemberRepository;
     private final CommunityRepository communityRepository;
+    private final RoomSeasonService roomSeasonService;
 
     @Transactional
-    public Room createRoom(String roomName, Long memberId, Long boardGameId, Long communityId) {
+    public Room createRoom(String roomName, Long memberId, Long boardGameId, Long communityId,
+                           String seasonName, LocalDate seasonEndDate) {
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
 
@@ -58,6 +61,7 @@ public class RoomService {
         Room savedRoom = roomRepository.save(room);
 
         roomMemberRepository.save(new RoomMember(savedRoom, member, MemberRole.HOST));
+        roomSeasonService.createFirstSeason(savedRoom.getId(), communityId, seasonName, seasonEndDate);
 
         if (boardGameId != null) {
             boardGameRepository.findById(boardGameId).ifPresent(game -> {

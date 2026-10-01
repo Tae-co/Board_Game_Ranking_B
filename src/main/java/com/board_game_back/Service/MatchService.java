@@ -39,7 +39,8 @@ public class MatchService {
     private final RatingCalculator ratingCalculator;
     private final RoomRepository roomRepository;
     private final RoomMemberRepository roomMemberRepository;
-    private final SeasonBoundaryService seasonBoundaryService;
+    private final RoomSeasonService roomSeasonService;
+    private final SeasonRolloverService seasonRolloverService;
 
     @Transactional
     public List<ResultResponse> recordMatchResult(MatchDto.ResultRequest request, Long requesterId) {
@@ -51,6 +52,9 @@ public class MatchService {
 
         Room room = roomRepository.findById(request.roomId())
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
+
+        // 정각 스케줄러를 기다리면 시즌 종료 후 최대 1시간 동안의 경기가 지난 시즌 점수에 섞인다 (§22).
+        seasonRolloverService.rolloverIfDue(room.getId());
 
         MatchRecord matchRecord = MatchRecord.builder().boardGame(game).room(room).build();
 
@@ -237,7 +241,7 @@ public class MatchService {
 
         // 리셋된 적 있는 방은 현재 시즌 경기만 리플레이한다. 이게 없으면 재계산 한 번에
         // 지난 시즌 점수가 통째로 부활해 롤오버가 무의미해진다. null = 아직 리셋된 적 없음.
-        LocalDateTime seasonStart = seasonBoundaryService.currentSeasonStartUtc(roomId);
+        LocalDateTime seasonStart = roomSeasonService.currentSeasonStartUtc(roomId);
 
         for (MatchRecord match : matches) {
             if (seasonStart != null && match.getPlayedAt() != null
