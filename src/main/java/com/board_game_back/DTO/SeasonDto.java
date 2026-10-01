@@ -25,19 +25,18 @@ public class SeasonDto {
         int totalRooms,       // 커뮤니티의 현재 방 수
         long totalMembers,    // 커뮤니티의 현재 인원
         int matchCount,       // 기간 안 경기 수
-        List<Leader> leaders, // 기간 안 점수 상승 합 상위 3명
+        List<Leader> leaders, // 커뮤니티 방들 중 최고 점수 상위 3명 (시상대)
         List<Award> awards
     ) {}
 
-    /** 현황 상위권 한 칸. 동점은 같은 순위를 받는다. */
+    /** 현황 시상대 한 칸. 사람마다 가장 높은 방 점수 하나. 동점은 같은 순위를 받는다. */
     public record Leader(
         int rank,
         Long memberId,
         String nickname,
         String profileImage,
-        double climb,       // 기간 안 ratingChange 합
-        int playCount,
-        int winCount
+        double displayScore, // 그 방의 현재 점수
+        String roomName      // 그 점수를 가진 방
     ) {}
 
     /** type: MOST_WINS | LONGEST_STREAK | DARK_HORSE */

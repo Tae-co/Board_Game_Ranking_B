@@ -13,10 +13,12 @@ import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.MatchParticipant;
 import com.board_game_back.Entity.MatchRecord;
 import com.board_game_back.Entity.Member;
+import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Repository.CommunityMemberRepository;
 import com.board_game_back.Repository.CommunityRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
+import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -43,6 +45,7 @@ class SeasonServiceTest {
     @Mock private CommunityMemberRepository communityMemberRepository;
     @Mock private RoomRepository roomRepository;
     @Mock private MatchRecordRepository matchRecordRepository;
+    @Mock private PlayerGameRatingRepository playerGameRatingRepository;
 
     @InjectMocks private SeasonService seasonService;
 
@@ -84,25 +87,25 @@ class SeasonServiceTest {
     }
 
     @Test
-    void getStatus_상위권은_기간_안_점수_상승_합으로_줄_세우고_3판_미만은_뺀다() {
+    void getStatus_시상대는_사람마다_최고_점수인_방으로_줄_세운다() {
         givenCommunityWithRoom();
-        when(communityMemberRepository.countByCommunityId(1L)).thenReturn(4L);
+        when(matchRecordRepository.findByRoomIdsAndPlayedAtRange(anyList(), any(), any())).thenReturn(List.of());
+        Room 일요모임 = new Room("일요모임", "DEF456", 11L);
+        ReflectionTestUtils.setField(일요모임, "id", 101L);
         Member 민서 = member(4L, "민서");
-        when(matchRecordRepository.findByRoomIdsAndPlayedAtRange(anyList(), any(), any())).thenReturn(List.of(
-            match(카탄, at(1), placing(지민, 1, 100), placing(태윤, 2, 10), placing(현우, 3, -50)),
-            match(카탄, at(2), placing(지민, 1, 100), placing(태윤, 2, 10), placing(현우, 3, -50)),
-            match(아줄, at(3), placing(태윤, 1, 30), placing(지민, 2, -20), placing(현우, 3, -10)),
-            match(아줄, at(4), placing(민서, 1, 500), placing(현우, 2, -10))  // 민서는 1판뿐
+        when(playerGameRatingRepository.findByRoomIdsWithMinPlays(anyList(), eq(3))).thenReturn(List.of(
+            rating(태윤, room, 900), rating(태윤, 일요모임, 1300),  // 태윤은 일요모임 점수로 오른다
+            rating(지민, room, 1100),
+            rating(현우, 일요모임, 700),
+            rating(민서, room, 600)
         ));
-        when(matchRecordRepository.findFirstPlayedAtByMember(anyList())).thenReturn(List.of());
 
         SeasonDto.StatusResponse status = seasonService.getStatus(1L);
 
-        assertThat(status.matchCount()).isEqualTo(4);
-        assertThat(status.leaders()).extracting(SeasonDto.Leader::nickname).containsExactly("지민", "태윤", "현우");
-        assertThat(status.leaders()).extracting(SeasonDto.Leader::climb).containsExactly(180.0, 50.0, -120.0);
+        assertThat(status.leaders()).extracting(SeasonDto.Leader::nickname).containsExactly("태윤", "지민", "현우");
+        assertThat(status.leaders()).extracting(SeasonDto.Leader::roomName).containsExactly("일요모임", "금요모임", "일요모임");
+        assertThat(status.leaders()).extracting(SeasonDto.Leader::displayScore).containsExactly(1300.0, 1100.0, 700.0);
         assertThat(status.leaders()).extracting(SeasonDto.Leader::rank).containsExactly(1, 2, 3);
-        assertThat(status.leaders().get(0).winCount()).isEqualTo(2);
     }
 
     @Test
@@ -245,6 +248,12 @@ class SeasonServiceTest {
         Member member = Member.builder().nickname(nickname).build();
         ReflectionTestUtils.setField(member, "id", id);
         return member;
+    }
+
+    private PlayerGameRating rating(Member member, Room room, double score) {
+        PlayerGameRating rating = new PlayerGameRating(member, 카탄, room);
+        ReflectionTestUtils.setField(rating.getGameStats(), "rating", score);
+        return rating;
     }
 
     private BoardGame boardGame(Long id, String name) {

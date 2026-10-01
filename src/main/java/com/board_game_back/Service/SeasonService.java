@@ -5,10 +5,12 @@ import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.MatchParticipant;
 import com.board_game_back.Entity.MatchRecord;
 import com.board_game_back.Entity.Member;
+import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Repository.CommunityMemberRepository;
 import com.board_game_back.Repository.CommunityRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
+import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomRepository;
 import com.board_game_back.Utils.RegionTimeZones;
 import java.time.LocalDate;
@@ -18,6 +20,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,7 +46,7 @@ public class SeasonService {
 
     static final int WINDOW_DAYS = 30;
 
-    /** 상위권에 오르려면 기간 안에 이만큼은 뛰어야 한다. 1판 이긴 사람이 1등이 되지 않게 한다. */
+    /** 시상대에 오르려면 그 방·게임에서 이만큼은 뛰어야 한다. 1판 이긴 사람이 1등이 되지 않게 한다. */
     private static final int MIN_LEADER_PLAYS = 3;
 
     private static final int LEADER_SIZE = 3;
@@ -55,6 +58,7 @@ public class SeasonService {
     private final CommunityMemberRepository communityMemberRepository;
     private final RoomRepository roomRepository;
     private final MatchRecordRepository matchRecordRepository;
+    private final PlayerGameRatingRepository playerGameRatingRepository;
 
     public SeasonDto.StatusResponse getStatus(Long communityId) {
         Community community = communityRepository.findById(communityId)
@@ -93,36 +97,44 @@ public class SeasonService {
             roomIds.size(),
             communityMemberRepository.countByCommunityId(communityId),
             matches.size(),
-            buildLeaders(tallies),
+            buildLeaders(roomIds),
             buildAwards(tallies, roomIds, from, to)
         );
     }
 
     /**
-     * 기간 안 점수 상승 합 상위 3명. 방·게임이 섞이지만 ratingChange는 단위가 같은 표시 점수라
-     * 합칠 수 있다. 방마다 시즌 리셋 시점이 달라 "지금 점수"끼리는 비교가 안 되므로 상승폭으로 본다.
+     * 시상대 — 커뮤니티 방들에서 가장 높은 점수를 가진 3명. 사람마다 최고 점수인 방 하나만 본다.
+     * 레이팅은 방별 시즌이 시작될 때 리셋되므로 지금 점수 = 진행 중 시즌 점수다.
+     * 1판 이긴 사람이 올라오지 않게 그 방·게임에서 {@link #MIN_LEADER_PLAYS}판 이상 뛴 레이팅만 본다.
      */
-    private List<SeasonDto.Leader> buildLeaders(Map<Long, PlayerTally> tallies) {
-        List<PlayerTally> sorted = tallies.values().stream()
-            .filter(t -> t.plays >= MIN_LEADER_PLAYS)
-            .sorted(Comparator.<PlayerTally>comparingDouble(t -> t.climb).reversed()
-                .thenComparing(Comparator.<PlayerTally>comparingInt(t -> t.wins).reversed()))
+    private List<SeasonDto.Leader> buildLeaders(List<Long> roomIds) {
+        if (roomIds.isEmpty()) return Collections.emptyList();
+
+        Map<Long, PlayerGameRating> bestByMember = new HashMap<>();
+        for (PlayerGameRating rating : playerGameRatingRepository.findByRoomIdsWithMinPlays(roomIds, MIN_LEADER_PLAYS)) {
+            bestByMember.merge(rating.getMember().getId(), rating,
+                (a, b) -> b.getGameStats().getDisplayScore() > a.getGameStats().getDisplayScore() ? b : a);
+        }
+        List<PlayerGameRating> sorted = bestByMember.values().stream()
+            .sorted(Comparator.<PlayerGameRating>comparingDouble(r -> r.getGameStats().getDisplayScore()).reversed()
+                .thenComparing(r -> r.getMember().getId()))
             .toList();
 
         List<SeasonDto.Leader> leaders = new ArrayList<>();
         int rank = 0;
         long previous = Long.MIN_VALUE;
         for (int i = 0; i < sorted.size(); i++) {
-            PlayerTally t = sorted.get(i);
-            long climb = Math.round(t.climb);
-            if (climb != previous) {
+            PlayerGameRating r = sorted.get(i);
+            long score = Math.round(r.getGameStats().getDisplayScore());
+            if (score != previous) {
                 rank = i + 1;
-                previous = climb;
+                previous = score;
             }
             if (rank > LEADER_SIZE) break;
+            Member member = r.getMember();
             leaders.add(new SeasonDto.Leader(
-                rank, t.member.getId(), t.member.getNickname(), t.member.getProfileImage(),
-                climb, t.plays, t.wins));
+                rank, member.getId(), member.getNickname(), member.getProfileImage(),
+                score, r.getRoom().getName()));
         }
         return leaders;
     }
