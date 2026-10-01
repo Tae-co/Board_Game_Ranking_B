@@ -2,24 +2,25 @@ package com.board_game_back.Service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.board_game_back.Entity.BoardGame;
-import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Entity.Room;
+import com.board_game_back.Entity.RoomSeason;
 import com.board_game_back.Entity.SeasonRankSnapshot;
-import com.board_game_back.Repository.CommunityRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomRepository;
+import com.board_game_back.Repository.RoomSeasonRepository;
 import com.board_game_back.Repository.SeasonRankSnapshotRepository;
 import com.board_game_back.Utils.RatingConstants;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -38,11 +39,12 @@ class SeasonRolloverServiceTest {
 
     private static final Long COMMUNITY_ID = 1L;
     private static final Long ROOM_ID = 100L;
-    private static final YearMonth SEASON = YearMonth.of(2026, 9);
-    private static final String SEASON_KEY = "2026-09";
+    private static final Long SEASON_ID = 7L;
+    private static final ZoneId 서울 = ZoneId.of("Asia/Seoul");
 
-    @Mock private CommunityRepository communityRepository;
     @Mock private RoomRepository roomRepository;
+    @Mock private RoomSeasonRepository seasonRepository;
+    @Mock private SeasonBoundaryService boundaryService;
     @Mock private PlayerGameRatingRepository ratingRepository;
     @Mock private SeasonRankSnapshotRepository snapshotRepository;
     // 롤오버가 SEASON_ROLLED_OVER를 남긴다 (§10). 이 테스트가 보는 건 스냅샷·리셋이다.
@@ -53,6 +55,7 @@ class SeasonRolloverServiceTest {
     @Captor private ArgumentCaptor<List<SeasonRankSnapshot>> snapshotCaptor;
 
     private Room room;
+    private RoomSeason season;
     private BoardGame 카탄;
     private PlayerGameRating 태윤;  // 1위
     private PlayerGameRating 지민;  // 2위
@@ -63,6 +66,12 @@ class SeasonRolloverServiceTest {
         room = new Room("금요모임", "ABC123", 10L);
         ReflectionTestUtils.setField(room, "id", ROOM_ID);
         room.assignCommunity(COMMUNITY_ID);
+
+        // 4주짜리 시즌이 어제 끝났다 → 마감 대상
+        LocalDate 종료일 = LocalDate.now(서울).minusDays(1);
+        season = RoomSeason.open(ROOM_ID, 2, "가을 시즌",
+            RoomSeason.endExclusiveUtc(종료일.minusDays(28), 서울), 종료일, 서울);
+        ReflectionTestUtils.setField(season, "id", SEASON_ID);
 
         카탄 = boardGame(10L, "카탄");
         태윤 = rating(1L, "태윤", 카탄, 1250.0);
@@ -76,7 +85,7 @@ class SeasonRolloverServiceTest {
         when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID))
             .thenReturn(List.of(지민, 현우, 태윤)); // 일부러 순서를 섞어 넣는다
 
-        rolloverService.rollover(COMMUNITY_ID, SEASON);
+        rolloverService.rollover(SEASON_ID);
 
         verify(snapshotRepository).saveAll(snapshotCaptor.capture());
         List<SeasonRankSnapshot> snapshots = snapshotCaptor.getValue();
@@ -88,13 +97,12 @@ class SeasonRolloverServiceTest {
     }
 
     @Test
-    void rollover_이미_마감된_시즌은_두_번_박히지_않는다() {
-        givenCommunityWithRoom();
-        when(snapshotRepository.existsBySeasonKeyAndRoomId(SEASON_KEY, ROOM_ID)).thenReturn(true);
+    void rollover_스냅샷이_이미_있으면_두_번_박히지_않는다() {
+        givenRolloverableRoom();
+        when(snapshotRepository.existsByRoomSeasonId(SEASON_ID)).thenReturn(true);
 
-        int rolled = rolloverService.rollover(COMMUNITY_ID, SEASON);
+        rolloverService.rollover(SEASON_ID);
 
-        assertThat(rolled).isZero();
         verify(snapshotRepository, never()).saveAll(anyList());
         verify(ratingRepository, never()).saveAll(anyList());
     }
@@ -105,7 +113,7 @@ class SeasonRolloverServiceTest {
         when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID))
             .thenReturn(List.of(태윤, 지민, 현우));
 
-        rolloverService.rollover(COMMUNITY_ID, SEASON);
+        rolloverService.rollover(SEASON_ID);
 
         for (PlayerGameRating rating : List.of(태윤, 지민, 현우)) {
             assertThat(rating.getGameStats().getRating()).isEqualTo(RatingConstants.INITIAL_RATING);
@@ -117,28 +125,49 @@ class SeasonRolloverServiceTest {
     }
 
     @Test
-    void 시즌_경계는_커뮤니티_타임존마다_다른_UTC_시각이다() {
-        LocalDateTime 서울 = SeasonBoundaryService.startOfSeasonUtc(ZoneId.of("Asia/Seoul"), YearMonth.of(2026, 10));
-        LocalDateTime 뉴욕 = SeasonBoundaryService.startOfSeasonUtc(ZoneId.of("America/New_York"), YearMonth.of(2026, 10));
-
-        // 한국의 10월 1일 00:00은 UTC로 9월 30일 15:00 — UTC 기준으로 자르면 9시간이 어긋난다
-        assertThat(서울).isEqualTo(LocalDateTime.of(2026, 9, 30, 15, 0));
-        assertThat(뉴욕).isEqualTo(LocalDateTime.of(2026, 10, 1, 4, 0)); // EDT(UTC-4)
-        assertThat(서울).isBefore(뉴욕);
-    }
-
-    @Test
-    void rollover_첫_시즌이_짧은_방도_첫_달에_마감된다() {
-        // 14일 규칙을 폐기했다 — 월말에 첫 경기를 한 방도 예외 없이 1일에 마감된다 (§20).
+    void rollover_시즌을_닫고_같은_길이의_다음_시즌을_연다() {
         givenRolloverableRoom();
         when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID)).thenReturn(List.of(태윤));
 
-        int rolled = rolloverService.rollover(COMMUNITY_ID, SEASON);
+        RoomSeason next = rolloverService.rollover(SEASON_ID).orElseThrow();
 
-        assertThat(rolled).isEqualTo(1);
-        verify(snapshotRepository).saveAll(snapshotCaptor.capture());
-        assertThat(snapshotCaptor.getValue()).hasSize(1);
-        assertThat(태윤.getGameStats().getRating()).isEqualTo(RatingConstants.INITIAL_RATING);
+        assertThat(season.isClosed()).isTrue();
+        assertThat(next.getSeasonNumber()).isEqualTo(3);
+        assertThat(next.getName()).isNull(); // 화면이 "시즌 3"으로 표시한다
+        assertThat(next.getStartAt()).isEqualTo(season.getEndAt()); // 빈틈 없이 이어진다
+        assertThat(next.endDate(서울)).isEqualTo(season.endDate(서울).plusDays(28)); // 28일짜리 시즌
+    }
+
+    @Test
+    void rollover_경기가_없던_방도_시즌은_넘어간다() {
+        givenRolloverableRoom();
+        when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID)).thenReturn(List.of());
+
+        RoomSeason next = rolloverService.rollover(SEASON_ID).orElseThrow();
+
+        assertThat(season.isClosed()).isTrue();
+        assertThat(next.getSeasonNumber()).isEqualTo(3);
+        verify(snapshotRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void rollover_종료_전_시즌은_건드리지_않는다() {
+        RoomSeason 진행중 = RoomSeason.open(ROOM_ID, 1, "시즌", LocalDateTime.now(), LocalDate.now(서울).plusDays(3), 서울);
+        when(seasonRepository.findById(SEASON_ID)).thenReturn(Optional.of(진행중));
+
+        assertThat(rolloverService.rollover(SEASON_ID)).isEmpty();
+        assertThat(진행중.isClosed()).isFalse();
+        verify(ratingRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void rollover_방이_삭제됐으면_시즌만_닫고_다음_시즌은_없다() {
+        when(seasonRepository.findById(SEASON_ID)).thenReturn(Optional.of(season));
+        when(roomRepository.findById(ROOM_ID)).thenReturn(Optional.empty());
+
+        assertThat(rolloverService.rollover(SEASON_ID)).isEmpty();
+        assertThat(season.isClosed()).isTrue();
+        verify(seasonRepository, never()).save(any());
     }
 
     @Test
@@ -149,7 +178,7 @@ class SeasonRolloverServiceTest {
         double sigmaBefore = 태윤.getGameStats().getRatingDeviation();
         double displayBefore = 태윤.getGameStats().getDisplayScore();
 
-        rolloverService.rollover(COMMUNITY_ID, SEASON);
+        rolloverService.rollover(SEASON_ID);
 
         verify(snapshotRepository).saveAll(snapshotCaptor.capture());
         SeasonRankSnapshot snapshot = snapshotCaptor.getValue().get(0);
@@ -167,18 +196,12 @@ class SeasonRolloverServiceTest {
 
     // ── fixtures ──
 
-    /** 커뮤니티·방만 세운다. 롤오버 진행 여부는 각 테스트가 정한다. */
-    private void givenCommunityWithRoom() {
-        Community community = new Community("금요보드", "South Korea", null, 1L);
-        ReflectionTestUtils.setField(community, "id", COMMUNITY_ID);
-        when(communityRepository.findById(COMMUNITY_ID)).thenReturn(Optional.of(community));
-        when(roomRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(room));
-    }
-
-    /** 아직 이 시즌을 마감하지 않은, 정상 마감 대상 방. */
+    /** 종료 시각이 지난 시즌과 그 방. */
     private void givenRolloverableRoom() {
-        givenCommunityWithRoom();
-        when(snapshotRepository.existsBySeasonKeyAndRoomId(SEASON_KEY, ROOM_ID)).thenReturn(false);
+        when(seasonRepository.findById(SEASON_ID)).thenReturn(Optional.of(season));
+        when(roomRepository.findById(ROOM_ID)).thenReturn(Optional.of(room));
+        when(boundaryService.zoneOfRoom(ROOM_ID)).thenReturn(서울);
+        when(seasonRepository.save(any(RoomSeason.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
     private BoardGame boardGame(Long id, String name) {

@@ -38,8 +38,15 @@ public class SeasonRankSnapshot {
     @Column(name = "season_rank_snapshot_id")
     private Long id;
 
-    /** "2026-09" — 커뮤니티 region 타임존 기준의 연-월 */
-    @Column(name = "season_key", nullable = false, length = 7)
+    /** 이 행이 속한 시즌 ({@link RoomSeason}). */
+    @Column(name = "room_season_id", nullable = false)
+    private Long roomSeasonId;
+
+    /**
+     * 월간 시즌 시절(V16)의 "2026-09". 방별 시즌(§22) 이후 행은 null이다.
+     * 구버전 앱이 이 값을 월 라벨로 파싱하므로 옛 행에서는 지우지 않는다.
+     */
+    @Column(name = "season_key", length = 7)
     private String seasonKey;
 
     @Column(name = "room_id", nullable = false)
@@ -82,11 +89,11 @@ public class SeasonRankSnapshot {
      *
      * @param rank 같은 방·게임 안에서의 순위 (1부터)
      */
-    public static SeasonRankSnapshot from(String seasonKey, int rank, PlayerGameRating rating) {
+    public static SeasonRankSnapshot from(Long roomSeasonId, int rank, PlayerGameRating rating) {
         GlickoStats stats = rating.getGameStats();
 
         SeasonRankSnapshot snapshot = new SeasonRankSnapshot();
-        snapshot.seasonKey = seasonKey;
+        snapshot.roomSeasonId = roomSeasonId;
         snapshot.roomId = rating.getRoom().getId();
         snapshot.boardGameId = rating.getBoardGame().getId();
         snapshot.memberId = rating.getMember().getId();

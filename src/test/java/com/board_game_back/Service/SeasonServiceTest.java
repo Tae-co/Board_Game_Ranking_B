@@ -1,7 +1,6 @@
 package com.board_game_back.Service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -19,8 +18,10 @@ import com.board_game_back.Repository.CommunityMemberRepository;
 import com.board_game_back.Repository.CommunityRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
 import com.board_game_back.Repository.RoomRepository;
-import com.board_game_back.Utils.RegionTimeZones;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,21 +38,17 @@ import org.springframework.test.util.ReflectionTestUtils;
 @ExtendWith(MockitoExtension.class)
 class SeasonServiceTest {
 
-    private static final String PERIOD = "2026-08";
 
     @Mock private CommunityRepository communityRepository;
     @Mock private CommunityMemberRepository communityMemberRepository;
     @Mock private RoomRepository roomRepository;
     @Mock private MatchRecordRepository matchRecordRepository;
-    // 결산에 시상대를 얹으면서 생긴 의존. 이 테스트가 보는 건 수상 3종이고, 목은 빈 목록을 준다.
-    @Mock private SeasonArchiveService archiveService;
-    @Mock private SeasonBoundaryService boundaryService;
 
     @InjectMocks private SeasonService seasonService;
 
     private Member 태윤;   // 최다승
     private Member 지민;   // 최대 연승
-    private Member 현우;   // 이번 달 데뷔 = 다크호스
+    private Member 현우;   // 기간 안 데뷔 = 다크호스
     private BoardGame 카탄;
     private BoardGame 아줄;
     private Room room;
@@ -68,59 +65,48 @@ class SeasonServiceTest {
     }
 
     @Test
-    void getPeriods_경기가_있는_달만_최신순으로_반환한다() {
-        when(roomRepository.findByCommunityId(1L)).thenReturn(List.of(room));
-        when(boundaryService.zoneOfCommunity(1L)).thenReturn(RegionTimeZones.DEFAULT);
-        when(matchRecordRepository.findPlayedAtByRoomIds(anyList())).thenReturn(List.of(
-            LocalDateTime.of(2026, 8, 3, 20, 0),
-            LocalDateTime.of(2026, 8, 17, 20, 0),
-            LocalDateTime.of(2026, 6, 1, 20, 0)
-        ));
-
-        List<SeasonDto.PeriodResponse> periods = seasonService.getPeriods(1L);
-
-        assertThat(periods).extracting(SeasonDto.PeriodResponse::period)
-            .containsExactly("2026-08", "2026-06");
-        assertThat(periods.get(0).matchCount()).isEqualTo(2);
-    }
-
-    @Test
-    void getPeriods_달은_커뮤니티_타임존으로_가른다() {
-        when(roomRepository.findByCommunityId(1L)).thenReturn(List.of(room));
-        when(boundaryService.zoneOfCommunity(1L)).thenReturn(RegionTimeZones.DEFAULT);
-        // playedAt은 UTC 벽시계. UTC 8/31 15:30 = KST 9/1 00:30 → 9월, UTC 8/31 14:59 = KST 8/31 23:59 → 8월
-        when(matchRecordRepository.findPlayedAtByRoomIds(anyList())).thenReturn(List.of(
-            LocalDateTime.of(2026, 8, 31, 15, 30),
-            LocalDateTime.of(2026, 8, 31, 14, 59)
-        ));
-
-        List<SeasonDto.PeriodResponse> periods = seasonService.getPeriods(1L);
-
-        assertThat(periods).extracting(SeasonDto.PeriodResponse::period)
-            .containsExactly("2026-09", "2026-08");
-    }
-
-    @Test
-    void getSummary_조회_범위는_커뮤니티_타임존의_1일_00시를_UTC로_옮긴_값이다() {
+    void getStatus_조회_범위는_커뮤니티_타임존의_최근_30일이다() {
         givenCommunityWithRoom();
         when(matchRecordRepository.findByRoomIdsAndPlayedAtRange(anyList(), any(), any())).thenReturn(List.of());
 
-        seasonService.getSummary(1L, PERIOD);
+        SeasonDto.StatusResponse status = seasonService.getStatus(1L);
 
-        // KST 8/1 00:00 = UTC 7/31 15:00, KST 9/1 00:00 = UTC 8/31 15:00
+        // 오늘 포함 30일: (오늘-29) 00:00 KST ~ 내일 00:00 KST, UTC로 옮겨서 자른다
+        ZoneId 서울 = ZoneId.of("Asia/Seoul");
+        LocalDate today = LocalDate.now(서울);
         verify(matchRecordRepository).findByRoomIdsAndPlayedAtRange(
-            anyList(), eq(LocalDateTime.of(2026, 7, 31, 15, 0)), eq(LocalDateTime.of(2026, 8, 31, 15, 0)));
+            anyList(),
+            eq(LocalDateTime.ofInstant(today.minusDays(29).atStartOfDay(서울).toInstant(), ZoneOffset.UTC)),
+            eq(LocalDateTime.ofInstant(today.plusDays(1).atStartOfDay(서울).toInstant(), ZoneOffset.UTC)));
+        assertThat(status.from()).isEqualTo(today.minusDays(29));
+        assertThat(status.to()).isEqualTo(today);
+        assertThat(status.windowDays()).isEqualTo(30);
     }
 
     @Test
-    void getPeriods_방이_없으면_빈_목록이다() {
-        when(roomRepository.findByCommunityId(1L)).thenReturn(List.of());
+    void getStatus_상위권은_기간_안_점수_상승_합으로_줄_세우고_3판_미만은_뺀다() {
+        givenCommunityWithRoom();
+        when(communityMemberRepository.countByCommunityId(1L)).thenReturn(4L);
+        Member 민서 = member(4L, "민서");
+        when(matchRecordRepository.findByRoomIdsAndPlayedAtRange(anyList(), any(), any())).thenReturn(List.of(
+            match(카탄, at(1), placing(지민, 1, 100), placing(태윤, 2, 10), placing(현우, 3, -50)),
+            match(카탄, at(2), placing(지민, 1, 100), placing(태윤, 2, 10), placing(현우, 3, -50)),
+            match(아줄, at(3), placing(태윤, 1, 30), placing(지민, 2, -20), placing(현우, 3, -10)),
+            match(아줄, at(4), placing(민서, 1, 500), placing(현우, 2, -10))  // 민서는 1판뿐
+        ));
+        when(matchRecordRepository.findFirstPlayedAtByMember(anyList())).thenReturn(List.of());
 
-        assertThat(seasonService.getPeriods(1L)).isEmpty();
+        SeasonDto.StatusResponse status = seasonService.getStatus(1L);
+
+        assertThat(status.matchCount()).isEqualTo(4);
+        assertThat(status.leaders()).extracting(SeasonDto.Leader::nickname).containsExactly("지민", "태윤", "현우");
+        assertThat(status.leaders()).extracting(SeasonDto.Leader::climb).containsExactly(180.0, 50.0, -120.0);
+        assertThat(status.leaders()).extracting(SeasonDto.Leader::rank).containsExactly(1, 2, 3);
+        assertThat(status.leaders().get(0).winCount()).isEqualTo(2);
     }
 
     @Test
-    void getSummary_최다승과_최대연승과_다크호스를_각각_다른_사람에게_준다() {
+    void getStatus_최다승과_최대연승과_다크호스를_각각_다른_사람에게_준다() {
         givenCommunityWithRoom();
         when(communityMemberRepository.countByCommunityId(1L)).thenReturn(7L);
         // 태윤 4승이지만 연승은 2까지, 지민 3승인데 내리 3연승 — 승수와 연승이 갈리는 배치다
@@ -140,14 +126,14 @@ class SeasonServiceTest {
             match(카탄, LocalDateTime.of(2026, 8, 18, 20, 0),
                 placing(태윤, 1, 11), placing(지민, 2, -6), placing(현우, 3, -6))
         ));
-        // 현우만 이번 달에 커뮤니티 데뷔
+        // 현우만 기간 안에 커뮤니티 데뷔
         when(matchRecordRepository.findFirstPlayedAtByMember(anyList())).thenReturn(List.of(
             new Object[]{1L, LocalDateTime.of(2026, 5, 1, 20, 0)},
             new Object[]{2L, LocalDateTime.of(2026, 5, 1, 20, 0)},
-            new Object[]{3L, LocalDateTime.of(2026, 8, 3, 20, 0)}
+            new Object[]{3L, LocalDateTime.now(ZoneOffset.UTC).minusDays(5)} // 30일 안
         ));
 
-        SeasonDto.SummaryResponse summary = seasonService.getSummary(1L, PERIOD);
+        SeasonDto.StatusResponse summary = seasonService.getStatus(1L);
 
         assertThat(summary.totalRooms()).isEqualTo(1);
         assertThat(summary.totalMembers()).isEqualTo(7L);
@@ -164,7 +150,7 @@ class SeasonServiceTest {
     }
 
     @Test
-    void getSummary_1연승뿐이면_최대연승은_주지_않는다() {
+    void getStatus_1연승뿐이면_최대연승은_주지_않는다() {
         givenCommunityWithRoom();
         when(communityMemberRepository.countByCommunityId(1L)).thenReturn(3L);
         // 태윤·지민이 번갈아 이겨서 아무도 2연승이 없다
@@ -174,13 +160,13 @@ class SeasonServiceTest {
         ));
         when(matchRecordRepository.findFirstPlayedAtByMember(anyList())).thenReturn(List.of());
 
-        SeasonDto.SummaryResponse summary = seasonService.getSummary(1L, PERIOD);
+        SeasonDto.StatusResponse summary = seasonService.getStatus(1L);
 
         assertThat(summary.awards()).extracting(SeasonDto.Award::type).containsExactly("MOST_WINS");
     }
 
     @Test
-    void getSummary_불참한_경기는_연승을_끊지_않는다() {
+    void getStatus_불참한_경기는_연승을_끊지_않는다() {
         givenCommunityWithRoom();
         when(communityMemberRepository.countByCommunityId(1L)).thenReturn(3L);
         // 태윤은 1·3번째 판에서 이겼고 2번째 판에는 없다 → 2연승이다
@@ -191,7 +177,7 @@ class SeasonServiceTest {
         ));
         when(matchRecordRepository.findFirstPlayedAtByMember(anyList())).thenReturn(List.of());
 
-        SeasonDto.SummaryResponse summary = seasonService.getSummary(1L, PERIOD);
+        SeasonDto.StatusResponse summary = seasonService.getStatus(1L);
 
         Map<String, SeasonDto.Award> awards = summary.awards().stream()
             .collect(Collectors.toMap(SeasonDto.Award::type, Function.identity()));
@@ -202,7 +188,7 @@ class SeasonServiceTest {
     }
 
     @Test
-    void getSummary_한_사람이_두_상을_동시에_받지_않는다() {
+    void getStatus_한_사람이_두_상을_동시에_받지_않는다() {
         givenCommunityWithRoom();
         when(communityMemberRepository.countByCommunityId(1L)).thenReturn(3L);
         // 태윤이 최다승이자 최대 연승(3연승) — 연승 상은 2연승인 지민에게 간다
@@ -215,7 +201,7 @@ class SeasonServiceTest {
         ));
         when(matchRecordRepository.findFirstPlayedAtByMember(anyList())).thenReturn(List.of());
 
-        SeasonDto.SummaryResponse summary = seasonService.getSummary(1L, PERIOD);
+        SeasonDto.StatusResponse summary = seasonService.getStatus(1L);
 
         assertThat(summary.awards()).extracting(SeasonDto.Award::nickname)
             .containsExactly("태윤", "지민");
@@ -225,24 +211,19 @@ class SeasonServiceTest {
     }
 
     @Test
-    void getSummary_경기가_없는_달은_비어있는_결산을_돌려준다() {
+    void getStatus_경기가_없으면_비어있는_현황을_돌려준다() {
         givenCommunityWithRoom();
         when(communityMemberRepository.countByCommunityId(1L)).thenReturn(4L);
         when(matchRecordRepository.findByRoomIdsAndPlayedAtRange(anyList(), any(), any())).thenReturn(List.of());
 
-        SeasonDto.SummaryResponse summary = seasonService.getSummary(1L, PERIOD);
+        SeasonDto.StatusResponse summary = seasonService.getStatus(1L);
 
         // 경기가 없어도 방·인원은 커뮤니티의 현재 값이라 0이 아니다
         assertThat(summary.totalRooms()).isEqualTo(1);
         assertThat(summary.totalMembers()).isEqualTo(4L);
         assertThat(summary.awards()).isEmpty();
+        assertThat(summary.leaders()).isEmpty();
         assertThat(summary.inviteCode()).isEqualTo("XYZ789");
-    }
-
-    @Test
-    void getSummary_시즌_형식이_잘못되면_거부한다() {
-        assertThatThrownBy(() -> seasonService.getSummary(1L, "2026년8월"))
-            .isInstanceOf(IllegalArgumentException.class);
     }
 
     // ── fixtures ──
@@ -253,6 +234,11 @@ class SeasonServiceTest {
         community.assignInviteCode("XYZ789");
         when(communityRepository.findById(1L)).thenReturn(Optional.of(community));
         when(roomRepository.findByCommunityId(1L)).thenReturn(List.of(room));
+    }
+
+    /** 기간 안의 날짜 — 경기 시각 자체는 쿼리 목이 거르므로 순서만 의미가 있다. */
+    private LocalDateTime at(int day) {
+        return LocalDateTime.of(2026, 9, day, 20, 0);
     }
 
     private Member member(Long id, String nickname) {
