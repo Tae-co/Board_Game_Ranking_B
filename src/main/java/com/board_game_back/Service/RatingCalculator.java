@@ -5,7 +5,8 @@ import java.util.List;
 
 public interface RatingCalculator {
 
-    void calculateMultiplayerRatings(List<PlayerResult> results);
+    /** casual = false면 CASUAL_RULES_FROM 이전 경기용 옛 규칙 (RatingConstants.isCasualRules) */
+    void calculateMultiplayerRatings(List<PlayerResult> results, boolean casual);
 
     class PlayerResult {
 
