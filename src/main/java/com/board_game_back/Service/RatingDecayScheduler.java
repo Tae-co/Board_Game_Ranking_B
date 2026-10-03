@@ -15,13 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 비활동 decay. 기획: {@code docs/plans/plan-season-reset.md} §7.
  *
- * <p><b>왜 7일인가:</b> 시즌이 최대 31일인데 기준이 28일이면 시즌당 많아야 한 번, 그것도
- * 항상 리셋 직전에 발동한다. 이틀 뒤 리셋에 지워질 하락은 설명할 수 없는 노이즈다.
- * 7일이면 시즌 안에서 4번 발동해 실제 의미가 생긴다.
+ * <p><b>왜 14일·50%인가:</b> 처음엔 7일·80%였다. 경쟁이 너무 세다는 피드백에 캐주얼 쪽으로
+ * 낮췄다 — 격주 모임은 대부분 안 깎이고, 깎여도 지난 승리의 절반만 날아간다.
  *
  * <p><b>왜 고정값이 아닌가:</b> 전원 −30/주 같은 고정값을 쓰면 1승에 +457 버는 신규와
- * +21 버는 고인물이 같은 폭으로 깎인다. 각자의 승리 평균에 비례시키면 "일주일 빠지면
- * 지난 승리 하나가 거의 날아간다"가 누구에게나 같은 무게로 성립한다.
+ * +21 버는 고인물이 같은 폭으로 깎인다. 각자의 승리 평균에 비례시키면 "2주 빠지면
+ * 지난 승리 절반이 날아간다"가 누구에게나 같은 무게로 성립한다.
  *
  * <p><b>하한은 표시 점수 500</b>({@link PlayerGameRating#applyDecay}). 운영 데이터 기준
  * 주당 감소 중앙값이 315점이라 하한이 없으면 월 1회 참석자가 3주 만에 0점이 된다.
@@ -31,10 +30,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class RatingDecayScheduler {
 
     /** 이만큼 안 플레이하면 깎는다. */
-    private static final int STALE_DAYS = 7;
+    private static final int STALE_DAYS = 14;
 
     /** 승리 평균의 이 비율만큼 깎는다. */
-    private static final double DECAY_RATIO = 0.8;
+    private static final double DECAY_RATIO = 0.5;
 
     private final PlayerGameRatingRepository ratingRepository;
     private final MatchParticipantRepository participantRepository;
