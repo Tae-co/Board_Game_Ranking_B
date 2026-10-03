@@ -47,15 +47,15 @@ class RatingDecaySchedulerTest {
     }
 
     @Test
-    void 승리_평균의_80퍼센트만큼_깎는다() {
-        // 승리 평균 400 → 표시 점수 320 감소
+    void 승리_평균의_절반만큼_깎는다() {
+        // 승리 평균 400 → 표시 점수 200 감소
         PlayerGameRating rating = staleRating(1250.0);
         givenStale(rating);
         givenPlayerWinAverage(400.0);
 
         scheduler.applyWeeklyDecay();
 
-        assertThat(rating.getGameStats().getDisplayScore()).isCloseTo(930.0, within(0.001));
+        assertThat(rating.getGameStats().getDisplayScore()).isCloseTo(1050.0, within(0.001));
     }
 
     @Test
@@ -71,8 +71,8 @@ class RatingDecaySchedulerTest {
 
         scheduler.applyWeeklyDecay();
 
-        assertThat(신규.getGameStats().getDisplayScore()).isCloseTo(930.0, within(0.001));  // -320
-        assertThat(고인물.getGameStats().getDisplayScore()).isCloseTo(1230.0, within(0.001)); // -20
+        assertThat(신규.getGameStats().getDisplayScore()).isCloseTo(1050.0, within(0.001)); // -200
+        assertThat(고인물.getGameStats().getDisplayScore()).isCloseTo(1237.5, within(0.001)); // -12.5
     }
 
     @Test
@@ -86,12 +86,12 @@ class RatingDecaySchedulerTest {
 
         scheduler.applyWeeklyDecay();
 
-        assertThat(rating.getGameStats().getDisplayScore()).isCloseTo(1090.0, within(0.001)); // -160
+        assertThat(rating.getGameStats().getDisplayScore()).isCloseTo(1150.0, within(0.001)); // -100
     }
 
     @Test
     void 표시_점수_500_밑으로는_내려가지_않는다() {
-        PlayerGameRating rating = staleRating(600.0); // 320을 깎으면 280이 될 자리
+        PlayerGameRating rating = staleRating(600.0); // 200을 깎으면 400이 될 자리
         givenStale(rating);
         givenPlayerWinAverage(400.0);
 
@@ -136,9 +136,9 @@ class RatingDecaySchedulerTest {
     }
 
     @Test
-    void cutoff를_7일_기준으로_계산한다() {
-        LocalDateTime 하한 = LocalDateTime.now().minusDays(7).minusSeconds(5);
-        LocalDateTime 상한 = LocalDateTime.now().minusDays(7).plusSeconds(5);
+    void cutoff를_14일_기준으로_계산한다() {
+        LocalDateTime 하한 = LocalDateTime.now().minusDays(14).minusSeconds(5);
+        LocalDateTime 상한 = LocalDateTime.now().minusDays(14).plusSeconds(5);
         when(ratingRepository.findStaleActiveRatings(any(LocalDateTime.class))).thenReturn(List.of());
 
         scheduler.applyWeeklyDecay();
@@ -184,7 +184,7 @@ class RatingDecaySchedulerTest {
             .member(member).boardGame(game).room(room).build();
         rating.getGameStats().update(score, 0.0, 0.0);
         rating.addPlayCount();
-        rating.updateLastPlayedAt(LocalDateTime.now().minusDays(8));
+        rating.updateLastPlayedAt(LocalDateTime.now().minusDays(15));
         return rating;
     }
 }
