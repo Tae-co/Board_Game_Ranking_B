@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 public class EloRatingCalculator implements RatingCalculator {
 
     @Override
-    public void calculateMultiplayerRatings(List<RatingCalculator.PlayerResult> results) {
+    public void calculateMultiplayerRatings(List<RatingCalculator.PlayerResult> results, boolean casual) {
         int opponents = results.size() - 1;
         int lastPlacement = results.stream().mapToInt(r -> r.placement).max().orElse(0);
         long secondCount = results.stream().filter(r -> r.placement == 2).count();
@@ -33,8 +33,9 @@ public class EloRatingCalculator implements RatingCalculator {
                 surprise += actual - expectedScore(current, other.currentStats.getRating());
             }
 
-            double k = me.playCount < RatingConstants.PLACEMENT_GAMES
-                ? RatingConstants.K_PLACEMENT : RatingConstants.K_REGULAR;
+            int placementGames = casual ? RatingConstants.PLACEMENT_GAMES : RatingConstants.LEGACY_PLACEMENT_GAMES;
+            double kPlacement = casual ? RatingConstants.K_PLACEMENT : RatingConstants.LEGACY_K_PLACEMENT;
+            double k = me.playCount < placementGames ? kPlacement : RatingConstants.K_REGULAR;
             double change = k * surprise / opponents;
             // 꼴등이 2등에게 K의 일부를 더 낸다. 동점자끼리 3인전에서 2등이 0점이 되는 걸 막는다.
             if (transfer && me.placement == 2) {
@@ -42,7 +43,7 @@ public class EloRatingCalculator implements RatingCalculator {
             } else if (transfer && me.placement == lastPlacement) {
                 change -= k * RatingConstants.SECOND_PLACE_SHARE / lastCount;
             }
-            change *= change > 0 ? winMultiplier(current) : lossMultiplier(current);
+            if (casual) change *= change > 0 ? winMultiplier(current) : lossMultiplier(current);
             double updated = current + change;
             // 하한 밑으로 끌어내리지 않는다. 이미 밑이면(방장이 낮게 설정) 더 내려가지만 않게 한다.
             double newRating = Math.max(updated, Math.min(current, RatingConstants.RATING_FLOOR));
