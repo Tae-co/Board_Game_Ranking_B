@@ -1,5 +1,7 @@
 package com.board_game_back.Utils;
 
+import java.time.LocalDateTime;
+
 public final class RatingConstants {
 
     // rating 컬럼에 Elo 점수를 그대로 저장한다. 표시 점수 = rating.
@@ -25,6 +27,16 @@ public final class RatingConstants {
     public static final double CASUAL_CEILING = 1300.0;
     // 이 점수 밑에서는 감점 절반, 여기서 CASUAL_CEILING까지 점점 원래대로
     public static final double LOSS_HALF_BELOW = 1000.0;
+
+    // 이 시각(UTC, MatchRecord.playedAt — 서버가 기록 시점에 찍는다) 이후 경기만 위의 캐주얼 규칙(배치 K 300·3판,
+    // 점수대 보정)을 쓴다. 이전 경기는 수정·삭제로 리플레이돼도 옛 규칙으로 계산해 기존 점수를 그대로 둔다.
+    public static final LocalDateTime CASUAL_RULES_FROM = LocalDateTime.of(2026, 10, 3, 5, 0); // 10-03 14:00 KST
+    public static final double LEGACY_K_PLACEMENT = 500.0;
+    public static final int LEGACY_PLACEMENT_GAMES = 10;
+
+    public static boolean isCasualRules(LocalDateTime playedAt) {
+        return playedAt != null && !playedAt.isBefore(CASUAL_RULES_FROM);
+    }
 
     private RatingConstants() {}
 }

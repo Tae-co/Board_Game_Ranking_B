@@ -16,6 +16,7 @@ import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
+import com.board_game_back.Utils.RatingConstants;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -86,7 +87,8 @@ public class MatchService {
             gameRatings.add(gameRating);
         }
 
-        ratingCalculator.calculateMultiplayerRatings(calcResults);
+        ratingCalculator.calculateMultiplayerRatings(
+            calcResults, RatingConstants.isCasualRules(matchRecord.getPlayedAt()));
 
         List<MatchDto.ResultResponse> responseList = new ArrayList<>();
 
@@ -264,7 +266,8 @@ public class MatchService {
 
             if (calcResults.size() < 2) continue;
 
-            ratingCalculator.calculateMultiplayerRatings(calcResults);
+            ratingCalculator.calculateMultiplayerRatings(
+                calcResults, RatingConstants.isCasualRules(match.getPlayedAt()));
 
             for (int i = 0; i < participants.size(); i++) {
                 MatchParticipant mp = participants.get(i);
