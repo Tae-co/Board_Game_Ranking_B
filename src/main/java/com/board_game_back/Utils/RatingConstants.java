@@ -16,7 +16,7 @@ public final class RatingConstants {
     public static final double ELO_SCALE = 3200.0; // 점수 차가 이만큼이면 기대 승률 10:1
     public static final double K_PLACEMENT = 300.0; // 처음 PLACEMENT_GAMES판 — 빨리 제자리를 찾게 (500이면 2연승에 500→1000)
     public static final double K_REGULAR = 200.0;
-    public static final int PLACEMENT_GAMES = 10;
+    public static final int PLACEMENT_GAMES = 3;
     // 3인 이상에서 꼴등이 2등에게 추가로 넘기는 몫 (K 대비). 배치고사 30, 이후 20.
     public static final double SECOND_PLACE_SHARE = 0.1;
 
