@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.PlayerGameRating;
+import com.board_game_back.Entity.RatingType;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Entity.RoomSeason;
 import com.board_game_back.Entity.SeasonRankSnapshot;
@@ -203,6 +204,37 @@ class SeasonRolloverServiceTest {
         assertThat(태윤.getGameStats().getRating()).isEqualTo(muBefore);
         assertThat(태윤.getGameStats().getRatingDeviation()).isEqualTo(sigmaBefore);
         assertThat(태윤.getGameStats().getDisplayScore()).isCloseTo(displayBefore, within(0.001));
+    }
+
+    @Test
+    void rollover_칩_게임은_잔고가_아니라_순수익_순으로_스냅샷을_찍는다() {
+        givenRolloverableRoom();
+        BoardGame 포커 = BoardGame.builder().name("포커").ratingType(RatingType.CHIP).build();
+        ReflectionTestUtils.setField(포커, "id", 30L);
+        PlayerGameRating 리바이 = rating(1L, "태윤", 포커, 1500.0); // 잔고 1500, 리바이 1회 → 순수익 -500
+        ReflectionTestUtils.setField(리바이, "rebuyCount", 1);
+        PlayerGameRating 무리바이 = rating(2L, "지민", 포커, 1200.0); // 순수익 +200
+        when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID)).thenReturn(List.of(리바이, 무리바이));
+
+        rolloverService.rolloverIfDue(ROOM_ID);
+
+        verify(snapshotRepository).saveAll(snapshotCaptor.capture());
+        List<SeasonRankSnapshot> snapshots = snapshotCaptor.getValue();
+        assertThat(snapshots).extracting(SeasonRankSnapshot::getMemberId).containsExactly(2L, 1L);
+        assertThat(snapshots).extracting(SeasonRankSnapshot::getDisplayScore).containsExactly(200.0, -500.0);
+        assertThat(snapshots.get(1).getMu()).isEqualTo(1500.0); // 잔고는 μ에 남는다
+    }
+
+    @Test
+    void rollover_예약해_둔_시작_칩은_다음_시즌부터_적용된다() {
+        givenRolloverableRoom();
+        room.reserveStartingChips(5000);
+        when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID)).thenReturn(List.of());
+
+        rolloverService.rolloverIfDue(ROOM_ID);
+
+        assertThat(room.getStartingChips()).isEqualTo(5000);
+        assertThat(room.getPendingStartingChips()).isNull();
     }
 
     // ── fixtures ──

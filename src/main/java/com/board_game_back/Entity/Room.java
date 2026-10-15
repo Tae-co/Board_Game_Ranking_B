@@ -32,6 +32,10 @@ public class Room {
 
     private boolean sessionActive = false;
 
+    // 칩 게임의 시작 칩. 경기가 시작된 시즌에 바꾸면 pending에 두고 다음 시즌에 적용한다.
+    private int startingChips = 1000;
+    private Integer pendingStartingChips;
+
     @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RoomMember> roomMembers = new ArrayList<>();
 
@@ -54,6 +58,22 @@ public class Room {
 
     public void assignCommunity(Long communityId) {
         this.communityId = communityId;
+    }
+
+    public void changeStartingChips(int chips) {
+        if (chips <= 0) throw new IllegalArgumentException("시작 칩은 1 이상이어야 합니다.");
+        this.startingChips = chips;
+        this.pendingStartingChips = null;
+    }
+
+    public void reserveStartingChips(int chips) {
+        if (chips <= 0) throw new IllegalArgumentException("시작 칩은 1 이상이어야 합니다.");
+        this.pendingStartingChips = chips == this.startingChips ? null : chips;
+    }
+
+    /** 시즌 롤오버 때 예약해 둔 시작 칩을 적용한다. */
+    public void applyPendingStartingChips() {
+        if (pendingStartingChips != null) changeStartingChips(pendingStartingChips);
     }
 
     public void activateSession() {

@@ -85,6 +85,9 @@ public class SeasonArchiveService {
                 season.getSeasonNumber() == 1 ? null : season.getStartAt(), season.getEndAt()))
             .orElse(Map.of());
 
+        // 칩 게임 스냅샷은 display_score에 순수익, mu에 잔고가 들어 있다 (SeasonRolloverService.snapshotGame)
+        boolean chipGame = boardGameRepository.findById(gameId).map(g -> g.isChipGame()).orElse(false);
+
         List<RankingDto.GameRankingResponse> responses = new ArrayList<>();
         for (SeasonRankSnapshot snapshot : snapshots) {
             Member member = members.get(snapshot.getMemberId());
@@ -94,9 +97,11 @@ public class SeasonArchiveService {
                 member.getId(),
                 member.getNickname(),
                 member.getProfileImage(),
-                snapshot.getDisplayScore(),
+                chipGame ? snapshot.getMu() : snapshot.getDisplayScore(),
                 snapshot.getPlayCount(), snapshot.getWinCount(), snapshot.getLoseCount(),
-                placements.get(member.getId())));
+                placements.get(member.getId()),
+                null,
+                chipGame ? snapshot.getDisplayScore() : null));
         }
         return responses;
     }

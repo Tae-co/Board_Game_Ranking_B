@@ -19,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.ToDoubleFunction;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -67,6 +68,11 @@ public class SeasonRolloverService {
         Optional<Room> room = roomRepository.findById(season.getRoomId());
 
         int playerCount = room.map(r -> snapshotAndReset(r, season)).orElse(0);
+        // 시즌 중에 바꾼 시작 칩은 형평성 때문에 새 시즌부터 쓴다.
+        room.ifPresent(r -> {
+            r.applyPendingStartingChips();
+            roomRepository.save(r);
+        });
 
         // 진행 중 시즌은 방당 하나(uq_room_season_open)라 닫힌 상태를 먼저 내보내야 다음 시즌을 넣을 수 있다.
         season.close(now);
@@ -102,7 +108,7 @@ public class SeasonRolloverService {
         List<PlayerGameRating> ratings = ratingRepository.findByRoomIdWithMemberAndBoardGame(room.getId());
         List<SeasonRankSnapshot> snapshots = new ArrayList<>();
         for (List<PlayerGameRating> perGame : groupByBoardGame(ratings).values()) {
-            snapshots.addAll(snapshotGame(season.getId(), perGame));
+            snapshots.addAll(snapshotGame(season.getId(), perGame, room.getStartingChips()));
         }
 
         // 참가자가 없으면 스냅샷도 리셋도 의미가 없다. 이미 초기값인 방을 건드리지 않는다.
@@ -114,11 +120,18 @@ public class SeasonRolloverService {
         return snapshots.size();
     }
 
-    /** 한 게임의 최종 순위를 사진으로 남긴다. 동점은 같은 순위를 받는다 (1,2,2,4). */
-    private List<SeasonRankSnapshot> snapshotGame(Long roomSeasonId, List<PlayerGameRating> perGame) {
+    /**
+     * 한 게임의 최종 순위를 사진으로 남긴다. 동점은 같은 순위를 받는다 (1,2,2,4).
+     * 칩 게임은 방 랭킹과 같게 순수익 순이다.
+     */
+    private List<SeasonRankSnapshot> snapshotGame(Long roomSeasonId, List<PlayerGameRating> perGame, int startingChips) {
+        boolean chipGame = perGame.get(0).getBoardGame().isChipGame();
+        ToDoubleFunction<PlayerGameRating> scoreOf = chipGame
+            ? r -> r.chipNetProfit(startingChips)
+            : r -> r.getGameStats().getDisplayScore();
         List<PlayerGameRating> played = perGame.stream()
             .filter(r -> r.getPlayCount() > 0)
-            .sorted(Comparator.comparingDouble((PlayerGameRating r) -> r.getGameStats().getDisplayScore()).reversed())
+            .sorted(Comparator.comparingDouble(scoreOf).reversed())
             .toList();
 
         List<SeasonRankSnapshot> snapshots = new ArrayList<>();
@@ -126,12 +139,12 @@ public class SeasonRolloverService {
         double previousScore = Double.NaN;
         for (int i = 0; i < played.size(); i++) {
             PlayerGameRating rating = played.get(i);
-            double score = rating.getGameStats().getDisplayScore();
+            double score = scoreOf.applyAsDouble(rating);
             if (score != previousScore) {
                 rank = i + 1;
                 previousScore = score;
             }
-            snapshots.add(SeasonRankSnapshot.from(roomSeasonId, rank, rating));
+            snapshots.add(SeasonRankSnapshot.from(roomSeasonId, rank, rating, score));
         }
         return snapshots;
     }

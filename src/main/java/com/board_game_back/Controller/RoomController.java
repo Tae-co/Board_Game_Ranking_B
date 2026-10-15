@@ -44,9 +44,9 @@ public class RoomController {
             @RequestBody RoomDto.CreateRequest request,
             @AuthenticationPrincipal Long memberId) {
         Room room = roomService.createRoom(request.roomName(), memberId, request.boardGameId(), request.communityId(),
-            request.seasonName(), request.seasonEndDate());
+            request.seasonName(), request.seasonEndDate(), request.startingChips());
         return ResponseEntity.ok(
-            new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode(), room.getBoardGameId()));
+            RoomDto.Response.from(room));
     }
 
     @PostMapping("/join")
@@ -55,7 +55,7 @@ public class RoomController {
             @AuthenticationPrincipal Long memberId) {
         Room room = roomService.joinRoom(request.inviteCode(), memberId);
         return ResponseEntity.ok(
-            new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode(), room.getBoardGameId()));
+            RoomDto.Response.from(room));
     }
 
     /** 초대 코드로 방만 찾는다. 참가는 방 화면의 참가하기 버튼(/join)에서 따로 한다. */
@@ -63,13 +63,13 @@ public class RoomController {
     public ResponseEntity<RoomDto.Response> getRoomByInviteCode(@PathVariable String inviteCode) {
         Room room = roomService.getRoomByInviteCode(inviteCode);
         return ResponseEntity.ok(
-            new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode(), room.getBoardGameId()));
+            RoomDto.Response.from(room));
     }
 
     @GetMapping("/my/{memberId}")
     public ResponseEntity<List<Response>> getMyRooms(@PathVariable Long memberId) {
         List<RoomDto.Response> responses = roomService.getMyRooms(memberId).stream()
-            .map(r -> new RoomDto.Response(r.getId(), r.getName(), r.getInviteCode(), r.getBoardGameId()))
+            .map(RoomDto.Response::from)
             .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
     }
@@ -83,7 +83,7 @@ public class RoomController {
     public ResponseEntity<RoomDto.Response> getRoomDetail(@PathVariable Long roomId) {
         Room room = roomService.getRoomById(roomId);
         return ResponseEntity.ok(
-            new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode(), room.getBoardGameId()));
+            RoomDto.Response.from(room));
     }
 
     /**
@@ -175,6 +175,16 @@ public class RoomController {
         if (newName.isBlank()) return ResponseEntity.badRequest().body("방 이름을 입력해주세요.");
         roomService.updateRoomName(roomId, requesterId, newName);
         return ResponseEntity.ok("방 이름이 변경되었습니다.");
+    }
+
+    /** 호스트 전용 — 칩 게임 시작 칩. 이번 시즌에 경기가 있었으면 다음 시즌부터 적용된다. */
+    @PatchMapping("/{roomId}/starting-chips")
+    public ResponseEntity<RoomDto.Response> updateStartingChips(
+            @PathVariable Long roomId,
+            @RequestBody RoomDto.UpdateStartingChipsRequest request,
+            @AuthenticationPrincipal Long requesterId) {
+        return ResponseEntity.ok(RoomDto.Response.from(
+            roomService.updateStartingChips(roomId, requesterId, request.startingChips())));
     }
 
     @PutMapping("/{roomId}/members/{memberId}/rating")

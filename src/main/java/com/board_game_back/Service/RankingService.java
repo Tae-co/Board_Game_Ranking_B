@@ -3,8 +3,11 @@ package com.board_game_back.Service;
 import com.board_game_back.DTO.RankingDto;
 import com.board_game_back.DTO.RankingDto.GameRankingResponse;
 import com.board_game_back.Entity.PlayerGameRating;
+import com.board_game_back.Entity.Room;
+import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MatchParticipantRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
+import com.board_game_back.Repository.RoomRepository;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -21,6 +24,8 @@ public class RankingService {
     private final PlayerGameRatingRepository ratingRepository;
     private final MatchParticipantRepository participantRepository;
     private final RoomSeasonService roomSeasonService;
+    private final BoardGameRepository boardGameRepository;
+    private final RoomRepository roomRepository;
 
     public List<GameRankingResponse> getGameRanking(Long boardGameId) {
         List<PlayerGameRating> ratings = ratingRepository.findByBoardGameIdOrderByDisplayScoreDesc(boardGameId);
@@ -51,6 +56,12 @@ public class RankingService {
         Map<Long, List<Integer>> placements = participantRepository.placementCountsByMember(
             roomId, boardGameId, roomSeasonService.currentSeasonStartUtc(roomId), null);
 
+        boolean chipGame = boardGameRepository.findById(boardGameId).map(g -> g.isChipGame()).orElse(false);
+        if (chipGame) {
+            Room room = roomRepository.findById(roomId).orElseThrow();
+            return chipRanking(ratings, placements, room.getStartingChips());
+        }
+
         List<RankingDto.GameRankingResponse> responseList = new ArrayList<>();
         int currentRank = 1;
 
@@ -76,6 +87,34 @@ public class RankingService {
             }
         }
 
+        return responseList;
+    }
+
+    /** 칩 게임: 리바이를 많이 한 사람이 잔고만으로 앞서지 않게 순수익 순으로 줄 세운다. */
+    private List<GameRankingResponse> chipRanking(
+        List<PlayerGameRating> ratings, Map<Long, List<Integer>> placements, int startingChips) {
+
+        List<PlayerGameRating> sorted = ratings.stream()
+            .sorted(Comparator.comparing((PlayerGameRating r) -> r.getPlayCount() == 0)
+                .thenComparing(Comparator.comparingDouble((PlayerGameRating r) -> r.chipNetProfit(startingChips))
+                    .reversed()))
+            .toList();
+
+        List<GameRankingResponse> responseList = new ArrayList<>();
+        int currentRank = 1;
+        for (PlayerGameRating rating : sorted) {
+            boolean played = rating.getPlayCount() > 0;
+            responseList.add(new GameRankingResponse(
+                played ? currentRank++ : null,
+                rating.getMember().getId(),
+                rating.getMember().getNickname(),
+                rating.getMember().getProfileImage(),
+                rating.chipBalance(startingChips),
+                rating.getPlayCount(), rating.getWinCount(), rating.getLoseCount(),
+                placements.get(rating.getMember().getId()),
+                rating.getRebuyCount(),
+                rating.chipNetProfit(startingChips)));
+        }
         return responseList;
     }
 }

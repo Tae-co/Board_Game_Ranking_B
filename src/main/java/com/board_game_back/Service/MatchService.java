@@ -83,8 +83,25 @@ public class MatchService {
 
             MatchParticipant mp = new MatchParticipant(matchRecord, member, pr.placement());
             if (pr.scoresJson() != null) mp.updateScoresJson(pr.scoresJson());
+            mp.updateChipDelta(chipDeltaOf(game, pr));
             participants.add(mp);
             gameRatings.add(gameRating);
+        }
+
+        if (game.isChipGame()) {
+            List<MatchDto.ResultResponse> responseList = new ArrayList<>();
+            for (int i = 0; i < participants.size(); i++) {
+                MatchParticipant participant = participants.get(i);
+                PlayerGameRating gameRating = gameRatings.get(i);
+                applyChipResult(participant, gameRating, room, matchRecord.getPlayedAt());
+                ratingRepository.save(gameRating);
+                responseList.add(new MatchDto.ResultResponse(
+                    participant.getMember().getId(), participant.getMember().getNickname(),
+                    participant.getPlacement(), participant.getRatingChange()
+                ));
+            }
+            matchRecordRepository.save(matchRecord);
+            return responseList;
         }
 
         ratingCalculator.calculateMultiplayerRatings(
@@ -185,6 +202,7 @@ public class MatchService {
             Member member = memberRepository.findById(pr.memberId()).orElseThrow();
             MatchParticipant newMp = new MatchParticipant(match, member, pr.placement());
             if (pr.scoresJson() != null) newMp.updateScoresJson(pr.scoresJson());
+            newMp.updateChipDelta(chipDeltaOf(match.getBoardGame(), pr));
             newParticipants.add(newMp);
         }
 
@@ -249,6 +267,16 @@ public class MatchService {
             if (seasonStart != null && match.getPlayedAt() != null
                 && match.getPlayedAt().isBefore(seasonStart)) continue;
 
+            if (game.isChipGame()) {
+                for (MatchParticipant mp : match.getParticipants()) {
+                    PlayerGameRating gr = ratingByMemberId.computeIfAbsent(mp.getMember().getId(), id ->
+                        ratingRepository.save(PlayerGameRating.builder()
+                            .member(mp.getMember()).boardGame(game).room(room).build()));
+                    applyChipResult(mp, gr, room, match.getPlayedAt());
+                }
+                continue;
+            }
+
             List<RatingCalculator.PlayerResult> calcResults = new ArrayList<>();
             List<MatchParticipant> participants = match.getParticipants();
 
@@ -297,7 +325,8 @@ public class MatchService {
 
         for (PlayerGameRating gr : ratingByMemberId.values()) {
             Member member = gr.getMember();
-            List<PlayerGameRating> allPlayed = ratingRepository.findPlayedByMemberId(member.getId());
+            // 칩 게임 잔고는 Elo가 아니라 전체 랭킹에 섞지 않는다.
+            List<PlayerGameRating> allPlayed = ratingRepository.findPlayedEloByMemberId(member.getId());
             allPlayed.stream()
                 .max(Comparator.comparingDouble(r -> r.getGameStats().getDisplayScore()))
                 .ifPresentOrElse(
@@ -312,6 +341,23 @@ public class MatchService {
                 );
             memberRepository.save(member);
         }
+    }
+
+    /** 칩 게임에서 증감이 없으면 기록할 게 없다. Elo 게임은 무시한다. */
+    private Integer chipDeltaOf(BoardGame game, MatchDto.ParticipantRequest pr) {
+        if (!game.isChipGame()) return null;
+        if (pr.chipDelta() == null) throw new IllegalArgumentException("칩 증감을 입력해주세요.");
+        return pr.chipDelta();
+    }
+
+    /** 칩 게임 한 판: Elo·전체 랭킹을 건드리지 않고 칩 잔고만 옮긴다. 1등만 승리로 센다. */
+    private void applyChipResult(MatchParticipant mp, PlayerGameRating gr, Room room, LocalDateTime playedAt) {
+        int delta = mp.getChipDelta() != null ? mp.getChipDelta() : 0;
+        mp.updateRatingChange(gr.applyChipResult(room.getStartingChips(), delta));
+        gr.addPlayCount();
+        gr.updateLastPlayedAt(playedAt);
+        if (mp.getPlacement() == 1) gr.addWinCount();
+        else gr.addLoseCount();
     }
 
     @Transactional

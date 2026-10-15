@@ -45,6 +45,7 @@ public class PlayerGameRating {
     private int playCount = 0;
     private int winCount = 0;
     private int loseCount = 0;
+    private int rebuyCount = 0; // 칩 게임: 잔고 0에서 시작 칩을 다시 받은 횟수
 
     private LocalDateTime lastPlayedAt;
 
@@ -85,8 +86,36 @@ public class PlayerGameRating {
         this.playCount = 0;
         this.winCount = 0;
         this.loseCount = 0;
+        this.rebuyCount = 0;
         this.lastPlayedAt = null;
         this.gameStats.reset();
+    }
+
+    /** 칩 게임 잔고. 아직 안 뛰었으면 시작 칩이다 (rating 컬럼의 초기값 500은 Elo용). */
+    public double chipBalance(int startingChips) {
+        return playCount == 0 ? startingChips : gameStats.getRating();
+    }
+
+    /** 칩 게임 순수익 = 잔고 - 받은 칩 전부(시작 칩 + 리바이). */
+    public double chipNetProfit(int startingChips) {
+        return chipBalance(startingChips) - (double) startingChips * (1 + rebuyCount);
+    }
+
+    /**
+     * 칩 게임 한 판을 반영한다. 잔고가 0이면 이번 판 전에 시작 칩으로 리바이한다.
+     * 잔고는 0 밑으로 내려가지 않는다.
+     *
+     * @return 실제 증감 (0에서 멈추면 입력보다 작다)
+     */
+    public double applyChipResult(int startingChips, int chipDelta) {
+        double before = chipBalance(startingChips);
+        if (before <= 0) {
+            before = startingChips;
+            rebuyCount++;
+        }
+        double after = Math.max(0, before + chipDelta);
+        gameStats.update(after, gameStats.getRatingDeviation(), gameStats.getVolatility());
+        return after - before;
     }
 
     public void updateInitialRating(double newRating) {

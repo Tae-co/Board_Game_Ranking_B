@@ -47,7 +47,7 @@ public class RoomService {
 
     @Transactional
     public Room createRoom(String roomName, Long memberId, Long boardGameId, Long communityId,
-                           String seasonName, LocalDate seasonEndDate) {
+                           String seasonName, LocalDate seasonEndDate, Integer startingChips) {
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
 
@@ -58,6 +58,7 @@ public class RoomService {
         String inviteCode = InviteCodeUtil.generateUnique(roomRepository::existsByInviteCode);
         Room room = new Room(roomName, inviteCode, boardGameId);
         if (communityId != null) room.assignCommunity(communityId);
+        if (startingChips != null) room.changeStartingChips(startingChips);
         Room savedRoom = roomRepository.save(room);
 
         roomMemberRepository.save(new RoomMember(savedRoom, member, MemberRole.HOST));
@@ -135,6 +136,23 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
         room.rename(newName);
+    }
+
+    /** 이번 시즌에 이미 경기가 있었으면 형평성을 위해 다음 시즌으로 예약만 한다. */
+    @Transactional
+    public Room updateStartingChips(Long roomId, Long requesterId, int startingChips) {
+        RoomMember rm = roomMemberRepository.findByRoomIdAndMemberId(roomId, requesterId)
+            .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
+        if (rm.getRole() != MemberRole.HOST) {
+            throw new IllegalStateException("방장만 수정할 수 있습니다.");
+        }
+        Room room = getRoomById(roomId);
+        boolean playedThisSeason = room.getBoardGameId() != null && playerGameRatingRepository
+            .findByRoomIdAndBoardGameIdOrderByGameStatsRatingDesc(roomId, room.getBoardGameId())
+            .stream().anyMatch(r -> r.getPlayCount() > 0);
+        if (playedThisSeason) room.reserveStartingChips(startingChips);
+        else room.changeStartingChips(startingChips);
+        return room;
     }
 
     public Room getRoomById(Long roomId) {

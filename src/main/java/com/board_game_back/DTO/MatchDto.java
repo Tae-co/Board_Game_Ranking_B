@@ -13,7 +13,8 @@ public class MatchDto {
     public record ParticipantRequest(
         Long memberId,
         int placement,
-        String scoresJson
+        String scoresJson,
+        Integer chipDelta // 칩 게임에서만. 이번 판에 딴(+)/잃은(-) 칩
     ) {}
 
     public record ResultResponse(

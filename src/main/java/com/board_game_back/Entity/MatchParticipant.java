@@ -37,6 +37,8 @@ public class MatchParticipant {
     @Column(columnDefinition = "TEXT")
     private String scoresJson; // 카테고리별 점수 JSON {"settlement":3,"cities":2,...}
 
+    private Integer chipDelta; // 칩 게임에서 입력한 증감. ratingChange는 0에서 멈춘 뒤의 실제 증감
+
     @Builder
     public MatchParticipant(MatchRecord matchRecord, Member member, int placement) {
         this.matchRecord = matchRecord;
@@ -51,6 +53,10 @@ public class MatchParticipant {
 
     public void updatePlacement(int placement) {
         this.placement = placement;
+    }
+
+    public void updateChipDelta(Integer chipDelta) {
+        this.chipDelta = chipDelta;
     }
 
     public void updateScoresJson(String scoresJson) {
