@@ -102,14 +102,13 @@ class MatchServiceChipTest {
     }
 
     @Test
-    void 파산한_사람은_다음_판에_리바이하고_순수익이_깎인다() {
+    void 파산한_사람은_다음_판에_리바이한다() {
         record(1000, 0, -1000);   // p3 파산
         record(-100, -100, 200);  // p3 리바이 후 +200
 
         PlayerGameRating p3 = ratings.get(3L);
         assertThat(p3.getRebuyCount()).isEqualTo(1);
         assertThat(p3.chipBalance(1000)).isEqualTo(1200.0);
-        assertThat(p3.chipNetProfit(1000)).isEqualTo(-800.0);
     }
 
     @Test

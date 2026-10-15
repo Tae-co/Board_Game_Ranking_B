@@ -26,7 +26,6 @@ class PlayerGameRatingChipTest {
     @Test
     void 안_뛴_사람의_잔고는_시작_칩이다() {
         assertThat(rating.chipBalance(START)).isEqualTo(1000.0);
-        assertThat(rating.chipNetProfit(START)).isZero();
     }
 
     @Test
@@ -34,7 +33,6 @@ class PlayerGameRatingChipTest {
         assertThat(play(300)).isEqualTo(300.0);
 
         assertThat(rating.chipBalance(START)).isEqualTo(1300.0);
-        assertThat(rating.chipNetProfit(START)).isEqualTo(300.0);
     }
 
     @Test
@@ -46,14 +44,12 @@ class PlayerGameRatingChipTest {
     }
 
     @Test
-    void 잔고_0이면_다음_판에_리바이하고_순수익에_반영된다() {
+    void 잔고_0이면_다음_판에_시작_칩을_다시_받고_리바이를_센다() {
         play(-1000);
 
         assertThat(play(200)).isEqualTo(200.0);
         assertThat(rating.getRebuyCount()).isEqualTo(1);
         assertThat(rating.chipBalance(START)).isEqualTo(1200.0);
-        // 받은 칩 2000, 잔고 1200
-        assertThat(rating.chipNetProfit(START)).isEqualTo(-800.0);
     }
 
     @Test
@@ -61,7 +57,7 @@ class PlayerGameRatingChipTest {
         play(-1000);
 
         assertThat(rating.getRebuyCount()).isZero();
-        assertThat(rating.chipNetProfit(START)).isEqualTo(-1000.0);
+        assertThat(rating.chipBalance(START)).isZero();
     }
 
     @Test

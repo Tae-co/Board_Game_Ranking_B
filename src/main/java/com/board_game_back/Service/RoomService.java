@@ -1,6 +1,7 @@
 package com.board_game_back.Service;
 
 import com.board_game_back.DTO.RoomDto;
+import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.MemberRole;
@@ -58,7 +59,10 @@ public class RoomService {
         String inviteCode = InviteCodeUtil.generateUnique(roomRepository::existsByInviteCode);
         Room room = new Room(roomName, inviteCode, boardGameId);
         if (communityId != null) room.assignCommunity(communityId);
-        if (startingChips != null) room.changeStartingChips(startingChips);
+        // 요청에 없으면 칩 게임을 만들 때 정한 값을 그룹 기본값으로 쓴다
+        Integer chips = startingChips != null ? startingChips : boardGameId == null ? null
+            : boardGameRepository.findById(boardGameId).map(BoardGame::getStartingChips).orElse(null);
+        if (chips != null) room.changeStartingChips(chips);
         Room savedRoom = roomRepository.save(room);
 
         roomMemberRepository.save(new RoomMember(savedRoom, member, MemberRole.HOST));

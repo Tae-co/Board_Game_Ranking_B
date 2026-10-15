@@ -42,6 +42,7 @@ public class BoardGameController {
     private static final int DEFAULT_MIN_PLAYERS = 2;
     private static final int DEFAULT_MAX_PLAYERS = 8;
     private static final int MAX_ROOM_NAMES_IN_MESSAGE = 3;
+    private static final int DEFAULT_STARTING_CHIPS = 1000;
 
     private final BoardGameRepository boardGameRepository;
     private final CommunityAdminRepository communityAdminRepository;
@@ -105,6 +106,12 @@ public class BoardGameController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "인원수 설정이 올바르지 않습니다.");
         }
 
+        boolean chipGame = "chip".equals(schemaType);
+        int startingChips = req.startingChips() != null ? req.startingChips() : DEFAULT_STARTING_CHIPS;
+        if (chipGame && startingChips < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "시작 칩은 1 이상이어야 합니다.");
+        }
+
         BoardGame game = BoardGame.builder()
             .name(name)
             .imageUrl(req.imageUrl() != null ? req.imageUrl() : "")
@@ -113,7 +120,8 @@ public class BoardGameController {
             .schemaJson(req.schemaJson())
             .communityId(req.communityId())
             .createdByMemberId(memberId)
-            .ratingType("chip".equals(schemaType) ? RatingType.CHIP : RatingType.ELO)
+            .ratingType(chipGame ? RatingType.CHIP : RatingType.ELO)
+            .startingChips(chipGame ? startingChips : null)
             .build();
 
         return ResponseEntity.ok(boardGameRepository.save(game));

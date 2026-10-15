@@ -207,22 +207,20 @@ class SeasonRolloverServiceTest {
     }
 
     @Test
-    void rollover_칩_게임은_잔고가_아니라_순수익_순으로_스냅샷을_찍는다() {
+    void rollover_칩_게임은_보유_칩_순으로_스냅샷을_찍는다() {
         givenRolloverableRoom();
         BoardGame 포커 = BoardGame.builder().name("포커").ratingType(RatingType.CHIP).build();
         ReflectionTestUtils.setField(포커, "id", 30L);
-        PlayerGameRating 리바이 = rating(1L, "태윤", 포커, 1500.0); // 잔고 1500, 리바이 1회 → 순수익 -500
-        ReflectionTestUtils.setField(리바이, "rebuyCount", 1);
-        PlayerGameRating 무리바이 = rating(2L, "지민", 포커, 1200.0); // 순수익 +200
-        when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID)).thenReturn(List.of(리바이, 무리바이));
+        PlayerGameRating 적게 = rating(1L, "태윤", 포커, 800.0);
+        PlayerGameRating 많이 = rating(2L, "지민", 포커, 1500.0);
+        when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID)).thenReturn(List.of(적게, 많이));
 
         rolloverService.rolloverIfDue(ROOM_ID);
 
         verify(snapshotRepository).saveAll(snapshotCaptor.capture());
         List<SeasonRankSnapshot> snapshots = snapshotCaptor.getValue();
         assertThat(snapshots).extracting(SeasonRankSnapshot::getMemberId).containsExactly(2L, 1L);
-        assertThat(snapshots).extracting(SeasonRankSnapshot::getDisplayScore).containsExactly(200.0, -500.0);
-        assertThat(snapshots.get(1).getMu()).isEqualTo(1500.0); // 잔고는 μ에 남는다
+        assertThat(snapshots).extracting(SeasonRankSnapshot::getDisplayScore).containsExactly(1500.0, 800.0);
     }
 
     @Test

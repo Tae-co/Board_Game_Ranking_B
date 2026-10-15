@@ -90,11 +90,6 @@ public class SeasonRankSnapshot {
      * @param rank 같은 방·게임 안에서의 순위 (1부터)
      */
     public static SeasonRankSnapshot from(Long roomSeasonId, int rank, PlayerGameRating rating) {
-        return from(roomSeasonId, rank, rating, rating.getGameStats().getDisplayScore());
-    }
-
-    /** @param displayScore 순위 기준 점수. 칩 게임은 잔고가 아니라 순수익을 넣는다 (μ에는 잔고가 남는다). */
-    public static SeasonRankSnapshot from(Long roomSeasonId, int rank, PlayerGameRating rating, double displayScore) {
         GlickoStats stats = rating.getGameStats();
 
         SeasonRankSnapshot snapshot = new SeasonRankSnapshot();
@@ -103,7 +98,7 @@ public class SeasonRankSnapshot {
         snapshot.boardGameId = rating.getBoardGame().getId();
         snapshot.memberId = rating.getMember().getId();
         snapshot.rank = rank;
-        snapshot.displayScore = displayScore;
+        snapshot.displayScore = stats.getDisplayScore();
         snapshot.mu = stats.getRating();
         snapshot.sigma = stats.getRatingDeviation();
         snapshot.playCount = rating.getPlayCount();

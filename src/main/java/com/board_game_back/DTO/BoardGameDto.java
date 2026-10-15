@@ -9,6 +9,7 @@ public class BoardGameDto {
         String schemaJson,
         String imageUrl,
         Integer minPlayers,
-        Integer maxPlayers
+        Integer maxPlayers,
+        Integer startingChips // 칩 게임만. 없으면 1000
     ) {}
 }

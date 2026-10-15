@@ -96,11 +96,6 @@ public class PlayerGameRating {
         return playCount == 0 ? startingChips : gameStats.getRating();
     }
 
-    /** 칩 게임 순수익 = 잔고 - 받은 칩 전부(시작 칩 + 리바이). */
-    public double chipNetProfit(int startingChips) {
-        return chipBalance(startingChips) - (double) startingChips * (1 + rebuyCount);
-    }
-
     /**
      * 칩 게임 한 판을 반영한다. 잔고가 0이면 이번 판 전에 시작 칩으로 리바이한다.
      * 잔고는 0 밑으로 내려가지 않는다.

@@ -2,6 +2,8 @@
 -- 커스텀 점수판을 만들 때 고르고, 바꿀 수 없다 (게임 수정 API가 없다).
 
 ALTER TABLE board_game ADD COLUMN IF NOT EXISTS rating_type VARCHAR(10) NOT NULL DEFAULT 'ELO';
+-- 칩 게임을 만들 때 정한 시작 칩. 이 게임으로 그룹을 만들면 그룹의 시작 칩 기본값이 된다.
+ALTER TABLE board_game ADD COLUMN IF NOT EXISTS starting_chips INTEGER;
 
 -- 방장이 정하는 시작 칩. 경기가 시작된 시즌에 바꾸면 pending에 두고 다음 시즌부터 적용한다.
 ALTER TABLE room ADD COLUMN IF NOT EXISTS starting_chips INTEGER NOT NULL DEFAULT 1000;

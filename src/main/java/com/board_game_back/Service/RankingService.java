@@ -90,13 +90,13 @@ public class RankingService {
         return responseList;
     }
 
-    /** 칩 게임: 리바이를 많이 한 사람이 잔고만으로 앞서지 않게 순수익 순으로 줄 세운다. */
+    /** 칩 게임: 보유 칩 순. 안 뛴 사람은 시작 칩을 들고 맨 뒤에 선다. */
     private List<GameRankingResponse> chipRanking(
         List<PlayerGameRating> ratings, Map<Long, List<Integer>> placements, int startingChips) {
 
         List<PlayerGameRating> sorted = ratings.stream()
             .sorted(Comparator.comparing((PlayerGameRating r) -> r.getPlayCount() == 0)
-                .thenComparing(Comparator.comparingDouble((PlayerGameRating r) -> r.chipNetProfit(startingChips))
+                .thenComparing(Comparator.comparingDouble((PlayerGameRating r) -> r.chipBalance(startingChips))
                     .reversed()))
             .toList();
 
@@ -112,8 +112,7 @@ public class RankingService {
                 rating.chipBalance(startingChips),
                 rating.getPlayCount(), rating.getWinCount(), rating.getLoseCount(),
                 placements.get(rating.getMember().getId()),
-                rating.getRebuyCount(),
-                rating.chipNetProfit(startingChips)));
+                rating.getRebuyCount()));
         }
         return responseList;
     }
