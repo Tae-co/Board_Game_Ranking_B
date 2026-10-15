@@ -48,7 +48,8 @@ public class RoomService {
 
     @Transactional
     public Room createRoom(String roomName, Long memberId, Long boardGameId, Long communityId,
-                           String seasonName, LocalDate seasonEndDate, Integer startingChips) {
+                           String seasonName, LocalDate seasonEndDate, Integer startingChips,
+                           List<Integer> chipDenominations) {
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
 
@@ -63,6 +64,7 @@ public class RoomService {
         Integer chips = startingChips != null ? startingChips : boardGameId == null ? null
             : boardGameRepository.findById(boardGameId).map(BoardGame::getStartingChips).orElse(null);
         if (chips != null) room.changeStartingChips(chips);
+        if (chipDenominations != null && !chipDenominations.isEmpty()) room.changeChipDenominations(chipDenominations);
         Room savedRoom = roomRepository.save(room);
 
         roomMemberRepository.save(new RoomMember(savedRoom, member, MemberRole.HOST));

@@ -44,7 +44,8 @@ public class RoomController {
             @RequestBody RoomDto.CreateRequest request,
             @AuthenticationPrincipal Long memberId) {
         Room room = roomService.createRoom(request.roomName(), memberId, request.boardGameId(), request.communityId(),
-            request.seasonName(), request.seasonEndDate(), request.startingChips());
+            request.seasonName(), request.seasonEndDate(), request.startingChips(),
+            request.chipDenominations());
         return ResponseEntity.ok(
             RoomDto.Response.from(room));
     }

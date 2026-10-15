@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -35,6 +36,9 @@ public class Room {
     // 칩 게임의 시작 칩. 경기가 시작된 시즌에 바꾸면 pending에 두고 다음 시즌에 적용한다.
     private int startingChips = 1000;
     private Integer pendingStartingChips;
+
+    // 칩 게임 점수판에서 쓰는 칩 종류. 큰 값부터 "1000,500,100,10". 없으면 프론트 기본값
+    private String chipDenominations;
 
     @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RoomMember> roomMembers = new ArrayList<>();
@@ -69,6 +73,21 @@ public class Room {
     public void reserveStartingChips(int chips) {
         if (chips <= 0) throw new IllegalArgumentException("시작 칩은 1 이상이어야 합니다.");
         this.pendingStartingChips = chips == this.startingChips ? null : chips;
+    }
+
+    public static final int MAX_CHIP_DENOMINATIONS = 6;
+
+    public void changeChipDenominations(List<Integer> denominations) {
+        List<Integer> list = denominations.stream().distinct().sorted((a, b) -> b - a).toList();
+        if (list.isEmpty() || list.size() > MAX_CHIP_DENOMINATIONS || list.get(list.size() - 1) <= 0) {
+            throw new IllegalArgumentException("칩 종류는 1~" + MAX_CHIP_DENOMINATIONS + "개, 1 이상이어야 합니다.");
+        }
+        this.chipDenominations = String.join(",", list.stream().map(String::valueOf).toList());
+    }
+
+    public List<Integer> getChipDenominationList() {
+        if (chipDenominations == null || chipDenominations.isBlank()) return null;
+        return Arrays.stream(chipDenominations.split(",")).map(Integer::valueOf).toList();
     }
 
     /** 시즌 롤오버 때 예약해 둔 시작 칩을 적용한다. */
