@@ -31,12 +31,17 @@ public interface PlayerGameRatingRepository extends JpaRepository<PlayerGameRati
     @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.boardGame WHERE p.member.id = :memberId AND p.playCount > 0")
     List<PlayerGameRating> findPlayedByMemberId(@Param("memberId") Long memberId);
 
+    /** 전체 랭킹(Member.overallStats) 계산용 — 칩 게임은 점수 단위가 달라 뺀다. */
+    @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.boardGame b WHERE p.member.id = :memberId AND p.playCount > 0 AND b.ratingType = com.board_game_back.Entity.RatingType.ELO")
+    List<PlayerGameRating> findPlayedEloByMemberId(@Param("memberId") Long memberId);
+
     /** 롤오버: 방의 모든 게임 레이팅을 한 번에. 스냅샷이 member·boardGame을 모두 읽는다. */
     @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.member JOIN FETCH p.boardGame WHERE p.room.id = :roomId")
     List<PlayerGameRating> findByRoomIdWithMemberAndBoardGame(@Param("roomId") Long roomId);
 
     /** 커뮤니티 현황 시상대: 방들의 진행 중 시즌 레이팅 중 minPlays판 이상 뛴 것. 화면이 방 이름·닉네임을 읽는다. */
-    @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.member JOIN FETCH p.room WHERE p.room.id IN :roomIds AND p.playCount >= :minPlays")
+    /** 칩 게임은 점수 단위가 달라 Elo 점수와 같이 줄 세우지 않는다. */
+    @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.member JOIN FETCH p.room WHERE p.room.id IN :roomIds AND p.playCount >= :minPlays AND p.boardGame.ratingType = com.board_game_back.Entity.RatingType.ELO")
     List<PlayerGameRating> findByRoomIdsWithMinPlays(@Param("roomIds") List<Long> roomIds, @Param("minPlays") int minPlays);
 
     void deleteByRoomId(Long roomId);
@@ -45,7 +50,8 @@ public interface PlayerGameRatingRepository extends JpaRepository<PlayerGameRati
 
     void deleteByMember_Id(Long memberId);
 
-    @Query("SELECT p FROM PlayerGameRating p WHERE p.playCount > 0 AND (p.lastPlayedAt IS NULL OR p.lastPlayedAt < :cutoff)")
+    /** decay 대상. 칩은 딴 만큼이 자기 몫이라 안 깎는다. */
+    @Query("SELECT p FROM PlayerGameRating p WHERE p.playCount > 0 AND (p.lastPlayedAt IS NULL OR p.lastPlayedAt < :cutoff) AND p.boardGame.ratingType = com.board_game_back.Entity.RatingType.ELO")
     List<PlayerGameRating> findStaleActiveRatings(@Param("cutoff") LocalDateTime cutoff);
 
     boolean existsByLastPlayedAtIsNullAndPlayCountGreaterThan(int playCount);

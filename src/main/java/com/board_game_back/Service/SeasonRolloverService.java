@@ -118,7 +118,7 @@ public class SeasonRolloverService {
     private List<SeasonRankSnapshot> snapshotGame(Long roomSeasonId, List<PlayerGameRating> perGame) {
         List<PlayerGameRating> played = perGame.stream()
             .filter(r -> r.getPlayCount() > 0)
-            .sorted(Comparator.comparingDouble((PlayerGameRating r) -> r.getGameStats().getDisplayScore()).reversed())
+            .sorted(Comparator.comparingDouble(PlayerGameRating::rankingScore).reversed())
             .toList();
 
         List<SeasonRankSnapshot> snapshots = new ArrayList<>();
@@ -126,7 +126,7 @@ public class SeasonRolloverService {
         double previousScore = Double.NaN;
         for (int i = 0; i < played.size(); i++) {
             PlayerGameRating rating = played.get(i);
-            double score = rating.getGameStats().getDisplayScore();
+            double score = rating.rankingScore();
             if (score != previousScore) {
                 rank = i + 1;
                 previousScore = score;

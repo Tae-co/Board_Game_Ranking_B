@@ -98,7 +98,7 @@ public class SeasonRankSnapshot {
         snapshot.boardGameId = rating.getBoardGame().getId();
         snapshot.memberId = rating.getMember().getId();
         snapshot.rank = rank;
-        snapshot.displayScore = stats.getDisplayScore();
+        snapshot.displayScore = rating.rankingScore();
         snapshot.mu = stats.getRating();
         snapshot.sigma = stats.getRatingDeviation();
         snapshot.playCount = rating.getPlayCount();

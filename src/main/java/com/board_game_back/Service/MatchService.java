@@ -83,8 +83,25 @@ public class MatchService {
 
             MatchParticipant mp = new MatchParticipant(matchRecord, member, pr.placement());
             if (pr.scoresJson() != null) mp.updateScoresJson(pr.scoresJson());
+            applyChipRequest(mp, game, pr);
             participants.add(mp);
             gameRatings.add(gameRating);
+        }
+
+        if (game.isChipGame()) {
+            List<MatchDto.ResultResponse> responseList = new ArrayList<>();
+            for (int i = 0; i < participants.size(); i++) {
+                MatchParticipant participant = participants.get(i);
+                PlayerGameRating gameRating = gameRatings.get(i);
+                applyChipResult(participant, gameRating, matchRecord.getPlayedAt());
+                ratingRepository.save(gameRating);
+                responseList.add(new MatchDto.ResultResponse(
+                    participant.getMember().getId(), participant.getMember().getNickname(),
+                    participant.getPlacement(), participant.getRatingChange()
+                ));
+            }
+            matchRecordRepository.save(matchRecord);
+            return responseList;
         }
 
         ratingCalculator.calculateMultiplayerRatings(
@@ -185,6 +202,7 @@ public class MatchService {
             Member member = memberRepository.findById(pr.memberId()).orElseThrow();
             MatchParticipant newMp = new MatchParticipant(match, member, pr.placement());
             if (pr.scoresJson() != null) newMp.updateScoresJson(pr.scoresJson());
+            applyChipRequest(newMp, match.getBoardGame(), pr);
             newParticipants.add(newMp);
         }
 
@@ -249,6 +267,16 @@ public class MatchService {
             if (seasonStart != null && match.getPlayedAt() != null
                 && match.getPlayedAt().isBefore(seasonStart)) continue;
 
+            if (game.isChipGame()) {
+                for (MatchParticipant mp : match.getParticipants()) {
+                    PlayerGameRating gr = ratingByMemberId.computeIfAbsent(mp.getMember().getId(), id ->
+                        ratingRepository.save(PlayerGameRating.builder()
+                            .member(mp.getMember()).boardGame(game).room(room).build()));
+                    applyChipResult(mp, gr, match.getPlayedAt());
+                }
+                continue;
+            }
+
             List<RatingCalculator.PlayerResult> calcResults = new ArrayList<>();
             List<MatchParticipant> participants = match.getParticipants();
 
@@ -297,7 +325,8 @@ public class MatchService {
 
         for (PlayerGameRating gr : ratingByMemberId.values()) {
             Member member = gr.getMember();
-            List<PlayerGameRating> allPlayed = ratingRepository.findPlayedByMemberId(member.getId());
+            // 칩 게임 잔고는 Elo가 아니라 전체 랭킹에 섞지 않는다.
+            List<PlayerGameRating> allPlayed = ratingRepository.findPlayedEloByMemberId(member.getId());
             allPlayed.stream()
                 .max(Comparator.comparingDouble(r -> r.getGameStats().getDisplayScore()))
                 .ifPresentOrElse(
@@ -312,6 +341,26 @@ public class MatchService {
                 );
             memberRepository.save(member);
         }
+    }
+
+    /** 칩 게임은 손익과 바이인 횟수가 있어야 기록할 수 있다. Elo 게임은 무시한다. */
+    private void applyChipRequest(MatchParticipant mp, BoardGame game, MatchDto.ParticipantRequest pr) {
+        if (!game.isChipGame()) return;
+        if (pr.chipDelta() == null) throw new IllegalArgumentException("칩 손익을 입력해주세요.");
+        if (pr.buyIns() == null || pr.buyIns() < 1) throw new IllegalArgumentException("바이인 횟수는 1 이상이어야 합니다.");
+        mp.updateChipResult(pr.chipDelta(), pr.buyIns());
+    }
+
+    /** 칩 게임 한 판: Elo·전체 랭킹을 건드리지 않고 손익만 누적한다. 1등(우승자)만 승리로 센다. */
+    private void applyChipResult(MatchParticipant mp, PlayerGameRating gr, LocalDateTime playedAt) {
+        int delta = mp.getChipDelta() != null ? mp.getChipDelta() : 0;
+        int rebuys = mp.getBuyIns() != null ? Math.max(0, mp.getBuyIns() - 1) : 0;
+        gr.applyChipResult(delta, rebuys);
+        mp.updateRatingChange(delta);
+        gr.addPlayCount();
+        gr.updateLastPlayedAt(playedAt);
+        if (mp.getPlacement() == 1) gr.addWinCount();
+        else gr.addLoseCount();
     }
 
     @Transactional
