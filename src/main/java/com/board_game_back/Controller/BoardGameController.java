@@ -42,7 +42,6 @@ public class BoardGameController {
     private static final int DEFAULT_MIN_PLAYERS = 2;
     private static final int DEFAULT_MAX_PLAYERS = 8;
     private static final int MAX_ROOM_NAMES_IN_MESSAGE = 3;
-    private static final int DEFAULT_STARTING_CHIPS = 1000;
 
     private final BoardGameRepository boardGameRepository;
     private final CommunityAdminRepository communityAdminRepository;
@@ -107,10 +106,6 @@ public class BoardGameController {
         }
 
         boolean chipGame = "chip".equals(schemaType);
-        int startingChips = req.startingChips() != null ? req.startingChips() : DEFAULT_STARTING_CHIPS;
-        if (chipGame && startingChips < 1) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "시작 칩은 1 이상이어야 합니다.");
-        }
 
         BoardGame game = BoardGame.builder()
             .name(name)
@@ -121,7 +116,6 @@ public class BoardGameController {
             .communityId(req.communityId())
             .createdByMemberId(memberId)
             .ratingType(chipGame ? RatingType.CHIP : RatingType.ELO)
-            .startingChips(chipGame ? startingChips : null)
             .build();
 
         return ResponseEntity.ok(boardGameRepository.save(game));
@@ -224,9 +218,9 @@ public class BoardGameController {
     }
 
     /**
-     * 사용자가 만드는 점수판은 simple(순위만) / flat(항목별 점수) / outcome(승무패만) / chip(칩 증감)만 허용한다.
+     * 사용자가 만드는 점수판은 simple(순위만) / flat(항목별 점수) / outcome(승무패만) / chip(바이인 손익)만 허용한다.
      *
-     * @return 점수판 type. chip이면 랭킹도 Elo 대신 칩 누적이다.
+     * @return 점수판 type. chip이면 랭킹도 Elo 대신 손익 누적이다.
      */
     private String validateUserSchema(String schemaJson) {
         if (schemaJson == null || schemaJson.isBlank()) {

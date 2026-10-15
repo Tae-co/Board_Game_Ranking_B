@@ -45,7 +45,7 @@ public class PlayerGameRating {
     private int playCount = 0;
     private int winCount = 0;
     private int loseCount = 0;
-    private int rebuyCount = 0; // 칩 게임: 잔고 0에서 시작 칩을 다시 받은 횟수
+    private int rebuyCount = 0; // 칩 게임: 첫 바이인 뒤에 다시 산 횟수 (판마다 바이인 횟수 - 1)
 
     private LocalDateTime lastPlayedAt;
 
@@ -91,26 +91,20 @@ public class PlayerGameRating {
         this.gameStats.reset();
     }
 
-    /** 칩 게임 잔고. 아직 안 뛰었으면 시작 칩이다 (rating 컬럼의 초기값 500은 Elo용). */
-    public double chipBalance(int startingChips) {
-        return playCount == 0 ? startingChips : gameStats.getRating();
+    /** 칩 게임 누적 손익. 아직 안 뛰었으면 0이다 (rating 컬럼의 초기값 500은 Elo용). 음수도 그대로 둔다. */
+    public double chipNet() {
+        return playCount == 0 ? 0 : gameStats.getRating();
     }
 
-    /**
-     * 칩 게임 한 판을 반영한다. 잔고가 0이면 이번 판 전에 시작 칩으로 리바이한다.
-     * 잔고는 0 밑으로 내려가지 않는다.
-     *
-     * @return 실제 증감 (0에서 멈추면 입력보다 작다)
-     */
-    public double applyChipResult(int startingChips, int chipDelta) {
-        double before = chipBalance(startingChips);
-        if (before <= 0) {
-            before = startingChips;
-            rebuyCount++;
-        }
-        double after = Math.max(0, before + chipDelta);
-        gameStats.update(after, gameStats.getRatingDeviation(), gameStats.getVolatility());
-        return after - before;
+    /** 칩 게임 한 판을 반영한다. 바닥 없이 손익을 그대로 더한다. */
+    public void applyChipResult(int chipDelta, int rebuys) {
+        gameStats.update(chipNet() + chipDelta, gameStats.getRatingDeviation(), gameStats.getVolatility());
+        rebuyCount += rebuys;
+    }
+
+    /** 랭킹·시즌 스냅샷 정렬 기준. 칩 게임은 음수 손익을 0으로 자르면 안 되므로 따로 본다. */
+    public double rankingScore() {
+        return boardGame != null && boardGame.isChipGame() ? chipNet() : gameStats.getDisplayScore();
     }
 
     public void updateInitialRating(double newRating) {

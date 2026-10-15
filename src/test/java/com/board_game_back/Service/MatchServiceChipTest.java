@@ -64,7 +64,6 @@ class MatchServiceChipTest {
     void setUp() {
         room = new Room("포커방", "POKER1", GAME_ID);
         ReflectionTestUtils.setField(room, "id", ROOM_ID);
-        room.changeStartingChips(1000);
         포커 = BoardGame.builder().name("포커").ratingType(RatingType.CHIP).build();
         ReflectionTestUtils.setField(포커, "id", GAME_ID);
 
@@ -82,40 +81,47 @@ class MatchServiceChipTest {
         }
     }
 
-    private List<MatchDto.ResultResponse> record(int d1, int d2, int d3) {
+    private List<MatchDto.ResultResponse> record(int d1, int b1, int d2, int b2, int d3, int b3) {
         return matchService.recordMatchResult(new MatchDto.ResultRequest(GAME_ID, ROOM_ID, List.of(
-            new MatchDto.ParticipantRequest(1L, 1, null, d1),
-            new MatchDto.ParticipantRequest(2L, 2, null, d2),
-            new MatchDto.ParticipantRequest(3L, 3, null, d3))), 1L);
+            new MatchDto.ParticipantRequest(1L, 1, null, d1, b1),
+            new MatchDto.ParticipantRequest(2L, 2, null, d2, b2),
+            new MatchDto.ParticipantRequest(3L, 3, null, d3, b3))), 1L);
     }
 
     @Test
-    void 칩_게임은_입력한_칩만큼_잔고가_움직이고_Elo와_전체_랭킹은_건드리지_않는다() {
-        List<MatchDto.ResultResponse> result = record(500, -200, -300);
+    void 칩_게임은_손익을_바닥_없이_누적하고_Elo와_전체_랭킹은_건드리지_않는다() {
+        // 바이인 10,000: p1 우승(1회), p2 2회, p3 1회 → +30,000 / -20,000 / -10,000
+        List<MatchDto.ResultResponse> result = record(30000, 1, -20000, 2, -10000, 1);
 
-        assertThat(result).extracting(MatchDto.ResultResponse::ratingChange).containsExactly(500.0, -200.0, -300.0);
-        assertThat(ratings.get(1L).chipBalance(1000)).isEqualTo(1500.0);
-        assertThat(ratings.get(3L).chipBalance(1000)).isEqualTo(700.0);
+        assertThat(result).extracting(MatchDto.ResultResponse::ratingChange).containsExactly(30000.0, -20000.0, -10000.0);
+        assertThat(ratings.get(1L).chipNet()).isEqualTo(30000.0);
+        assertThat(ratings.get(2L).chipNet()).isEqualTo(-20000.0);
         assertThat(ratings.get(1L).getWinCount()).isEqualTo(1);
+        assertThat(ratings.get(2L).getLoseCount()).isEqualTo(1);
         verify(ratingCalculator, never()).calculateMultiplayerRatings(anyList(), anyBoolean());
         verify(memberRepository, never()).save(any());
     }
 
     @Test
-    void 파산한_사람은_다음_판에_리바이한다() {
-        record(1000, 0, -1000);   // p3 파산
-        record(-100, -100, 200);  // p3 리바이 후 +200
+    void 리바이는_판마다_바이인_횟수에서_1을_뺀_만큼_쌓인다() {
+        record(30000, 1, -20000, 2, -10000, 1);
+        record(-5000, 2, 15000, 3, -10000, 1);
 
-        PlayerGameRating p3 = ratings.get(3L);
-        assertThat(p3.getRebuyCount()).isEqualTo(1);
-        assertThat(p3.chipBalance(1000)).isEqualTo(1200.0);
+        assertThat(ratings.get(1L).getRebuyCount()).isEqualTo(1);
+        assertThat(ratings.get(2L).getRebuyCount()).isEqualTo(3);
+        assertThat(ratings.get(3L).getRebuyCount()).isZero();
+        assertThat(ratings.get(2L).chipNet()).isEqualTo(-5000.0);
     }
 
     @Test
-    void 칩_게임에서_증감이_없으면_거절한다() {
+    void 칩_게임에서_손익이나_바이인_횟수가_없으면_거절한다() {
         assertThatThrownBy(() -> matchService.recordMatchResult(new MatchDto.ResultRequest(GAME_ID, ROOM_ID, List.of(
-            new MatchDto.ParticipantRequest(1L, 1, null, null),
-            new MatchDto.ParticipantRequest(2L, 2, null, 0))), 1L))
+            new MatchDto.ParticipantRequest(1L, 1, null, null, 1),
+            new MatchDto.ParticipantRequest(2L, 2, null, 0, 1))), 1L))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> matchService.recordMatchResult(new MatchDto.ResultRequest(GAME_ID, ROOM_ID, List.of(
+            new MatchDto.ParticipantRequest(1L, 1, null, 100, 0),
+            new MatchDto.ParticipantRequest(2L, 2, null, -100, 1))), 1L))
             .isInstanceOf(IllegalArgumentException.class);
     }
 }

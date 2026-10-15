@@ -37,7 +37,8 @@ public class MatchParticipant {
     @Column(columnDefinition = "TEXT")
     private String scoresJson; // 카테고리별 점수 JSON {"settlement":3,"cities":2,...}
 
-    private Integer chipDelta; // 칩 게임에서 입력한 증감. ratingChange는 0에서 멈춘 뒤의 실제 증감
+    private Integer chipDelta; // 칩 게임에서 이번 판 손익
+    private Integer buyIns;    // 칩 게임에서 이번 판 바이인 횟수 (첫 바이인 포함). 리플레이 때 리바이 수를 다시 센다
 
     @Builder
     public MatchParticipant(MatchRecord matchRecord, Member member, int placement) {
@@ -55,8 +56,9 @@ public class MatchParticipant {
         this.placement = placement;
     }
 
-    public void updateChipDelta(Integer chipDelta) {
+    public void updateChipResult(Integer chipDelta, Integer buyIns) {
         this.chipDelta = chipDelta;
+        this.buyIns = buyIns;
     }
 
     public void updateScoresJson(String scoresJson) {

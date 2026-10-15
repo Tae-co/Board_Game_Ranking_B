@@ -83,7 +83,7 @@ public class MatchService {
 
             MatchParticipant mp = new MatchParticipant(matchRecord, member, pr.placement());
             if (pr.scoresJson() != null) mp.updateScoresJson(pr.scoresJson());
-            mp.updateChipDelta(chipDeltaOf(game, pr));
+            applyChipRequest(mp, game, pr);
             participants.add(mp);
             gameRatings.add(gameRating);
         }
@@ -93,7 +93,7 @@ public class MatchService {
             for (int i = 0; i < participants.size(); i++) {
                 MatchParticipant participant = participants.get(i);
                 PlayerGameRating gameRating = gameRatings.get(i);
-                applyChipResult(participant, gameRating, room, matchRecord.getPlayedAt());
+                applyChipResult(participant, gameRating, matchRecord.getPlayedAt());
                 ratingRepository.save(gameRating);
                 responseList.add(new MatchDto.ResultResponse(
                     participant.getMember().getId(), participant.getMember().getNickname(),
@@ -202,7 +202,7 @@ public class MatchService {
             Member member = memberRepository.findById(pr.memberId()).orElseThrow();
             MatchParticipant newMp = new MatchParticipant(match, member, pr.placement());
             if (pr.scoresJson() != null) newMp.updateScoresJson(pr.scoresJson());
-            newMp.updateChipDelta(chipDeltaOf(match.getBoardGame(), pr));
+            applyChipRequest(newMp, match.getBoardGame(), pr);
             newParticipants.add(newMp);
         }
 
@@ -272,7 +272,7 @@ public class MatchService {
                     PlayerGameRating gr = ratingByMemberId.computeIfAbsent(mp.getMember().getId(), id ->
                         ratingRepository.save(PlayerGameRating.builder()
                             .member(mp.getMember()).boardGame(game).room(room).build()));
-                    applyChipResult(mp, gr, room, match.getPlayedAt());
+                    applyChipResult(mp, gr, match.getPlayedAt());
                 }
                 continue;
             }
@@ -343,17 +343,20 @@ public class MatchService {
         }
     }
 
-    /** 칩 게임에서 증감이 없으면 기록할 게 없다. Elo 게임은 무시한다. */
-    private Integer chipDeltaOf(BoardGame game, MatchDto.ParticipantRequest pr) {
-        if (!game.isChipGame()) return null;
-        if (pr.chipDelta() == null) throw new IllegalArgumentException("칩 증감을 입력해주세요.");
-        return pr.chipDelta();
+    /** 칩 게임은 손익과 바이인 횟수가 있어야 기록할 수 있다. Elo 게임은 무시한다. */
+    private void applyChipRequest(MatchParticipant mp, BoardGame game, MatchDto.ParticipantRequest pr) {
+        if (!game.isChipGame()) return;
+        if (pr.chipDelta() == null) throw new IllegalArgumentException("칩 손익을 입력해주세요.");
+        if (pr.buyIns() == null || pr.buyIns() < 1) throw new IllegalArgumentException("바이인 횟수는 1 이상이어야 합니다.");
+        mp.updateChipResult(pr.chipDelta(), pr.buyIns());
     }
 
-    /** 칩 게임 한 판: Elo·전체 랭킹을 건드리지 않고 칩 잔고만 옮긴다. 1등만 승리로 센다. */
-    private void applyChipResult(MatchParticipant mp, PlayerGameRating gr, Room room, LocalDateTime playedAt) {
+    /** 칩 게임 한 판: Elo·전체 랭킹을 건드리지 않고 손익만 누적한다. 1등(우승자)만 승리로 센다. */
+    private void applyChipResult(MatchParticipant mp, PlayerGameRating gr, LocalDateTime playedAt) {
         int delta = mp.getChipDelta() != null ? mp.getChipDelta() : 0;
-        mp.updateRatingChange(gr.applyChipResult(room.getStartingChips(), delta));
+        int rebuys = mp.getBuyIns() != null ? Math.max(0, mp.getBuyIns() - 1) : 0;
+        gr.applyChipResult(delta, rebuys);
+        mp.updateRatingChange(delta);
         gr.addPlayCount();
         gr.updateLastPlayedAt(playedAt);
         if (mp.getPlacement() == 1) gr.addWinCount();

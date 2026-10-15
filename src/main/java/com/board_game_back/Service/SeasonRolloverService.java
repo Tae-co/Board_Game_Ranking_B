@@ -67,11 +67,6 @@ public class SeasonRolloverService {
         Optional<Room> room = roomRepository.findById(season.getRoomId());
 
         int playerCount = room.map(r -> snapshotAndReset(r, season)).orElse(0);
-        // 시즌 중에 바꾼 시작 칩은 형평성 때문에 새 시즌부터 쓴다.
-        room.ifPresent(r -> {
-            r.applyPendingStartingChips();
-            roomRepository.save(r);
-        });
 
         // 진행 중 시즌은 방당 하나(uq_room_season_open)라 닫힌 상태를 먼저 내보내야 다음 시즌을 넣을 수 있다.
         season.close(now);
@@ -123,7 +118,7 @@ public class SeasonRolloverService {
     private List<SeasonRankSnapshot> snapshotGame(Long roomSeasonId, List<PlayerGameRating> perGame) {
         List<PlayerGameRating> played = perGame.stream()
             .filter(r -> r.getPlayCount() > 0)
-            .sorted(Comparator.comparingDouble((PlayerGameRating r) -> r.getGameStats().getDisplayScore()).reversed())
+            .sorted(Comparator.comparingDouble(PlayerGameRating::rankingScore).reversed())
             .toList();
 
         List<SeasonRankSnapshot> snapshots = new ArrayList<>();
@@ -131,7 +126,7 @@ public class SeasonRolloverService {
         double previousScore = Double.NaN;
         for (int i = 0; i < played.size(); i++) {
             PlayerGameRating rating = played.get(i);
-            double score = rating.getGameStats().getDisplayScore();
+            double score = rating.rankingScore();
             if (score != previousScore) {
                 rank = i + 1;
                 previousScore = score;

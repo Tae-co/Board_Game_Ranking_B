@@ -36,11 +36,9 @@ public class BoardGame {
     @Enumerated(EnumType.STRING)
     private RatingType ratingType = RatingType.ELO;  // 만들 때 정하고 바꾸지 않는다
 
-    private Integer startingChips;  // 칩 게임만. 이 게임으로 만드는 그룹의 시작 칩 기본값
-
     @Builder
     public BoardGame(String name, String imageUrl, int minPlayers, int maxPlayers, String schemaJson,
-                     Long communityId, Long createdByMemberId, RatingType ratingType, Integer startingChips) {
+                     Long communityId, Long createdByMemberId, RatingType ratingType) {
         this.name = name;
         this.imageUrl = imageUrl;
         this.minPlayers = minPlayers;
@@ -49,7 +47,6 @@ public class BoardGame {
         this.communityId = communityId;
         this.createdByMemberId = createdByMemberId;
         if (ratingType != null) this.ratingType = ratingType;
-        this.startingChips = startingChips;
     }
 
     public boolean isChipGame() {

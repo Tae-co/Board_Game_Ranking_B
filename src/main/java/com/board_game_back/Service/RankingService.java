@@ -3,11 +3,9 @@ package com.board_game_back.Service;
 import com.board_game_back.DTO.RankingDto;
 import com.board_game_back.DTO.RankingDto.GameRankingResponse;
 import com.board_game_back.Entity.PlayerGameRating;
-import com.board_game_back.Entity.Room;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MatchParticipantRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
-import com.board_game_back.Repository.RoomRepository;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,7 +23,6 @@ public class RankingService {
     private final MatchParticipantRepository participantRepository;
     private final RoomSeasonService roomSeasonService;
     private final BoardGameRepository boardGameRepository;
-    private final RoomRepository roomRepository;
 
     public List<GameRankingResponse> getGameRanking(Long boardGameId) {
         List<PlayerGameRating> ratings = ratingRepository.findByBoardGameIdOrderByDisplayScoreDesc(boardGameId);
@@ -58,8 +55,7 @@ public class RankingService {
 
         boolean chipGame = boardGameRepository.findById(boardGameId).map(g -> g.isChipGame()).orElse(false);
         if (chipGame) {
-            Room room = roomRepository.findById(roomId).orElseThrow();
-            return chipRanking(ratings, placements, room.getStartingChips());
+            return chipRanking(ratings, placements);
         }
 
         List<RankingDto.GameRankingResponse> responseList = new ArrayList<>();
@@ -90,13 +86,13 @@ public class RankingService {
         return responseList;
     }
 
-    /** 칩 게임: 보유 칩 순. 안 뛴 사람은 시작 칩을 들고 맨 뒤에 선다. */
+    /** 칩 게임: 누적 손익 순. 안 뛴 사람은 0으로 맨 뒤에 선다. */
     private List<GameRankingResponse> chipRanking(
-        List<PlayerGameRating> ratings, Map<Long, List<Integer>> placements, int startingChips) {
+        List<PlayerGameRating> ratings, Map<Long, List<Integer>> placements) {
 
         List<PlayerGameRating> sorted = ratings.stream()
             .sorted(Comparator.comparing((PlayerGameRating r) -> r.getPlayCount() == 0)
-                .thenComparing(Comparator.comparingDouble((PlayerGameRating r) -> r.chipBalance(startingChips))
+                .thenComparing(Comparator.comparingDouble(PlayerGameRating::chipNet)
                     .reversed()))
             .toList();
 
@@ -109,7 +105,7 @@ public class RankingService {
                 rating.getMember().getId(),
                 rating.getMember().getNickname(),
                 rating.getMember().getProfileImage(),
-                rating.chipBalance(startingChips),
+                rating.chipNet(),
                 rating.getPlayCount(), rating.getWinCount(), rating.getLoseCount(),
                 placements.get(rating.getMember().getId()),
                 rating.getRebuyCount()));

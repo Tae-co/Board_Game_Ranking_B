@@ -207,32 +207,22 @@ class SeasonRolloverServiceTest {
     }
 
     @Test
-    void rollover_칩_게임은_보유_칩_순으로_스냅샷을_찍는다() {
+    void rollover_칩_게임은_음수_손익도_그대로_순위와_점수에_남긴다() {
         givenRolloverableRoom();
         BoardGame 포커 = BoardGame.builder().name("포커").ratingType(RatingType.CHIP).build();
         ReflectionTestUtils.setField(포커, "id", 30L);
-        PlayerGameRating 적게 = rating(1L, "태윤", 포커, 800.0);
-        PlayerGameRating 많이 = rating(2L, "지민", 포커, 1500.0);
-        when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID)).thenReturn(List.of(적게, 많이));
+        PlayerGameRating 크게잃음 = rating(1L, "태윤", 포커, -2000.0);
+        PlayerGameRating 조금잃음 = rating(2L, "지민", 포커, -500.0);
+        PlayerGameRating 땀 = rating(3L, "유나", 포커, 2500.0);
+        when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID)).thenReturn(List.of(크게잃음, 조금잃음, 땀));
 
         rolloverService.rolloverIfDue(ROOM_ID);
 
         verify(snapshotRepository).saveAll(snapshotCaptor.capture());
         List<SeasonRankSnapshot> snapshots = snapshotCaptor.getValue();
-        assertThat(snapshots).extracting(SeasonRankSnapshot::getMemberId).containsExactly(2L, 1L);
-        assertThat(snapshots).extracting(SeasonRankSnapshot::getDisplayScore).containsExactly(1500.0, 800.0);
-    }
-
-    @Test
-    void rollover_예약해_둔_시작_칩은_다음_시즌부터_적용된다() {
-        givenRolloverableRoom();
-        room.reserveStartingChips(5000);
-        when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID)).thenReturn(List.of());
-
-        rolloverService.rolloverIfDue(ROOM_ID);
-
-        assertThat(room.getStartingChips()).isEqualTo(5000);
-        assertThat(room.getPendingStartingChips()).isNull();
+        assertThat(snapshots).extracting(SeasonRankSnapshot::getMemberId).containsExactly(3L, 2L, 1L);
+        assertThat(snapshots).extracting(SeasonRankSnapshot::getDisplayScore).containsExactly(2500.0, -500.0, -2000.0);
+        assertThat(크게잃음.chipNet()).isZero();
     }
 
     // ── fixtures ──

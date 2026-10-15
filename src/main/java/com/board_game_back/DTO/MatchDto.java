@@ -14,7 +14,8 @@ public class MatchDto {
         Long memberId,
         int placement,
         String scoresJson,
-        Integer chipDelta // 칩 게임에서만. 이번 판에 딴(+)/잃은(-) 칩
+        Integer chipDelta, // 칩 게임에서만. 이번 판 손익
+        Integer buyIns     // 칩 게임에서만. 이번 판 바이인 횟수 (첫 바이인 포함, 1 이상)
     ) {}
 
     public record ResultResponse(
