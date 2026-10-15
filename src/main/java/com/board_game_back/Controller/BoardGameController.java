@@ -2,6 +2,7 @@ package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.BoardGameDto;
 import com.board_game_back.Entity.BoardGame;
+import com.board_game_back.Entity.RatingType;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.CommunityAdminRepository;
@@ -96,13 +97,15 @@ public class BoardGameController {
         if (boardGameRepository.existsByCommunityIdAndName(req.communityId(), name)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 같은 이름의 게임이 있습니다.");
         }
-        validateUserSchema(req.schemaJson());
+        String schemaType = validateUserSchema(req.schemaJson());
 
         int minPlayers = req.minPlayers() != null ? req.minPlayers() : DEFAULT_MIN_PLAYERS;
         int maxPlayers = req.maxPlayers() != null ? req.maxPlayers() : DEFAULT_MAX_PLAYERS;
         if (minPlayers < 1 || maxPlayers < minPlayers) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "인원수 설정이 올바르지 않습니다.");
         }
+
+        boolean chipGame = "chip".equals(schemaType);
 
         BoardGame game = BoardGame.builder()
             .name(name)
@@ -112,6 +115,7 @@ public class BoardGameController {
             .schemaJson(req.schemaJson())
             .communityId(req.communityId())
             .createdByMemberId(memberId)
+            .ratingType(chipGame ? RatingType.CHIP : RatingType.ELO)
             .build();
 
         return ResponseEntity.ok(boardGameRepository.save(game));
@@ -213,8 +217,12 @@ public class BoardGameController {
         return names + rest + " 그룹에서 사용 중이에요.\n그룹을 먼저 삭제한 뒤 점수판을 삭제해주세요.";
     }
 
-    /** 사용자가 만드는 점수판은 simple(순위만) / flat(항목별 점수) / outcome(승무패만) 세 가지만 허용한다. */
-    private void validateUserSchema(String schemaJson) {
+    /**
+     * 사용자가 만드는 점수판은 simple(순위만) / flat(항목별 점수) / outcome(승무패만) / chip(바이인 손익)만 허용한다.
+     *
+     * @return 점수판 type. chip이면 랭킹도 Elo 대신 손익 누적이다.
+     */
+    private String validateUserSchema(String schemaJson) {
         if (schemaJson == null || schemaJson.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "점수판 정보가 없습니다.");
         }
@@ -227,11 +235,11 @@ public class BoardGameController {
         }
 
         String type = parsed.get("type") instanceof String s ? s : null;
-        if (!"simple".equals(type) && !"flat".equals(type) && !"outcome".equals(type)) {
+        if (!"simple".equals(type) && !"flat".equals(type) && !"outcome".equals(type) && !"chip".equals(type)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "지원하지 않는 점수판 형식입니다.");
         }
         if (!"flat".equals(type)) {
-            return;
+            return type;
         }
 
         if (!(parsed.get("categories") instanceof List<?> categories) || categories.isEmpty()) {
@@ -244,5 +252,6 @@ public class BoardGameController {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "항목 이름을 모두 입력해주세요.");
             }
         }
+        return type;
     }
 }

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.PlayerGameRating;
+import com.board_game_back.Entity.RatingType;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Entity.RoomSeason;
 import com.board_game_back.Entity.SeasonRankSnapshot;
@@ -203,6 +204,25 @@ class SeasonRolloverServiceTest {
         assertThat(태윤.getGameStats().getRating()).isEqualTo(muBefore);
         assertThat(태윤.getGameStats().getRatingDeviation()).isEqualTo(sigmaBefore);
         assertThat(태윤.getGameStats().getDisplayScore()).isCloseTo(displayBefore, within(0.001));
+    }
+
+    @Test
+    void rollover_칩_게임은_음수_손익도_그대로_순위와_점수에_남긴다() {
+        givenRolloverableRoom();
+        BoardGame 포커 = BoardGame.builder().name("포커").ratingType(RatingType.CHIP).build();
+        ReflectionTestUtils.setField(포커, "id", 30L);
+        PlayerGameRating 크게잃음 = rating(1L, "태윤", 포커, -2000.0);
+        PlayerGameRating 조금잃음 = rating(2L, "지민", 포커, -500.0);
+        PlayerGameRating 땀 = rating(3L, "유나", 포커, 2500.0);
+        when(ratingRepository.findByRoomIdWithMemberAndBoardGame(ROOM_ID)).thenReturn(List.of(크게잃음, 조금잃음, 땀));
+
+        rolloverService.rolloverIfDue(ROOM_ID);
+
+        verify(snapshotRepository).saveAll(snapshotCaptor.capture());
+        List<SeasonRankSnapshot> snapshots = snapshotCaptor.getValue();
+        assertThat(snapshots).extracting(SeasonRankSnapshot::getMemberId).containsExactly(3L, 2L, 1L);
+        assertThat(snapshots).extracting(SeasonRankSnapshot::getDisplayScore).containsExactly(2500.0, -500.0, -2000.0);
+        assertThat(크게잃음.chipNet()).isZero();
     }
 
     // ── fixtures ──

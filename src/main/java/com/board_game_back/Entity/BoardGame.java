@@ -2,6 +2,8 @@ package com.board_game_back.Entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -31,9 +33,12 @@ public class BoardGame {
     private Long communityId;        // null = 공식 게임(모두에게 보임), 값 있으면 해당 커뮤니티 전용
     private Long createdByMemberId;  // null = 관리자가 만든 게임
 
+    @Enumerated(EnumType.STRING)
+    private RatingType ratingType = RatingType.ELO;  // 만들 때 정하고 바꾸지 않는다
+
     @Builder
     public BoardGame(String name, String imageUrl, int minPlayers, int maxPlayers, String schemaJson,
-                     Long communityId, Long createdByMemberId) {
+                     Long communityId, Long createdByMemberId, RatingType ratingType) {
         this.name = name;
         this.imageUrl = imageUrl;
         this.minPlayers = minPlayers;
@@ -41,6 +46,11 @@ public class BoardGame {
         this.schemaJson = schemaJson;
         this.communityId = communityId;
         this.createdByMemberId = createdByMemberId;
+        if (ratingType != null) this.ratingType = ratingType;
+    }
+
+    public boolean isChipGame() {
+        return ratingType == RatingType.CHIP;
     }
 
     public void update(String name, String imageUrl, int minPlayers, int maxPlayers, String schemaJson) {

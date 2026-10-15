@@ -45,6 +45,7 @@ public class PlayerGameRating {
     private int playCount = 0;
     private int winCount = 0;
     private int loseCount = 0;
+    private int rebuyCount = 0; // 칩 게임: 첫 바이인 뒤에 다시 산 횟수 (판마다 바이인 횟수 - 1)
 
     private LocalDateTime lastPlayedAt;
 
@@ -85,8 +86,25 @@ public class PlayerGameRating {
         this.playCount = 0;
         this.winCount = 0;
         this.loseCount = 0;
+        this.rebuyCount = 0;
         this.lastPlayedAt = null;
         this.gameStats.reset();
+    }
+
+    /** 칩 게임 누적 손익. 아직 안 뛰었으면 0이다 (rating 컬럼의 초기값 500은 Elo용). 음수도 그대로 둔다. */
+    public double chipNet() {
+        return playCount == 0 ? 0 : gameStats.getRating();
+    }
+
+    /** 칩 게임 한 판을 반영한다. 바닥 없이 손익을 그대로 더한다. */
+    public void applyChipResult(int chipDelta, int rebuys) {
+        gameStats.update(chipNet() + chipDelta, gameStats.getRatingDeviation(), gameStats.getVolatility());
+        rebuyCount += rebuys;
+    }
+
+    /** 랭킹·시즌 스냅샷 정렬 기준. 칩 게임은 음수 손익을 0으로 자르면 안 되므로 따로 본다. */
+    public double rankingScore() {
+        return boardGame != null && boardGame.isChipGame() ? chipNet() : gameStats.getDisplayScore();
     }
 
     public void updateInitialRating(double newRating) {
