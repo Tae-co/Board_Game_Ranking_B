@@ -161,14 +161,10 @@ class CommunityServiceAdminTest {
     }
 
     @Test
-    void 커뮤니티를_지우면_방의_커뮤니티_연결이_끊긴다() {
-        Room room = new Room();
-        room.assignCommunity(COMMUNITY_ID);
-        when(roomRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(room));
-
+    void 커뮤니티를_지우면_방도_지운다() {
         communityService.deleteCommunity(COMMUNITY_ID, OWNER);
 
-        assertThat(room.getCommunityId()).isNull();
+        verify(roomService).deleteRoomsOfCommunity(COMMUNITY_ID);
         verify(communityRepository).delete(community);
     }
 

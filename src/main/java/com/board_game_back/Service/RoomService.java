@@ -210,6 +210,14 @@ public class RoomService {
         deleteRoomInternal(roomId);
     }
 
+    /** 커뮤니티가 삭제될 때 그 커뮤니티의 방도 경기 기록·점수와 함께 지운다. */
+    @Transactional
+    public void deleteRoomsOfCommunity(Long communityId) {
+        for (Room room : roomRepository.findByCommunityId(communityId)) {
+            deleteRoomInternal(room.getId());
+        }
+    }
+
     private void deleteRoomInternal(Long roomId) {
         Room room = roomRepository.findById(roomId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
@@ -238,8 +246,7 @@ public class RoomService {
                 communityRepository.save(community);
                 continue;
             }
-            // 방과 경기 기록은 남기고 커뮤니티 연결만 끊는다 (없는 커뮤니티를 가리키지 않게)
-            roomRepository.findByCommunityId(community.getId()).forEach(room -> room.assignCommunity(null));
+            deleteRoomsOfCommunity(community.getId());
             communityAdminRepository.deleteByCommunityId(community.getId());
             communityMemberRepository.deleteByCommunityId(community.getId());
             communityRepository.delete(community);

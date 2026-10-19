@@ -22,6 +22,7 @@ import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -129,12 +130,16 @@ class RoomServiceDeleteMemberTest {
         ));
 
         Room room = new Room();
+        ReflectionTestUtils.setField(room, "id", 100L);
         room.assignCommunity(COMMUNITY_ID);
         when(roomRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(room));
+        when(roomRepository.findById(100L)).thenReturn(Optional.of(room));
 
         roomService.deleteMember(OWNER);
 
-        assertThat(room.getCommunityId()).isNull();
+        // 커뮤니티의 방도 경기 기록과 함께 지운다
+        verify(matchRecordRepository).deleteByRoomId(100L);
+        verify(roomRepository).delete(room);
         verify(communityRepository).delete(community);
         verify(communityAdminRepository).deleteByCommunityId(COMMUNITY_ID);
         verify(communityMemberRepository).deleteByCommunityId(COMMUNITY_ID);
