@@ -19,33 +19,38 @@ public class SeasonDto {
         String communityName,
         String communityImageUrl,
         String inviteCode,
-        LocalDate from,       // 커뮤니티 타임존 기준 집계 시작일 (포함)
+        LocalDate from,       // 커뮤니티 첫 경기 날짜 (경기가 없으면 오늘). 구버전 앱 호환용
         LocalDate to,         // 오늘 (포함)
-        int windowDays,
+        int windowDays,       // from~to 일수. 구버전 앱 호환용
         int totalRooms,       // 커뮤니티의 현재 방 수
         long totalMembers,    // 커뮤니티의 현재 인원
-        int matchCount,       // 기간 안 경기 수
-        List<Leader> leaders, // 커뮤니티 방들 중 최고 점수 상위 3명 (시상대)
+        int matchCount,       // 전체 경기 수
+        List<Leader> leaders, // 게임별 최고 점수 3칸 (칸마다 다른 게임)
         List<Award> awards
     ) {}
 
-    /** 현황 시상대 한 칸. 사람마다 가장 높은 방 점수 하나. 동점은 같은 순위를 받는다. */
+    /** 현황 게임별 최고 점수 한 칸. rank는 칸 순서(1~3)다. */
     public record Leader(
         int rank,
         Long memberId,
         String nickname,
         String profileImage,
-        double displayScore, // 그 방의 현재 점수
-        String roomName      // 그 점수를 가진 방
+        double displayScore, // 그 방·게임의 현재 점수
+        String roomName,     // 그 점수를 가진 방
+        String boardGameName
     ) {}
 
-    /** type: MOST_WINS | LONGEST_STREAK | DARK_HORSE */
+    /**
+     * type: LAST_WINNER | MOST_WINS | LONGEST_STREAK | LONGEST_LOSING_STREAK | BEST_WIN_RATE(value 0~100) | MOST_PLAYED.
+     * LAST_WINNER는 공동 1등이면 여러 개 오고, boardGameName은 LAST_WINNER에만 채운다.
+     */
     public record Award(
         String type,
         Long memberId,
         String nickname,
         String profileImage,
-        double value
+        double value,
+        String boardGameName
     ) {}
 
     // ── 방별 시즌 ──

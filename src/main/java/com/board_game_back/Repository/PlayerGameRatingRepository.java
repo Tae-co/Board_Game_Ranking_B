@@ -39,9 +39,9 @@ public interface PlayerGameRatingRepository extends JpaRepository<PlayerGameRati
     @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.member JOIN FETCH p.boardGame WHERE p.room.id = :roomId")
     List<PlayerGameRating> findByRoomIdWithMemberAndBoardGame(@Param("roomId") Long roomId);
 
-    /** 커뮤니티 현황 시상대: 방들의 진행 중 시즌 레이팅 중 minPlays판 이상 뛴 것. 화면이 방 이름·닉네임을 읽는다. */
+    /** 커뮤니티 현황 게임별 최고 점수: 방들의 진행 중 시즌 레이팅 중 minPlays판 이상 뛴 것. 화면이 방·게임 이름과 닉네임을 읽는다. */
     /** 칩 게임은 점수 단위가 달라 Elo 점수와 같이 줄 세우지 않는다. */
-    @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.member JOIN FETCH p.room WHERE p.room.id IN :roomIds AND p.playCount >= :minPlays AND p.boardGame.ratingType = com.board_game_back.Entity.RatingType.ELO")
+    @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.member JOIN FETCH p.room JOIN FETCH p.boardGame WHERE p.room.id IN :roomIds AND p.playCount >= :minPlays AND p.boardGame.ratingType = com.board_game_back.Entity.RatingType.ELO")
     List<PlayerGameRating> findByRoomIdsWithMinPlays(@Param("roomIds") List<Long> roomIds, @Param("minPlays") int minPlays);
 
     void deleteByRoomId(Long roomId);

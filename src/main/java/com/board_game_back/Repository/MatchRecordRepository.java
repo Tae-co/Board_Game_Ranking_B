@@ -59,13 +59,10 @@ public interface MatchRecordRepository extends JpaRepository<MatchRecord, Long> 
         JOIN FETCH m.boardGame
         JOIN FETCH m.participants p
         JOIN FETCH p.member
-        WHERE m.room.id IN :roomIds AND m.playedAt >= :from AND m.playedAt < :to
+        WHERE m.room.id IN :roomIds
         ORDER BY m.playedAt ASC, m.id ASC
         """)
-    List<MatchRecord> findByRoomIdsAndPlayedAtRange(
-        @Param("roomIds") Collection<Long> roomIds,
-        @Param("from") LocalDateTime from,
-        @Param("to") LocalDateTime to);
+    List<MatchRecord> findByRoomIds(@Param("roomIds") Collection<Long> roomIds);
 
     /**
      * 방·게임의 경기 시각 전체. 시즌별 경기 수를 낼 때 쓴다 — 첫 시즌은 달력 한 달보다 길 수 있으므로
@@ -77,13 +74,4 @@ public interface MatchRecordRepository extends JpaRepository<MatchRecord, Long> 
         """)
     List<LocalDateTime> findPlayedAtByRoomIdAndBoardGameId(
         @Param("roomId") Long roomId, @Param("boardGameId") Long boardGameId);
-
-    /** 커뮤니티 내 멤버별 첫 경기 시각 (다크호스 = 이번 시즌에 처음 뛴 멤버) */
-    @Query("""
-        SELECT p.member.id, MIN(m.playedAt) FROM MatchRecord m
-        JOIN m.participants p
-        WHERE m.room.id IN :roomIds
-        GROUP BY p.member.id
-        """)
-    List<Object[]> findFirstPlayedAtByMember(@Param("roomIds") Collection<Long> roomIds);
 }
