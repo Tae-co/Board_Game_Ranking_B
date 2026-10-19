@@ -19,10 +19,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,6 +45,8 @@ public class CommunityService {
     private final RoomMemberRepository roomMemberRepository;
     private final BoardGameRepository boardGameRepository;
     private final PlayerGameRatingRepository playerGameRatingRepository;
+
+    private static final int MAX_ADMINS = 5;  // 소유자 포함
 
     @Transactional
     public CommunityDto.Response createCommunity(CommunityDto.CreateRequest req, Long createdBy) {
@@ -158,28 +164,63 @@ public class CommunityService {
         }
 
         community.update(req.name(), req.region(), req.imageUrl());
-
-        communityAdminRepository.deleteByCommunityId(communityId);
-
-        Member creator = memberRepository.findById(community.getCreatedBy())
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
-        communityAdminRepository.save(new CommunityAdmin(community, creator));
-
         if (req.adminMemberIds() != null) {
-            for (Long memberId : req.adminMemberIds()) {
-                if (memberId.equals(community.getCreatedBy())) continue;
-                if (communityAdminRepository.countByCommunityId(communityId) >= 5) break;
-                memberRepository.findById(memberId).ifPresent(member -> {
-                    communityAdminRepository.save(new CommunityAdmin(community, member));
-                    if (!communityMemberRepository.existsByCommunityIdAndMemberId(communityId, member.getId())) {
-                        communityMemberRepository.save(new CommunityMember(community, member));
-                    }
-                });
-            }
+            syncAdmins(community, req.adminMemberIds(), requesterId, Boolean.TRUE.equals(req.ownerLeavesAdmin()));
         }
 
         communityRepository.save(community);
         return toResponse(community);
+    }
+
+    /**
+     * 어드민 목록을 요청대로 맞춘다. 전부 지우고 다시 넣지 않고 바뀐 것만 반영한다 —
+     * 어드민이 된 시각이 남아야 소유권을 "가장 오래된 어드민"에게 넘길 수 있다.
+     *
+     * <p>소유자(createdBy)는 항상 어드민이고, 본인이 ownerLeavesAdmin으로 내려놓을 때만 빠진다.
+     * 그때 소유권(삭제 권한 포함)은 남은 어드민 중 가장 오래된 사람에게 넘어간다.
+     * 소유자가 아닌 요청자가 보낸 목록에서 소유자가 빠져 있어도 무시한다.
+     *
+     * @param adminMemberIds 소유자를 뺀 나머지 어드민 (소유자 id가 있어도 무시)
+     */
+    private void syncAdmins(Community community, List<Long> adminMemberIds, Long requesterId, boolean ownerLeavesAdmin) {
+        Long ownerId = community.getCreatedBy();
+        boolean ownerLeaves = ownerLeavesAdmin && ownerId.equals(requesterId);
+
+        Set<Long> wanted = new LinkedHashSet<>(adminMemberIds);
+        wanted.remove(ownerId);
+        if (ownerLeaves && wanted.isEmpty()) {
+            throw new IllegalArgumentException("다른 어드민이 1명 이상 있어야 어드민을 내려놓을 수 있습니다.");
+        }
+        if (wanted.size() + (ownerLeaves ? 0 : 1) > MAX_ADMINS) {
+            throw new IllegalArgumentException("어드민은 최대 " + MAX_ADMINS + "명입니다.");
+        }
+
+        List<CommunityAdmin> remaining = new ArrayList<>();
+        Set<Long> currentIds = new HashSet<>();
+        for (CommunityAdmin admin : communityAdminRepository.findByCommunityId(community.getId())) {
+            Long memberId = admin.getMember().getId();
+            currentIds.add(memberId);
+            boolean keep = memberId.equals(ownerId) ? !ownerLeaves : wanted.contains(memberId);
+            if (keep) remaining.add(admin);
+            else communityAdminRepository.delete(admin);
+        }
+
+        for (Long memberId : wanted) {
+            if (currentIds.contains(memberId)) continue;
+            memberRepository.findById(memberId).ifPresent(member -> {
+                remaining.add(communityAdminRepository.save(new CommunityAdmin(community, member)));
+                if (!communityMemberRepository.existsByCommunityIdAndMemberId(community.getId(), member.getId())) {
+                    communityMemberRepository.save(new CommunityMember(community, member));
+                }
+            });
+        }
+
+        if (ownerLeaves) {
+            CommunityAdmin next = remaining.stream()
+                .min(Comparator.comparing(CommunityAdmin::getCreatedAt).thenComparing(CommunityAdmin::getId))
+                .orElseThrow(() -> new IllegalArgumentException("다른 어드민이 1명 이상 있어야 어드민을 내려놓을 수 있습니다."));
+            community.transferOwnership(next.getMember().getId());
+        }
     }
 
     @Transactional

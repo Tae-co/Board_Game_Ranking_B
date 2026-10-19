@@ -29,6 +29,7 @@ public class Community {
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
 
+    // 소유자. 처음엔 생성자이고, 소유자가 어드민을 내려놓으면 다음 어드민에게 넘어간다 (컬럼명은 그대로 둔다)
     @Column(nullable = false)
     private Long createdBy;
 
@@ -52,6 +53,10 @@ public class Community {
         if (name != null && !name.isBlank()) this.name = name.trim();
         if (region != null) this.region = region;
         if (imageUrl != null) this.imageUrl = imageUrl;
+    }
+
+    public void transferOwnership(Long memberId) {
+        this.createdBy = memberId;
     }
 
     public void assignInviteCode(String inviteCode) {
