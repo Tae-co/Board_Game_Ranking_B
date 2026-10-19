@@ -4,7 +4,6 @@ import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Entity.Room;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -49,10 +48,6 @@ public interface PlayerGameRatingRepository extends JpaRepository<PlayerGameRati
     void deleteByMember_IdAndRoom_Id(Long memberId, Long roomId);
 
     void deleteByMember_Id(Long memberId);
-
-    /** decay 대상. 칩은 딴 만큼이 자기 몫이라 안 깎는다. */
-    @Query("SELECT p FROM PlayerGameRating p WHERE p.playCount > 0 AND (p.lastPlayedAt IS NULL OR p.lastPlayedAt < :cutoff) AND p.boardGame.ratingType = com.board_game_back.Entity.RatingType.ELO")
-    List<PlayerGameRating> findStaleActiveRatings(@Param("cutoff") LocalDateTime cutoff);
 
     boolean existsByLastPlayedAtIsNullAndPlayCountGreaterThan(int playCount);
 }

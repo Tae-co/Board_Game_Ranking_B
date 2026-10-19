@@ -10,7 +10,7 @@ public final class RatingConstants {
     public static final double INITIAL_DEVIATION = 0.0;
     public static final double INITIAL_VOLATILITY = 0.0;
 
-    // 이 밑으로는 지거나 decay 돼도 내려가지 않는다 (시작 점수와 같음)
+    // 이 밑으로는 져도 내려가지 않는다 (시작 점수와 같음)
     public static final double RATING_FLOOR = 500.0;
 
     // 다인원 Elo: 상대마다 1:1 기대 승률을 구해 (실제 - 기대)의 평균 × K 만큼 움직인다.
