@@ -106,8 +106,10 @@ public class CommunityService {
         int groupCount = (int) roomRepository.countByCommunityId(communityId);
         long memberCount = communityMemberRepository.countByCommunityId(communityId);
 
+        // 어드민이 된 순서로 준다 — 앱이 소유자가 내려놓을 때 넘겨받을 사람(가장 오래된 어드민)을 미리 보여준다
         List<CommunityDto.AdminInfo> admins = communityAdminRepository.findByCommunityId(communityId)
             .stream()
+            .sorted(CommunityAdmin.OLDEST_FIRST)
             .map(ca -> new CommunityDto.AdminInfo(ca.getMember().getId(), ca.getMember().getNickname(), ca.getMember().getProfileImage()))
             .collect(Collectors.toList());
 
