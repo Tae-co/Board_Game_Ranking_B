@@ -109,7 +109,7 @@ public class CommunityService {
         return new CommunityDto.DetailResponse(
             community.getId(), community.getName(), community.getRegion(),
             community.getImageUrl(), community.getStatus(),
-            groupCount, memberCount, admins, community.getInviteCode()
+            groupCount, memberCount, admins, community.getInviteCode(), community.getCreatedBy()
         );
     }
 
