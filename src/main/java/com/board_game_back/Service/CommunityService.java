@@ -44,6 +44,7 @@ public class CommunityService {
     private final RoomMemberRepository roomMemberRepository;
     private final BoardGameRepository boardGameRepository;
     private final PlayerGameRatingRepository playerGameRatingRepository;
+    private final RoomService roomService;
 
     private static final int MAX_ADMINS = 5;  // 소유자 포함
 
@@ -279,8 +280,12 @@ public class CommunityService {
             .forEach(communityAdminRepository::delete);
         List<Room> rooms = roomRepository.findByCommunityId(communityId);
         for (Room room : rooms) {
-            playerGameRatingRepository.deleteByMember_IdAndRoom_Id(memberId, room.getId());
-            roomMemberRepository.deleteByRoomIdAndMemberId(room.getId(), memberId);
+            // 방 멤버면 방 나가기와 같은 경로로 — 방장이면 다음 사람에게 넘기고, 혼자였으면 방을 정리한다
+            if (roomMemberRepository.findByRoomIdAndMemberId(room.getId(), memberId).isPresent()) {
+                roomService.leaveRoom(room.getId(), memberId, memberId);
+            } else {
+                playerGameRatingRepository.deleteByMember_IdAndRoom_Id(memberId, room.getId());
+            }
         }
     }
 
