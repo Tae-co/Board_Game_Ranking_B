@@ -238,6 +238,8 @@ public class RoomService {
                 communityRepository.save(community);
                 continue;
             }
+            // 방과 경기 기록은 남기고 커뮤니티 연결만 끊는다 (없는 커뮤니티를 가리키지 않게)
+            roomRepository.findByCommunityId(community.getId()).forEach(room -> room.assignCommunity(null));
             communityAdminRepository.deleteByCommunityId(community.getId());
             communityMemberRepository.deleteByCommunityId(community.getId());
             communityRepository.delete(community);
