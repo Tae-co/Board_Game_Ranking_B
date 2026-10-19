@@ -2,6 +2,7 @@ package com.board_game_back.Service;
 
 import com.board_game_back.DTO.RoomDto;
 import com.board_game_back.Entity.Community;
+import com.board_game_back.Entity.CommunityAdmin;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.MemberRole;
 import com.board_game_back.Entity.PlayerGameRating;
@@ -23,6 +24,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import com.board_game_back.Utils.InviteCodeUtil;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -225,8 +227,17 @@ public class RoomService {
         playerGameRatingRepository.deleteByMember_Id(memberId);
         roomMemberRepository.deleteByMember_Id(memberId);
 
+        // 소유한 커뮤니티는 다른 어드민이 있으면 가장 오래된 어드민에게 넘기고, 없으면 지운다
         List<Community> ownedCommunities = communityRepository.findAllByCreatedBy(memberId);
         for (Community community : ownedCommunities) {
+            Optional<CommunityAdmin> nextOwner = communityAdminRepository.findByCommunityId(community.getId()).stream()
+                .filter(admin -> !admin.getMember().getId().equals(memberId))
+                .min(CommunityAdmin.OLDEST_FIRST);
+            if (nextOwner.isPresent()) {
+                community.transferOwnership(nextOwner.get().getMember().getId());
+                communityRepository.save(community);
+                continue;
+            }
             communityAdminRepository.deleteByCommunityId(community.getId());
             communityMemberRepository.deleteByCommunityId(community.getId());
             communityRepository.delete(community);
