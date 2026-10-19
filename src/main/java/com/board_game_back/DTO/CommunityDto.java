@@ -15,7 +15,8 @@ public class CommunityDto {
         String name,
         String region,
         String imageUrl,
-        List<Long> adminMemberIds
+        List<Long> adminMemberIds,  // 소유자를 뺀 어드민. null이면 어드민은 그대로 둔다
+        Boolean ownerLeavesAdmin    // 소유자 본인이 어드민을 내려놓을 때만 true (구버전 앱은 안 보낸다)
     ) {}
 
     public record Response(
@@ -46,7 +47,7 @@ public class CommunityDto {
         long memberCount,
         List<AdminInfo> admins,
         String inviteCode,
-        Long createdBy  // 생성자는 항상 어드민이라 설정 화면에서 해제할 수 없게 잠근다
+        Long createdBy  // 소유자(처음엔 생성자). 항상 어드민이고, 본인이 내려놓으면 가장 오래된 어드민에게 넘어간다
     ) {}
 
     public record RoomResponse(
