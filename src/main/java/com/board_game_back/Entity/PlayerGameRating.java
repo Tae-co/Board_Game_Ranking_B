@@ -2,7 +2,6 @@ package com.board_game_back.Entity;
 
 import static jakarta.persistence.GenerationType.*;
 
-import com.board_game_back.Utils.RatingConstants;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -70,16 +69,6 @@ public class PlayerGameRating {
 
     public void updateLastPlayedAt(LocalDateTime time) {
         this.lastPlayedAt = time;
-    }
-
-    public void applyDecay(double decay) {
-        double current = this.gameStats.getRating();
-        // 하한(= 시작 점수 500) 위로 올라간 사람만 깎는다. 갓 리셋된 사람은 하한에 있어 닿지 않는다.
-        double decayed = current - decay;
-        // decay는 벌어들인 것을 반납시킬 뿐 빚을 지우지 않는다. 이미 하한 밑이면 그대로 둔다.
-        double newRating = decayed < RatingConstants.RATING_FLOOR
-            ? Math.min(current, RatingConstants.RATING_FLOOR) : decayed;
-        this.gameStats.update(newRating, this.gameStats.getRatingDeviation(), this.gameStats.getVolatility());
     }
 
     public void reset() {
