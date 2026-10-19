@@ -15,9 +15,11 @@ import com.board_game_back.Entity.PlayerGameRating;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Repository.CommunityMemberRepository;
 import com.board_game_back.Repository.CommunityRepository;
+import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomRepository;
+import com.board_game_back.Repository.UserEventRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -45,6 +47,8 @@ class SeasonServiceTest {
     @Mock private RoomRepository roomRepository;
     @Mock private MatchRecordRepository matchRecordRepository;
     @Mock private PlayerGameRatingRepository playerGameRatingRepository;
+    @Mock private UserEventRepository userEventRepository;
+    @Mock private MemberRepository memberRepository;
 
     @InjectMocks private SeasonService seasonService;
 
@@ -222,6 +226,25 @@ class SeasonServiceTest {
 
         assertThat(summary.awards()).filteredOn(a -> a.type().equals("LAST_WINNER"))
             .extracting(SeasonDto.Award::nickname).containsExactlyInAnyOrder("태윤", "지민");
+    }
+
+    @Test
+    void getStatus_앱_접속_1위를_마지막에_준다() {
+        givenCommunityWithRoom();
+        when(matchRecordRepository.findByRoomIds(anyList())).thenReturn(List.of(
+            match(카탄, at(3), placing(태윤, 1, 10), placing(지민, 2, -10))
+        ));
+        when(userEventRepository.countAppOpensByCommunityMember(1L)).thenReturn(List.of(
+            new Object[]{2L, 15L}, new Object[]{1L, 7L}
+        ));
+        when(memberRepository.findById(2L)).thenReturn(Optional.of(지민));
+
+        SeasonDto.StatusResponse summary = seasonService.getStatus(1L);
+
+        SeasonDto.Award last = summary.awards().get(summary.awards().size() - 1);
+        assertThat(last.type()).isEqualTo("MOST_APP_OPENS");
+        assertThat(last.nickname()).isEqualTo("지민");
+        assertThat(last.value()).isEqualTo(15.0);
     }
 
     @Test
