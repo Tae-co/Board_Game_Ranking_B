@@ -25,6 +25,14 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
         """)
     List<Object[]> countByMemberInCommunity(@Param("communityId") Long communityId);
 
+    /** 방에서 멤버별 경기 수. 방장이 나갈 때 다음 방장을 고른다. */
+    @Query("""
+        SELECT mp.member.id, COUNT(mp) FROM MatchParticipant mp
+        WHERE mp.matchRecord.room.id = :roomId
+        GROUP BY mp.member.id
+        """)
+    List<Object[]> countByMemberInRoom(@Param("roomId") Long roomId);
+
     // ── 랭킹 표의 순위 분포 ──
     // 승/패만으로는 "2등 15번"과 "꼴등 15번"이 같은 15패로 보인다. 점수는 순위 전체를 반영하니
     // 순위별 횟수를 같이 보여줘야 점수가 납득된다.
