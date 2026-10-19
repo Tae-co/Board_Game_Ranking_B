@@ -41,7 +41,7 @@ public class SeasonDto {
     ) {}
 
     /**
-     * type: LAST_WINNER | MOST_WINS | LONGEST_STREAK | LONGEST_LOSING_STREAK | BEST_WIN_RATE(value 0~100) | MOST_PLAYED | MOST_APP_OPENS(앱 접속 수).
+     * type: LAST_WINNER | MOST_WINS | LONGEST_STREAK | LONGEST_LOSING_STREAK | BEST_WIN_RATE(value 0~100) | MOST_PLAYED | MOST_RECORDED(점수판 저장 수).
      * LAST_WINNER는 공동 1등이면 여러 개 오고, boardGameName은 LAST_WINNER에만 채운다.
      */
     public record Award(

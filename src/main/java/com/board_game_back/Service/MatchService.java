@@ -57,7 +57,7 @@ public class MatchService {
         // 정각 스케줄러를 기다리면 시즌 종료 후 최대 1시간 동안의 경기가 지난 시즌 점수에 섞인다 (§22).
         seasonRolloverService.rolloverIfDue(room.getId());
 
-        MatchRecord matchRecord = MatchRecord.builder().boardGame(game).room(room).build();
+        MatchRecord matchRecord = MatchRecord.builder().boardGame(game).room(room).recordedByMemberId(requesterId).build();
 
         List<RatingCalculator.PlayerResult> calcResults = new ArrayList<>();
         List<MatchParticipant> participants = new ArrayList<>();

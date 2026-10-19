@@ -13,7 +13,6 @@ import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomRepository;
-import com.board_game_back.Repository.UserEventRepository;
 import com.board_game_back.Utils.RegionTimeZones;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -60,7 +59,6 @@ public class SeasonService {
     private final RoomRepository roomRepository;
     private final MatchRecordRepository matchRecordRepository;
     private final PlayerGameRatingRepository playerGameRatingRepository;
-    private final UserEventRepository userEventRepository;
     private final MemberRepository memberRepository;
 
     public SeasonDto.StatusResponse getStatus(Long communityId) {
@@ -104,7 +102,7 @@ public class SeasonService {
             communityMemberRepository.countByCommunityId(communityId),
             matches.size(),
             buildLeaders(roomIds),
-            buildAwards(communityId, tallies, matches)
+            buildAwards(tallies, matches)
         );
     }
 
@@ -139,7 +137,7 @@ public class SeasonService {
     /**
      * 항목마다 독립이라 한 사람이 여러 상을 받을 수 있다. 동점이면 한 명만 고른다 (마지막 경기 승자만 예외).
      */
-    private List<SeasonDto.Award> buildAwards(Long communityId, Map<Long, PlayerTally> tallies, List<MatchRecord> matches) {
+    private List<SeasonDto.Award> buildAwards(Map<Long, PlayerTally> tallies, List<MatchRecord> matches) {
         List<SeasonDto.Award> awards = new ArrayList<>();
         if (tallies.isEmpty()) return awards;
 
@@ -179,12 +177,16 @@ public class SeasonService {
             .max(Comparator.<PlayerTally>comparingInt(t -> t.plays).thenComparingInt(t -> t.wins))
             .ifPresent(t -> awards.add(award("MOST_PLAYED", t, t.plays)));
 
-        // 앱 접속 수 — 경기 기록이 아니라 행동 로그(APP_OPENED, 2026-09-30부터)로 센다
-        userEventRepository.countAppOpensByCommunityMember(communityId).stream().findFirst()
-            .flatMap(row -> memberRepository.findById(((Number) row[0]).longValue())
+        // 점수판을 입력해 저장한 횟수. 기록자는 2026-10-02 이후 경기에만 있다. 동점은 먼저 기록한 사람.
+        Map<Long, Integer> recordCounts = new LinkedHashMap<>();
+        for (MatchRecord match : matches) {
+            if (match.getRecordedByMemberId() != null) recordCounts.merge(match.getRecordedByMemberId(), 1, Integer::sum);
+        }
+        recordCounts.entrySet().stream()
+            .max(Map.Entry.<Long, Integer>comparingByValue())
+            .flatMap(top -> memberRepository.findById(top.getKey())
                 .map(m -> new SeasonDto.Award(
-                    "MOST_APP_OPENS", m.getId(), m.getNickname(), m.getProfileImage(),
-                    ((Number) row[1]).doubleValue(), null)))
+                    "MOST_RECORDED", m.getId(), m.getNickname(), m.getProfileImage(), top.getValue(), null)))
             .ifPresent(awards::add);
 
         return awards;

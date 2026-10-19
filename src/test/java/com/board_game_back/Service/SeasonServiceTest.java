@@ -19,7 +19,6 @@ import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.MatchRecordRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomRepository;
-import com.board_game_back.Repository.UserEventRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -47,7 +46,6 @@ class SeasonServiceTest {
     @Mock private RoomRepository roomRepository;
     @Mock private MatchRecordRepository matchRecordRepository;
     @Mock private PlayerGameRatingRepository playerGameRatingRepository;
-    @Mock private UserEventRepository userEventRepository;
     @Mock private MemberRepository memberRepository;
 
     @InjectMocks private SeasonService seasonService;
@@ -229,22 +227,23 @@ class SeasonServiceTest {
     }
 
     @Test
-    void getStatus_앱_접속_1위를_마지막에_준다() {
+    void getStatus_점수판을_가장_많이_저장한_사람을_마지막에_준다() {
         givenCommunityWithRoom();
+        // 지민이 2판, 태윤이 1판 기록. 기록자가 없는 옛 경기는 세지 않는다
         when(matchRecordRepository.findByRoomIds(anyList())).thenReturn(List.of(
-            match(카탄, at(3), placing(태윤, 1, 10), placing(지민, 2, -10))
-        ));
-        when(userEventRepository.countAppOpensByCommunityMember(1L)).thenReturn(List.of(
-            new Object[]{2L, 15L}, new Object[]{1L, 7L}
+            match(카탄, at(1), placing(태윤, 1, 10), placing(지민, 2, -10)),
+            match(카탄, at(2), 1L, placing(태윤, 1, 10), placing(지민, 2, -10)),
+            match(카탄, at(3), 2L, placing(태윤, 1, 10), placing(지민, 2, -10)),
+            match(카탄, at(4), 2L, placing(지민, 1, 10), placing(태윤, 2, -10))
         ));
         when(memberRepository.findById(2L)).thenReturn(Optional.of(지민));
 
         SeasonDto.StatusResponse summary = seasonService.getStatus(1L);
 
         SeasonDto.Award last = summary.awards().get(summary.awards().size() - 1);
-        assertThat(last.type()).isEqualTo("MOST_APP_OPENS");
+        assertThat(last.type()).isEqualTo("MOST_RECORDED");
         assertThat(last.nickname()).isEqualTo("지민");
-        assertThat(last.value()).isEqualTo(15.0);
+        assertThat(last.value()).isEqualTo(2.0);
     }
 
     @Test
@@ -308,7 +307,11 @@ class SeasonServiceTest {
     }
 
     private MatchRecord match(BoardGame game, LocalDateTime playedAt, Placing... placings) {
-        MatchRecord record = MatchRecord.builder().boardGame(game).room(room).build();
+        return match(game, playedAt, null, placings);
+    }
+
+    private MatchRecord match(BoardGame game, LocalDateTime playedAt, Long recordedBy, Placing... placings) {
+        MatchRecord record = MatchRecord.builder().boardGame(game).room(room).recordedByMemberId(recordedBy).build();
         ReflectionTestUtils.setField(record, "playedAt", playedAt);
         for (Placing p : placings) {
             // MatchParticipant 생성자가 record.participants에 스스로 등록한다
