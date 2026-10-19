@@ -117,6 +117,24 @@ class CommunityServiceAdminTest {
         assertThat(community.getCreatedBy()).isEqualTo(OWNER);
     }
 
+    @Test
+    void 공동_어드민은_소유자를_내보낼_수_없다() {
+        assertThatThrownBy(() -> communityService.removeCommunityMember(COMMUNITY_ID, OWNER, OLD_ADMIN))
+            .isInstanceOf(SecurityException.class);
+
+        verify(communityMemberRepository, never()).delete(any());
+        verify(communityAdminRepository, never()).delete(any());
+    }
+
+    @Test
+    void 어드민을_내보내면_어드민_권한도_빠진다() {
+        communityService.removeCommunityMember(COMMUNITY_ID, NEW_ADMIN, OLD_ADMIN);
+
+        verify(communityAdminRepository).delete(adminOf(NEW_ADMIN));
+        verify(communityAdminRepository, never()).delete(adminOf(OWNER));
+        verify(communityAdminRepository, never()).delete(adminOf(OLD_ADMIN));
+    }
+
     private void update(Long requesterId, List<Long> adminMemberIds, Boolean ownerLeavesAdmin) {
         communityService.updateCommunity(COMMUNITY_ID,
             new CommunityDto.UpdateRequest(null, null, null, adminMemberIds, ownerLeavesAdmin), requesterId);

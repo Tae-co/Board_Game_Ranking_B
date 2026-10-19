@@ -1,0 +1,102 @@
+package com.board_game_back.Service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.board_game_back.Entity.Community;
+import com.board_game_back.Entity.CommunityAdmin;
+import com.board_game_back.Entity.Member;
+import com.board_game_back.Repository.BoardGameRepository;
+import com.board_game_back.Repository.CommunityAdminRepository;
+import com.board_game_back.Repository.CommunityMemberRepository;
+import com.board_game_back.Repository.CommunityRepository;
+import com.board_game_back.Repository.MatchParticipantRepository;
+import com.board_game_back.Repository.MatchRecordRepository;
+import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.Repository.PlayerGameRatingRepository;
+import com.board_game_back.Repository.RoomMemberRepository;
+import com.board_game_back.Repository.RoomRepository;
+import java.time.LocalDateTime;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
+
+/** 회원 탈퇴 시 소유한 커뮤니티 처리 — 다른 어드민이 있으면 가장 오래된 어드민에게 넘긴다 */
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class RoomServiceDeleteMemberTest {
+
+    private static final Long COMMUNITY_ID = 9L;
+    private static final Long OWNER = 52L;
+    private static final Long OLD_ADMIN = 11L;
+    private static final Long NEW_ADMIN = 20L;
+
+    @Mock private RoomRepository roomRepository;
+    @Mock private RoomMemberRepository roomMemberRepository;
+    @Mock private MemberRepository memberRepository;
+    @Mock private PlayerGameRatingRepository playerGameRatingRepository;
+    @Mock private BoardGameRepository boardGameRepository;
+    @Mock private MatchRecordRepository matchRecordRepository;
+    @Mock private MatchParticipantRepository matchParticipantRepository;
+    @Mock private CommunityAdminRepository communityAdminRepository;
+    @Mock private CommunityMemberRepository communityMemberRepository;
+    @Mock private CommunityRepository communityRepository;
+
+    @InjectMocks private RoomService roomService;
+
+    private Community community;
+
+    @BeforeEach
+    void setUp() {
+        community = new Community("Yada Seoul", "South Korea", null, OWNER);
+        ReflectionTestUtils.setField(community, "id", COMMUNITY_ID);
+        when(communityRepository.findAllByCreatedBy(OWNER)).thenReturn(List.of(community));
+    }
+
+    @Test
+    void 소유자가_탈퇴하면_가장_오래된_어드민에게_소유권이_넘어간다() {
+        when(communityAdminRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(
+            admin(1L, OWNER, LocalDateTime.of(2026, 5, 9, 0, 0)),
+            admin(3L, NEW_ADMIN, LocalDateTime.of(2026, 9, 1, 0, 0)),
+            admin(2L, OLD_ADMIN, LocalDateTime.of(2026, 6, 1, 0, 0))
+        ));
+
+        roomService.deleteMember(OWNER);
+
+        assertThat(community.getCreatedBy()).isEqualTo(OLD_ADMIN);
+        verify(communityRepository, never()).delete(community);
+        verify(communityAdminRepository, never()).deleteByCommunityId(COMMUNITY_ID);
+        verify(communityAdminRepository).deleteByMemberId(OWNER);
+    }
+
+    @Test
+    void 다른_어드민이_없으면_커뮤니티를_지운다() {
+        when(communityAdminRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(
+            admin(1L, OWNER, LocalDateTime.of(2026, 5, 9, 0, 0))
+        ));
+
+        roomService.deleteMember(OWNER);
+
+        verify(communityRepository).delete(community);
+        verify(communityAdminRepository).deleteByCommunityId(COMMUNITY_ID);
+        verify(communityMemberRepository).deleteByCommunityId(COMMUNITY_ID);
+    }
+
+    private CommunityAdmin admin(Long id, Long memberId, LocalDateTime createdAt) {
+        Member member = Member.builder().nickname("m" + memberId).build();
+        ReflectionTestUtils.setField(member, "id", memberId);
+        CommunityAdmin admin = new CommunityAdmin(community, member);
+        admin.setId(id);
+        admin.setCreatedAt(createdAt);
+        return admin;
+    }
+}
