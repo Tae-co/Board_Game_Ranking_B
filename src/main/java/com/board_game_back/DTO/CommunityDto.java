@@ -45,7 +45,8 @@ public class CommunityDto {
         int groupCount,
         long memberCount,
         List<AdminInfo> admins,
-        String inviteCode
+        String inviteCode,
+        Long createdBy  // 생성자는 항상 어드민이라 설정 화면에서 해제할 수 없게 잠근다
     ) {}
 
     public record RoomResponse(
