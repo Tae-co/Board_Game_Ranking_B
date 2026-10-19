@@ -38,13 +38,16 @@ public class MatchRecord {
 
     private LocalDateTime playedAt; // 게임 종료 및 랭킹 반영 시간
 
+    private Long recordedByMemberId; // 점수판을 입력해 저장한 사람. 2026-10-02 이전 경기는 NULL
+
     @OneToMany(mappedBy = "matchRecord", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MatchParticipant> participants = new ArrayList<>();
 
     @Builder
-    public MatchRecord(BoardGame boardGame, Room room) {
+    public MatchRecord(BoardGame boardGame, Room room, Long recordedByMemberId) {
         this.boardGame = boardGame;
         this.room = room;
+        this.recordedByMemberId = recordedByMemberId;
         // UTC로 저장한다. MatchService가 응답에 "Z"를 붙여 절대 시각으로 내보내고,
         // 프론트가 커뮤니티 region(REGION_TIMEZONE)에 맞춰 현지 시각으로 변환한다.
         // KST 벽시계로 바꾸면 모든 국가에서 9시간 어긋난다.
