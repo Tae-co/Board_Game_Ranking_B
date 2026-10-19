@@ -174,24 +174,15 @@ public class RoomService {
                 return;
             }
 
-            Long boardGameId = roomRepository.findById(roomId).map(Room::getBoardGameId).orElse(null);
-            RoomMember nextHostMember = null;
-
-            if (boardGameId != null) {
-                List<PlayerGameRating> ratings = playerGameRatingRepository
-                    .findByRoomIdAndBoardGameIdOrderByPlayedThenRating(roomId, boardGameId);
-                Map<Long, Integer> rankingOrder = new HashMap<>();
-                for (int i = 0; i < ratings.size(); i++) {
-                    rankingOrder.put(ratings.get(i).getMember().getId(), i);
-                }
-                nextHostMember = others.stream()
-                    .min(java.util.Comparator.comparingInt(
-                        other -> rankingOrder.getOrDefault(other.getMember().getId(), Integer.MAX_VALUE)
-                    ))
-                    .orElse(null);
+            // 커뮤니티 소유권과 같은 기준 — 이 방에서 경기를 가장 많이 한 사람, 동점·전원 0판이면 먼저 들어온 사람
+            Map<Long, Long> playCounts = new HashMap<>();
+            for (Object[] row : matchParticipantRepository.countByMemberInRoom(roomId)) {
+                playCounts.put((Long) row[0], (Long) row[1]);
             }
-
-            if (nextHostMember == null) nextHostMember = others.get(0);
+            RoomMember nextHostMember = others.stream()
+                .min(Comparator.<RoomMember>comparingLong(other -> -playCounts.getOrDefault(other.getMember().getId(), 0L))
+                    .thenComparing(RoomMember::getId))
+                .orElseThrow();
             nextHostMember.promoteToHost();
             roomMemberRepository.save(nextHostMember);
         }
