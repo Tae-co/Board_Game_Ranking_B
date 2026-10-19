@@ -15,7 +15,11 @@ import com.board_game_back.Repository.CommunityAdminRepository;
 import com.board_game_back.Repository.CommunityMemberRepository;
 import com.board_game_back.Repository.CommunityRepository;
 import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.Repository.PlayerGameRatingRepository;
+import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
+import com.board_game_back.Entity.Room;
+import com.board_game_back.Entity.RoomMember;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,6 +49,9 @@ class CommunityServiceAdminTest {
     @Mock private CommunityMemberRepository communityMemberRepository;
     @Mock private MemberRepository memberRepository;
     @Mock private RoomRepository roomRepository;
+    @Mock private RoomMemberRepository roomMemberRepository;
+    @Mock private PlayerGameRatingRepository playerGameRatingRepository;
+    @Mock private RoomService roomService;
 
     @InjectMocks private CommunityService communityService;
 
@@ -115,6 +122,50 @@ class CommunityServiceAdminTest {
 
         verify(communityAdminRepository, never()).delete(any());
         assertThat(community.getCreatedBy()).isEqualTo(OWNER);
+    }
+
+    @Test
+    void 공동_어드민은_소유자를_내보낼_수_없다() {
+        assertThatThrownBy(() -> communityService.removeCommunityMember(COMMUNITY_ID, OWNER, OLD_ADMIN))
+            .isInstanceOf(SecurityException.class);
+
+        verify(communityMemberRepository, never()).delete(any());
+        verify(communityAdminRepository, never()).delete(any());
+    }
+
+    @Test
+    void 어드민을_내보내면_어드민_권한도_빠진다() {
+        communityService.removeCommunityMember(COMMUNITY_ID, NEW_ADMIN, OLD_ADMIN);
+
+        verify(communityAdminRepository).delete(adminOf(NEW_ADMIN));
+        verify(communityAdminRepository, never()).delete(adminOf(OWNER));
+        verify(communityAdminRepository, never()).delete(adminOf(OLD_ADMIN));
+    }
+
+    @Test
+    void 커뮤니티에서_내보내면_방은_방_나가기_경로로_나간다() {
+        Room joined = new Room();
+        ReflectionTestUtils.setField(joined, "id", 100L);
+        Room notJoined = new Room();
+        ReflectionTestUtils.setField(notJoined, "id", 200L);
+        when(roomRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(joined, notJoined));
+        when(roomMemberRepository.findByRoomIdAndMemberId(100L, NEW_ADMIN)).thenReturn(Optional.of(new RoomMember()));
+        when(roomMemberRepository.findByRoomIdAndMemberId(200L, NEW_ADMIN)).thenReturn(Optional.empty());
+
+        communityService.removeCommunityMember(COMMUNITY_ID, NEW_ADMIN, OLD_ADMIN);
+
+        // 방장 이어받기·빈 방 정리는 leaveRoom이 한다
+        verify(roomService).leaveRoom(100L, NEW_ADMIN, NEW_ADMIN);
+        verify(roomService, never()).leaveRoom(200L, NEW_ADMIN, NEW_ADMIN);
+        verify(playerGameRatingRepository).deleteByMember_IdAndRoom_Id(NEW_ADMIN, 200L);
+    }
+
+    @Test
+    void 커뮤니티를_지우면_방도_지운다() {
+        communityService.deleteCommunity(COMMUNITY_ID, OWNER);
+
+        verify(roomService).deleteRoomsOfCommunity(COMMUNITY_ID);
+        verify(communityRepository).delete(community);
     }
 
     private void update(Long requesterId, List<Long> adminMemberIds, Boolean ownerLeavesAdmin) {

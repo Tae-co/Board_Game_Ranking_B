@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -45,6 +44,7 @@ public class CommunityService {
     private final RoomMemberRepository roomMemberRepository;
     private final BoardGameRepository boardGameRepository;
     private final PlayerGameRatingRepository playerGameRatingRepository;
+    private final RoomService roomService;
 
     private static final int MAX_ADMINS = 5;  // 소유자 포함
 
@@ -107,8 +107,10 @@ public class CommunityService {
         int groupCount = (int) roomRepository.countByCommunityId(communityId);
         long memberCount = communityMemberRepository.countByCommunityId(communityId);
 
+        // 어드민이 된 순서로 준다 — 앱이 소유자가 내려놓을 때 넘겨받을 사람(가장 오래된 어드민)을 미리 보여준다
         List<CommunityDto.AdminInfo> admins = communityAdminRepository.findByCommunityId(communityId)
             .stream()
+            .sorted(CommunityAdmin.OLDEST_FIRST)
             .map(ca -> new CommunityDto.AdminInfo(ca.getMember().getId(), ca.getMember().getNickname(), ca.getMember().getProfileImage()))
             .collect(Collectors.toList());
 
@@ -217,7 +219,7 @@ public class CommunityService {
 
         if (ownerLeaves) {
             CommunityAdmin next = remaining.stream()
-                .min(Comparator.comparing(CommunityAdmin::getCreatedAt).thenComparing(CommunityAdmin::getId))
+                .min(CommunityAdmin.OLDEST_FIRST)
                 .orElseThrow(() -> new IllegalArgumentException("다른 어드민이 1명 이상 있어야 어드민을 내려놓을 수 있습니다."));
             community.transferOwnership(next.getMember().getId());
         }
@@ -243,6 +245,7 @@ public class CommunityService {
         if (!community.getCreatedBy().equals(requesterId)) {
             throw new SecurityException("커뮤니티 생성자만 삭제할 수 있습니다.");
         }
+        roomService.deleteRoomsOfCommunity(communityId);
         communityAdminRepository.deleteByCommunityId(communityId);
         communityMemberRepository.deleteByCommunityId(communityId);
         communityRepository.delete(community);
@@ -261,17 +264,29 @@ public class CommunityService {
 
     @Transactional
     public void removeCommunityMember(Long communityId, Long memberId, Long requesterId) {
-        communityRepository.findById(communityId)
+        Community community = communityRepository.findById(communityId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
         if (!communityAdminRepository.existsByCommunityIdAndMemberId(communityId, requesterId)) {
             throw new SecurityException("커뮤니티 어드민만 멤버를 제거할 수 있습니다.");
         }
+        // 소유자는 어드민 해제도 본인만 할 수 있다 — 강퇴로 우회하지 못하게 막는다
+        if (community.getCreatedBy().equals(memberId)) {
+            throw new SecurityException("커뮤니티 소유자는 내보낼 수 없습니다.");
+        }
         communityMemberRepository.findByCommunityIdAndMemberId(communityId, memberId)
             .ifPresent(communityMemberRepository::delete);
+        // 어드민을 내보내면 어드민 권한도 함께 뺀다 (멤버가 아닌 어드민이 남지 않게)
+        communityAdminRepository.findByCommunityId(communityId).stream()
+            .filter(admin -> admin.getMember().getId().equals(memberId))
+            .forEach(communityAdminRepository::delete);
         List<Room> rooms = roomRepository.findByCommunityId(communityId);
         for (Room room : rooms) {
-            playerGameRatingRepository.deleteByMember_IdAndRoom_Id(memberId, room.getId());
-            roomMemberRepository.deleteByRoomIdAndMemberId(room.getId(), memberId);
+            // 방 멤버면 방 나가기와 같은 경로로 — 방장이면 다음 사람에게 넘기고, 혼자였으면 방을 정리한다
+            if (roomMemberRepository.findByRoomIdAndMemberId(room.getId(), memberId).isPresent()) {
+                roomService.leaveRoom(room.getId(), memberId, memberId);
+            } else {
+                playerGameRatingRepository.deleteByMember_IdAndRoom_Id(memberId, room.getId());
+            }
         }
     }
 

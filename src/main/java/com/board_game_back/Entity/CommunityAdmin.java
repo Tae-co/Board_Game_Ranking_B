@@ -3,6 +3,7 @@ package com.board_game_back.Entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 
 @Entity
 @Getter
@@ -10,6 +11,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @Table(uniqueConstraints = @UniqueConstraint(columnNames = {"community_id", "member_id"}))
 public class CommunityAdmin {
+
+    /** 어드민이 된 순서. 소유권은 남은 어드민 중 가장 오래된 사람에게 넘어간다. */
+    public static final Comparator<CommunityAdmin> OLDEST_FIRST =
+        Comparator.comparing(CommunityAdmin::getCreatedAt).thenComparing(CommunityAdmin::getId);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

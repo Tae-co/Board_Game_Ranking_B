@@ -24,9 +24,6 @@ public interface PlayerGameRatingRepository extends JpaRepository<PlayerGameRati
     @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.member WHERE p.room.id = :roomId AND p.boardGame.id = :boardGameId ORDER BY CASE WHEN p.playCount > 0 THEN 0 ELSE 1 END ASC, (p.gameStats.rating - 3 * p.gameStats.ratingDeviation) DESC")
     List<PlayerGameRating> findByRoomIdAndBoardGameIdOrderByPlayedThenDisplayScore(@Param("roomId") Long roomId, @Param("boardGameId") Long boardGameId);
 
-    @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.member WHERE p.room.id = :roomId AND p.boardGame.id = :boardGameId ORDER BY CASE WHEN p.playCount > 0 THEN 0 ELSE 1 END ASC, p.gameStats.rating DESC")
-    List<PlayerGameRating> findByRoomIdAndBoardGameIdOrderByPlayedThenRating(@Param("roomId") Long roomId, @Param("boardGameId") Long boardGameId);
-
     @Query("SELECT p FROM PlayerGameRating p JOIN FETCH p.boardGame WHERE p.member.id = :memberId AND p.playCount > 0")
     List<PlayerGameRating> findPlayedByMemberId(@Param("memberId") Long memberId);
 
