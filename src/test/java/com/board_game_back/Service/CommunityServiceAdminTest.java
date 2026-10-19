@@ -160,6 +160,18 @@ class CommunityServiceAdminTest {
         verify(playerGameRatingRepository).deleteByMember_IdAndRoom_Id(NEW_ADMIN, 200L);
     }
 
+    @Test
+    void 커뮤니티를_지우면_방의_커뮤니티_연결이_끊긴다() {
+        Room room = new Room();
+        room.assignCommunity(COMMUNITY_ID);
+        when(roomRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(room));
+
+        communityService.deleteCommunity(COMMUNITY_ID, OWNER);
+
+        assertThat(room.getCommunityId()).isNull();
+        verify(communityRepository).delete(community);
+    }
+
     private void update(Long requesterId, List<Long> adminMemberIds, Boolean ownerLeavesAdmin) {
         communityService.updateCommunity(COMMUNITY_ID,
             new CommunityDto.UpdateRequest(null, null, null, adminMemberIds, ownerLeavesAdmin), requesterId);

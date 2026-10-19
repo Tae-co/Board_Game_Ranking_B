@@ -9,6 +9,7 @@ import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.CommunityAdmin;
 import com.board_game_back.Entity.CommunityMember;
 import com.board_game_back.Entity.Member;
+import com.board_game_back.Entity.Room;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.CommunityAdminRepository;
 import com.board_game_back.Repository.CommunityMemberRepository;
@@ -127,8 +128,13 @@ class RoomServiceDeleteMemberTest {
             member(1L, OWNER, LocalDateTime.of(2026, 5, 9, 0, 0))
         ));
 
+        Room room = new Room();
+        room.assignCommunity(COMMUNITY_ID);
+        when(roomRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(room));
+
         roomService.deleteMember(OWNER);
 
+        assertThat(room.getCommunityId()).isNull();
         verify(communityRepository).delete(community);
         verify(communityAdminRepository).deleteByCommunityId(COMMUNITY_ID);
         verify(communityMemberRepository).deleteByCommunityId(COMMUNITY_ID);
