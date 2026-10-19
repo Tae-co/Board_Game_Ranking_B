@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.CommunityAdmin;
+import com.board_game_back.Entity.CommunityMember;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.CommunityAdminRepository;
@@ -23,6 +24,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,7 +32,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/** 회원 탈퇴 시 소유한 커뮤니티 처리 — 다른 어드민이 있으면 가장 오래된 어드민에게 넘긴다 */
+/** 회원 탈퇴 시 소유한 커뮤니티 처리 — 가장 오래된 어드민, 없으면 경기를 가장 많이 한 멤버에게 넘긴다 */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class RoomServiceDeleteMemberTest {
@@ -79,9 +81,50 @@ class RoomServiceDeleteMemberTest {
     }
 
     @Test
-    void 다른_어드민이_없으면_커뮤니티를_지운다() {
+    void 어드민이_혼자면_경기를_가장_많이_한_멤버가_어드민과_소유권을_받는다() {
         when(communityAdminRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(
             admin(1L, OWNER, LocalDateTime.of(2026, 5, 9, 0, 0))
+        ));
+        when(communityMemberRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(
+            member(1L, OWNER, LocalDateTime.of(2026, 5, 9, 0, 0)),
+            member(2L, OLD_ADMIN, LocalDateTime.of(2026, 6, 1, 0, 0)),
+            member(3L, NEW_ADMIN, LocalDateTime.of(2026, 9, 1, 0, 0))
+        ));
+        when(matchParticipantRepository.countByMemberInCommunity(COMMUNITY_ID)).thenReturn(List.of(
+            new Object[]{OLD_ADMIN, 4L}, new Object[]{NEW_ADMIN, 7L}
+        ));
+
+        roomService.deleteMember(OWNER);
+
+        assertThat(community.getCreatedBy()).isEqualTo(NEW_ADMIN);
+        ArgumentCaptor<CommunityAdmin> saved = ArgumentCaptor.forClass(CommunityAdmin.class);
+        verify(communityAdminRepository).save(saved.capture());
+        assertThat(saved.getValue().getMember().getId()).isEqualTo(NEW_ADMIN);
+        verify(communityRepository, never()).delete(community);
+    }
+
+    @Test
+    void 경기_수가_같으면_먼저_가입한_멤버가_받는다() {
+        when(communityAdminRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(
+            admin(1L, OWNER, LocalDateTime.of(2026, 5, 9, 0, 0))
+        ));
+        when(communityMemberRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(
+            member(3L, NEW_ADMIN, LocalDateTime.of(2026, 9, 1, 0, 0)),
+            member(2L, OLD_ADMIN, LocalDateTime.of(2026, 6, 1, 0, 0))
+        ));
+
+        roomService.deleteMember(OWNER);
+
+        assertThat(community.getCreatedBy()).isEqualTo(OLD_ADMIN);
+    }
+
+    @Test
+    void 남은_멤버가_없으면_커뮤니티를_지운다() {
+        when(communityAdminRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(
+            admin(1L, OWNER, LocalDateTime.of(2026, 5, 9, 0, 0))
+        ));
+        when(communityMemberRepository.findByCommunityId(COMMUNITY_ID)).thenReturn(List.of(
+            member(1L, OWNER, LocalDateTime.of(2026, 5, 9, 0, 0))
         ));
 
         roomService.deleteMember(OWNER);
@@ -89,6 +132,15 @@ class RoomServiceDeleteMemberTest {
         verify(communityRepository).delete(community);
         verify(communityAdminRepository).deleteByCommunityId(COMMUNITY_ID);
         verify(communityMemberRepository).deleteByCommunityId(COMMUNITY_ID);
+    }
+
+    private CommunityMember member(Long id, Long memberId, LocalDateTime joinedAt) {
+        Member member = Member.builder().nickname("m" + memberId).build();
+        ReflectionTestUtils.setField(member, "id", memberId);
+        CommunityMember cm = new CommunityMember(community, member);
+        ReflectionTestUtils.setField(cm, "id", id);
+        ReflectionTestUtils.setField(cm, "joinedAt", joinedAt);
+        return cm;
     }
 
     private CommunityAdmin admin(Long id, Long memberId, LocalDateTime createdAt) {

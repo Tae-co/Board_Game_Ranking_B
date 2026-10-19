@@ -3,6 +3,7 @@ package com.board_game_back.Service;
 import com.board_game_back.DTO.RoomDto;
 import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.CommunityAdmin;
+import com.board_game_back.Entity.CommunityMember;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.MemberRole;
 import com.board_game_back.Entity.PlayerGameRating;
@@ -21,6 +22,7 @@ import com.board_game_back.Repository.RoomRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -227,14 +229,12 @@ public class RoomService {
         playerGameRatingRepository.deleteByMember_Id(memberId);
         roomMemberRepository.deleteByMember_Id(memberId);
 
-        // 소유한 커뮤니티는 다른 어드민이 있으면 가장 오래된 어드민에게 넘기고, 없으면 지운다
+        // 소유한 커뮤니티는 다음 소유자에게 넘기고, 남은 멤버가 아무도 없을 때만 지운다
         List<Community> ownedCommunities = communityRepository.findAllByCreatedBy(memberId);
         for (Community community : ownedCommunities) {
-            Optional<CommunityAdmin> nextOwner = communityAdminRepository.findByCommunityId(community.getId()).stream()
-                .filter(admin -> !admin.getMember().getId().equals(memberId))
-                .min(CommunityAdmin.OLDEST_FIRST);
-            if (nextOwner.isPresent()) {
-                community.transferOwnership(nextOwner.get().getMember().getId());
+            Optional<Long> nextOwnerId = findNextOwner(community, memberId);
+            if (nextOwnerId.isPresent()) {
+                community.transferOwnership(nextOwnerId.get());
                 communityRepository.save(community);
                 continue;
             }
@@ -247,6 +247,29 @@ public class RoomService {
         communityMemberRepository.deleteByMemberId(memberId);
 
         memberRepository.deleteById(memberId);
+    }
+
+    /**
+     * 탈퇴하는 소유자의 커뮤니티를 넘겨받을 사람. 다른 어드민이 있으면 가장 오래된 어드민,
+     * 없으면 그 커뮤니티 방들에서 경기를 가장 많이 한 멤버(동점·전원 0판이면 먼저 가입한 멤버)를 어드민으로 올려 넘긴다.
+     */
+    private Optional<Long> findNextOwner(Community community, Long leavingMemberId) {
+        Optional<CommunityAdmin> oldestAdmin = communityAdminRepository.findByCommunityId(community.getId()).stream()
+            .filter(admin -> !admin.getMember().getId().equals(leavingMemberId))
+            .min(CommunityAdmin.OLDEST_FIRST);
+        if (oldestAdmin.isPresent()) return Optional.of(oldestAdmin.get().getMember().getId());
+
+        Map<Long, Long> playCounts = new HashMap<>();
+        for (Object[] row : matchParticipantRepository.countByMemberInCommunity(community.getId())) {
+            playCounts.put((Long) row[0], (Long) row[1]);
+        }
+        Optional<CommunityMember> mostActive = communityMemberRepository.findByCommunityId(community.getId()).stream()
+            .filter(cm -> !cm.getMember().getId().equals(leavingMemberId))
+            .min(Comparator.<CommunityMember>comparingLong(cm -> -playCounts.getOrDefault(cm.getMember().getId(), 0L))
+                .thenComparing(CommunityMember::getJoinedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(CommunityMember::getId));
+        mostActive.ifPresent(cm -> communityAdminRepository.save(new CommunityAdmin(community, cm.getMember())));
+        return mostActive.map(cm -> cm.getMember().getId());
     }
 
     @Transactional
