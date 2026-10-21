@@ -63,6 +63,31 @@ public class CommunityDto {
 
     public record JoinRequest(String inviteCode) {}
 
+    /**
+     * 참가 응답. 필드는 {@link Response}와 같고 {@code alreadyMember}만 더한다.
+     * 감싸지 않고 펼친 이유: 스토어에 나가 있는 구버전 앱이 응답을 커뮤니티로 그대로 읽는다.
+     *
+     * <p>{@code alreadyMember}: 참가 API는 이미 멤버여도 200이라, 이게 없으면 프론트가
+     * "새로 들어왔다"와 "원래 있던 모임에 들어갔다"를 구분할 수 없다.
+     */
+    public record JoinResponse(
+        Long communityId,
+        String name,
+        String region,
+        String imageUrl,
+        String status,
+        long memberCount,
+        int groupCount,
+        List<AdminInfo> admins,
+        String inviteCode,
+        boolean alreadyMember
+    ) {
+        public static JoinResponse of(Response r, boolean alreadyMember) {
+            return new JoinResponse(r.communityId(), r.name(), r.region(), r.imageUrl(), r.status(),
+                r.memberCount(), r.groupCount(), r.admins(), r.inviteCode(), alreadyMember);
+        }
+    }
+
     public record MemberInfo(
         Long memberId,
         String nickname,

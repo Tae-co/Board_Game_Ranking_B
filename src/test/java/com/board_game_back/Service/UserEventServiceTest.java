@@ -152,4 +152,35 @@ class UserEventServiceTest {
         assertThatCode(() -> userEventService.record(request("APP_OPENED", null), 7L))
                 .doesNotThrowAnyException();
     }
+
+    @Test
+    void 같은_회원의_같은_커뮤니티_참가_완료는_한_번만_저장한다() {
+        // 참가 API는 이미 멤버여도 200이라 구버전 앱은 같은 코드를 넣을 때마다 다시 보낸다
+        when(userEventRepository.existsByMemberIdAndCommunityIdAndEventName(7L, 10L, EventName.COMMUNITY_JOIN_COMPLETED))
+                .thenReturn(true);
+
+        userEventService.record(request("COMMUNITY_JOIN_COMPLETED", null), 7L);
+
+        verify(userEventRepository, never()).save(any());
+    }
+
+    @Test
+    void 처음_참가_완료는_저장한다() {
+        when(userEventRepository.existsByMemberIdAndCommunityIdAndEventName(7L, 10L, EventName.COMMUNITY_JOIN_COMPLETED))
+                .thenReturn(false);
+
+        userEventService.record(request("COMMUNITY_JOIN_COMPLETED", null), 7L);
+
+        assertThat(captureSaved().getEventName()).isEqualTo(EventName.COMMUNITY_JOIN_COMPLETED);
+    }
+
+    @Test
+    void 참가_완료가_아닌_이벤트는_중복을_검사하지_않는다() {
+        // 그룹 로비 진입처럼 반복이 정상인 이벤트까지 한 번으로 줄이면 안 된다
+        userEventService.record(request("GROUP_LOBBY_OPENED", null), 7L);
+        userEventService.record(request("GROUP_LOBBY_OPENED", null), 7L);
+
+        verify(userEventRepository, never()).existsByMemberIdAndCommunityIdAndEventName(any(), any(), any());
+        verify(userEventRepository, org.mockito.Mockito.times(2)).save(any());
+    }
 }
