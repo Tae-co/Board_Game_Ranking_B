@@ -46,6 +46,8 @@ public class UserEventService {
         if (SERVER_ONLY.contains(eventName)) return; // 클라이언트가 보낼 수 없는 이름
 
         try {
+            if (isRepeatedJoin(eventName, memberId, request.communityId())) return;
+
             userEventRepository.save(UserEvent.builder()
                     .memberId(memberId)
                     .anonId(truncate(request.anonId(), 64))
@@ -61,6 +63,16 @@ public class UserEventService {
         } catch (Exception e) {
             log.warn("이벤트 기록 실패 (무시): {}", eventName, e);
         }
+    }
+
+    /**
+     * 참가 완료는 회원·커뮤니티마다 한 번만 센다. 참가 API는 이미 멤버여도 200이라
+     * 같은 코드를 다시 넣으면 프론트가 또 보낸다 — 구버전 앱은 그걸 가릴 방법이 없어서
+     * 서버에서 막는다. 그대로 두면 같은 사람이 여러 번 들어간 것처럼 참가 퍼널이 부풀려진다.
+     */
+    private boolean isRepeatedJoin(EventName eventName, Long memberId, Long communityId) {
+        if (eventName != EventName.COMMUNITY_JOIN_COMPLETED || memberId == null || communityId == null) return false;
+        return userEventRepository.existsByMemberIdAndCommunityIdAndEventName(memberId, communityId, eventName);
     }
 
     /**

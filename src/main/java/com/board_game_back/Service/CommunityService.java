@@ -78,18 +78,19 @@ public class CommunityService {
     }
 
     @Transactional
-    public CommunityDto.Response joinCommunity(String inviteCode, Long memberId) {
+    public CommunityDto.JoinResponse joinCommunity(String inviteCode, Long memberId) {
         Community community = communityRepository.findByInviteCode(inviteCode.toUpperCase().trim())
             .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 초대 코드입니다."));
 
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
 
-        if (!communityMemberRepository.existsByCommunityIdAndMemberId(community.getId(), memberId)) {
+        boolean alreadyMember = communityMemberRepository.existsByCommunityIdAndMemberId(community.getId(), memberId);
+        if (!alreadyMember) {
             communityMemberRepository.save(new CommunityMember(community, member));
         }
 
-        return toResponse(community);
+        return CommunityDto.JoinResponse.of(toResponse(community), alreadyMember);
     }
 
     @Transactional(readOnly = true)
