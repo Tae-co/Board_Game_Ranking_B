@@ -24,7 +24,7 @@ public class CommunityController {
     }
 
     @PostMapping("/join")
-    public ResponseEntity<CommunityDto.Response> joinCommunity(
+    public ResponseEntity<CommunityDto.JoinResponse> joinCommunity(
             @RequestBody CommunityDto.JoinRequest request,
             @AuthenticationPrincipal Long memberId) {
         return ResponseEntity.ok(communityService.joinCommunity(request.inviteCode(), memberId));
