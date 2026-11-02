@@ -20,6 +20,8 @@ import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
+import com.board_game_back.Repository.StoreMemberRepository;
+import com.board_game_back.Repository.StoreStaffRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -54,6 +56,8 @@ class RoomServiceDeleteMemberTest {
     @Mock private CommunityAdminRepository communityAdminRepository;
     @Mock private CommunityMemberRepository communityMemberRepository;
     @Mock private CommunityRepository communityRepository;
+    @Mock private StoreMemberRepository storeMemberRepository;
+    @Mock private StoreStaffRepository storeStaffRepository;
 
     @InjectMocks private RoomService roomService;
 
@@ -64,6 +68,14 @@ class RoomServiceDeleteMemberTest {
         community = new Community("Yada Seoul", "South Korea", null, OWNER);
         ReflectionTestUtils.setField(community, "id", COMMUNITY_ID);
         when(communityRepository.findAllByCreatedBy(OWNER)).thenReturn(List.of(community));
+    }
+
+    @Test
+    void 탈퇴하면_매장_멤버와_STAFF_지정도_지운다() {
+        roomService.deleteMember(OWNER);
+
+        verify(storeMemberRepository).deleteByMemberId(OWNER);
+        verify(storeStaffRepository).deleteByMemberId(OWNER);
     }
 
     @Test

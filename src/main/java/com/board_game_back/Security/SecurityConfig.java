@@ -58,6 +58,8 @@ public class SecurityConfig {
                 // 구버전 앱이 폐기된 이름을 보내는 건 정상 상황이라 400으로 만들면
                 // 500 에러 로그만 쌓인다. 판정은 UserEventService가 한다.
                 .requestMatchers(HttpMethod.POST, "/api/events").permitAll()
+                // 매장 QR은 찍은 순간 확인해야 해서 로그인 전에도 연다. 응답은 서명된 티켓뿐이다 (plan-store §6.6).
+                .requestMatchers(HttpMethod.POST, "/api/stores/*/scan").permitAll()
                 // 관리자 전용
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/matches/admin/**").hasRole("ADMIN")

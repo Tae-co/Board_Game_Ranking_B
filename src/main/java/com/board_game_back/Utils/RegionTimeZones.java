@@ -52,5 +52,9 @@ public final class RegionTimeZones {
         return BY_REGION.getOrDefault(region, DEFAULT);
     }
 
+    public static boolean isKnown(String region) {
+        return region != null && BY_REGION.containsKey(region);
+    }
+
     private RegionTimeZones() {}
 }

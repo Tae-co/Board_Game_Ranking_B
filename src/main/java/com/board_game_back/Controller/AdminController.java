@@ -4,6 +4,7 @@ import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Service.RoomService;
+import com.board_game_back.Service.StoreAdminService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ public class AdminController {
     private final BoardGameRepository boardGameRepository;
     private final MemberRepository memberRepository;
     private final RoomService roomService;
+    private final StoreAdminService storeAdminService;
 
     @Value("${supabase.url}")
     private String supabaseUrl;
@@ -85,7 +87,9 @@ public class AdminController {
                 .maxPlayers(((Number) body.getOrDefault("maxPlayers", 6)).intValue())
                 .schemaJson(schemaJson)
                 .build();
-        return ResponseEntity.ok(boardGameRepository.save(game));
+        BoardGame saved = boardGameRepository.save(game);
+        storeAdminService.createRoomsForGame(saved);
+        return ResponseEntity.ok(saved);
     }
 
     /** 보드게임 수정 */
@@ -113,6 +117,7 @@ public class AdminController {
     @DeleteMapping("/games/{id}")
     public ResponseEntity<String> deleteGame(@PathVariable Long id) {
         checkAdmin();
+        storeAdminService.deleteRoomsForGame(id);
         boardGameRepository.deleteById(id);
         return ResponseEntity.ok("삭제되었습니다.");
     }
