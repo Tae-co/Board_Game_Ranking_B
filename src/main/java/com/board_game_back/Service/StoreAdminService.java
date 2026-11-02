@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -91,9 +92,11 @@ public class StoreAdminService {
     // ── STAFF ──
 
     public List<StoreDto.StaffInfo> staff(Long storeId) {
-        List<Long> memberIds = storeStaffRepository.findByStoreId(storeId).stream().map(StoreStaff::getMemberId).toList();
-        return memberRepository.findAllById(memberIds).stream()
-            .map(m -> new StoreDto.StaffInfo(m.getId(), m.getNickname()))
+        Map<Long, LocalDateTime> assignedAt = storeStaffRepository.findByStoreId(storeId).stream()
+            .collect(Collectors.toMap(StoreStaff::getMemberId, StoreStaff::getAssignedAt));
+        return memberRepository.findAllById(assignedAt.keySet()).stream()
+            .sorted(Comparator.comparing(m -> assignedAt.get(m.getId())))
+            .map(m -> new StoreDto.StaffInfo(m.getId(), m.getNickname(), StoreDto.iso(assignedAt.get(m.getId()))))
             .toList();
     }
 
@@ -103,7 +106,7 @@ public class StoreAdminService {
         return memberRepository.findByRole(StoreAccessService.STAFF_ROLE).stream()
             .filter(m -> !assigned.contains(m.getId()))
             .sorted(Comparator.comparing(Member::getId))
-            .map(m -> new StoreDto.StaffInfo(m.getId(), m.getNickname()))
+            .map(m -> new StoreDto.StaffInfo(m.getId(), m.getNickname(), null))
             .toList();
     }
 

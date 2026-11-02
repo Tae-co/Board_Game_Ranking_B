@@ -130,6 +130,7 @@ public class StoreService {
                 .toList();
         }
         Map<Long, Long> memberCounts = stores.isEmpty() ? Map.of() : countMap(storeMemberRepository.countByStoreIds(ids(stores)));
+        Map<Long, Long> gameCounts = stores.isEmpty() ? Map.of() : countMap(storeRoomRepository.countOpenByStoreIds(ids(stores)));
         Set<Long> joined = storeMemberRepository.findByMemberIdOrderByJoinedAtAsc(memberId).stream()
             .map(StoreMember::getStoreId)
             .collect(Collectors.toSet());
@@ -137,7 +138,8 @@ public class StoreService {
             .sorted(Comparator.comparing(Store::getRegion).thenComparing(Store::getName)
                 .thenComparing(s -> s.getBranch() == null ? "" : s.getBranch()))
             .map(s -> new StoreDto.DirectoryItem(s.getId(), s.getName(), s.getBranch(), s.getRegion(),
-                s.getAddress(), s.getImageUrl(), memberCounts.getOrDefault(s.getId(), 0L), joined.contains(s.getId())))
+                s.getAddress(), s.getImageUrl(), memberCounts.getOrDefault(s.getId(), 0L),
+                gameCounts.getOrDefault(s.getId(), 0L), joined.contains(s.getId())))
             .toList();
     }
 
@@ -164,7 +166,8 @@ public class StoreService {
             Store s = stores.get(id);
             if (s == null) continue;
             result.add(new StoreDto.MyStoreItem(s.getId(), s.getName(), s.getBranch(), s.getImageUrl(),
-                memberCounts.getOrDefault(id, 0L), gameCounts.getOrDefault(id, 0L), role, s.isClosed()));
+                memberCounts.getOrDefault(id, 0L), gameCounts.getOrDefault(id, 0L), role, s.isClosed(),
+                StoreDto.iso(s.getClosedAt())));
         }
         return result;
     }

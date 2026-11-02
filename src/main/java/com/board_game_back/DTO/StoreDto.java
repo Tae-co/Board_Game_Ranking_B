@@ -37,11 +37,12 @@ public class StoreDto {
     // ── 목록 ──
 
     public record DirectoryItem(Long id, String name, String branch, String region, String address,
-                                String imageUrl, long memberCount, boolean joined) {}
+                                String imageUrl, long memberCount, long gameCount, boolean joined) {}
 
     /** role: MEMBER / STAFF */
     public record MyStoreItem(Long id, String name, String branch, String imageUrl,
-                              long memberCount, long gameCount, String role, boolean closed) {}
+                              long memberCount, long gameCount, String role, boolean closed,
+                              String closedAt) {}
 
     // ── 매장 홈 ──
 
@@ -68,5 +69,6 @@ public class StoreDto {
     public record AdminStoreItem(StoreInfo store, long memberCount, List<StaffInfo> staff, String createdAt,
                                  String closedAt) {}
 
-    public record StaffInfo(Long memberId, String nickname) {}
+    /** assignedAt은 지정된 STAFF일 때만 (후보는 null) */
+    public record StaffInfo(Long memberId, String nickname, String assignedAt) {}
 }
