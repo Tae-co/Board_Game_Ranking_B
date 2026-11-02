@@ -95,6 +95,11 @@ public class Store {
         this.closeTime = closeTime;
     }
 
+    /** 6g QR 비밀키 새로 만들기. 지금 QR이 모두 무효가 되고 기기 토큰은 그대로 */
+    public void rotateQrSecret(String newSecret) {
+        this.qrSecret = newSecret;
+    }
+
     public void close(LocalDateTime now) {
         if (closedAt == null) closedAt = now;
     }

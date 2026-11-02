@@ -136,6 +136,46 @@ public class StoreDto {
 
     public record CheckinQrResponse(String url, String expiresAt, String serverNow) {}
 
+    // ── 매장 기기 (2l·4·4f·4j·6g·6k) ──
+
+    public record PairCodeResponse(String code, String nonce, String expiresAt, String serverNow) {}
+
+    /** status: WAITING / CLAIMED / EXPIRED. deviceToken은 CLAIMED 응답에 한 번만 */
+    public record PairStatusResponse(String status, String deviceToken, String kind) {}
+
+    /** kind: TV / TABLE */
+    public record RegisterDeviceRequest(String code, String kind, String name) {}
+
+    /** connected = 기기가 토큰을 받아 갔음 */
+    public record DeviceItem(Long id, String kind, String name, boolean connected, String createdAt,
+                             String lastSeenAt, String lastIp) {}
+
+    public record DeviceBrief(Long id, String kind, String name) {}
+
+    public record QrInfo(String url, String expiresAt) {}
+
+    public record TvSetting(List<String> order, int intervalSec, boolean showJustFinished, List<Long> top10HiddenGameIds) {}
+
+    public record Top10(Long boardGameId, String name, List<RankItem> items) {}
+
+    public record JustFinishedPlayer(Integer placement, String nickname, Double gameScore, Integer ratingChange) {}
+
+    public record JustFinished(Long matchId, String gameName, String startedAt, String endedAt,
+                               List<JustFinishedPlayer> players) {}
+
+    /**
+     * 기기 화면. 테이블 기기는 store·device·qr만 (mvp·top10·justFinished·setting은 null).
+     * qr은 매장 지역 정각에 바뀐다 — 기기는 expiresAt(서버 시각 기준)에 다시 부른다 (§6.6).
+     */
+    public record DisplayResponse(DeviceBrief device, StoreBrief store, String serverNow, QrInfo qr,
+                                  TvSetting setting, Mvp mvp, List<Top10> top10, List<JustFinished> justFinished) {}
+
+    /** 6k: 설정 + TOP 10 게임 후보(열린 게임) + 미리 보기 데이터 */
+    public record TvSettingResponse(TvSetting setting, List<TvGame> games, long tvCount, String tvLastSeenAt,
+                                    Mvp mvp, List<Top10> top10) {}
+
+    public record TvGame(Long boardGameId, String name, long matchCount) {}
+
     // ── 어드민 ──
 
     public record StoreForm(String name, String branch, String address, String region, String phone,

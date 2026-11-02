@@ -10,6 +10,7 @@ import com.board_game_back.Exception.StoreErrorCode;
 import com.board_game_back.Exception.StoreException;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.Repository.StoreDeviceRepository;
 import com.board_game_back.Repository.StoreMatchRepository;
 import com.board_game_back.Repository.StoreMemberRepository;
 import com.board_game_back.Repository.StoreRepository;
@@ -44,6 +45,7 @@ public class StoreAdminService {
     private final MemberRepository memberRepository;
     private final StoreAccessService storeAccessService;
     private final StoreMatchRepository storeMatchRepository;
+    private final StoreDeviceRepository storeDeviceRepository;
 
     public List<StoreDto.AdminStoreItem> list() {
         List<Store> stores = storeRepository.findAll();
@@ -83,11 +85,13 @@ public class StoreAdminService {
         return item(store);
     }
 
-    /** 매장 운영 끝내기. 기록은 남기고 QR·가입·체크인을 막는다 */
+    /** 매장 운영 끝내기. 기록은 남기고 QR·가입·체크인을 막는다. 매장 기기 토큰도 전부 무효 → 기기는 4j로 (6f) */
     @Transactional
     public StoreDto.AdminStoreItem close(Long storeId) {
         Store store = getStore(storeId);
-        store.close(LocalDateTime.now(ZoneOffset.UTC));
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        store.close(now);
+        storeDeviceRepository.findByStoreIdAndRevokedAtIsNullOrderByIdAsc(storeId).forEach(d -> d.revoke(now));
         return item(store);
     }
 
