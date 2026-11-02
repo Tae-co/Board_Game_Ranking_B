@@ -119,7 +119,7 @@ public class StoreDto {
                                 String status, String endReason, Long partyId, Long recorderMemberId,
                                 String recorderNickname, int minMinutes, int maxMinutes, String startedAt,
                                 String saveOpensAt, String saveDeadline, String closesAt, String firstSavedAt,
-                                String confirmDeadline, String endedAt, String serverNow, String disputedByNickname,
+                                String confirmDeadline, String endedAt, String serverNow, Long disputedByMemberId, String disputedByNickname,
                                 String draftJson, int draftVersion, List<MatchParticipantItem> participants,
                                 Integer myRankBefore, Integer myRankAfter) {}
 

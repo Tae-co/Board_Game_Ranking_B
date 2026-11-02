@@ -332,7 +332,7 @@ public class StoreMatchService {
             StoreDto.iso(match.getSaveDeadline()), StoreDto.iso(match.getClosesAt()),
             StoreDto.iso(match.getFirstSavedAt()), StoreDto.iso(match.getConfirmDeadline()),
             StoreDto.iso(match.getEndedAt()), StoreDto.iso(StorePartyService.now()),
-            nameOf(names, match.getDisputedByMemberId()), match.getDraftJson(), match.getDraftVersion(), items,
+            match.getDisputedByMemberId(), nameOf(names, match.getDisputedByMemberId()), match.getDraftJson(), match.getDraftVersion(), items,
             rankBefore, rankAfter);
     }
 
