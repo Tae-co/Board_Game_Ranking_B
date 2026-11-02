@@ -36,6 +36,10 @@ public class BoardGame {
     @Enumerated(EnumType.STRING)
     private RatingType ratingType = RatingType.ELO;  // 만들 때 정하고 바꾸지 않는다
 
+    // 매장 기록 시간(분). 시작 후 min~max 사이에 처음 저장한 판만 기록된다. null이면 매장에서 시작할 수 없다
+    private Integer minMinutes;
+    private Integer maxMinutes;
+
     @Builder
     public BoardGame(String name, String imageUrl, int minPlayers, int maxPlayers, String schemaJson,
                      Long communityId, Long createdByMemberId, RatingType ratingType) {
@@ -59,5 +63,14 @@ public class BoardGame {
         this.minPlayers = minPlayers;
         this.maxPlayers = maxPlayers;
         this.schemaJson = schemaJson;
+    }
+
+    public void updateRecordMinutes(Integer minMinutes, Integer maxMinutes) {
+        this.minMinutes = minMinutes;
+        this.maxMinutes = maxMinutes;
+    }
+
+    public boolean hasRecordMinutes() {
+        return minMinutes != null && maxMinutes != null;
     }
 }

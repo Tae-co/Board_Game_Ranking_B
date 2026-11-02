@@ -4,6 +4,7 @@ import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Service.RoomService;
+import com.board_game_back.Service.StoreAdminService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ public class AdminController {
     private final BoardGameRepository boardGameRepository;
     private final MemberRepository memberRepository;
     private final RoomService roomService;
+    private final StoreAdminService storeAdminService;
 
     @Value("${supabase.url}")
     private String supabaseUrl;
@@ -85,7 +87,13 @@ public class AdminController {
                 .maxPlayers(((Number) body.getOrDefault("maxPlayers", 6)).intValue())
                 .schemaJson(schemaJson)
                 .build();
-        return ResponseEntity.ok(boardGameRepository.save(game));
+        Integer minMinutes = intOrNull(body.get("minMinutes"));
+        Integer maxMinutes = intOrNull(body.get("maxMinutes"));
+        StoreAdminService.validateRecordMinutes(minMinutes, maxMinutes);
+        game.updateRecordMinutes(minMinutes, maxMinutes);
+        BoardGame saved = boardGameRepository.save(game);
+        storeAdminService.createRoomsForGame(saved);
+        return ResponseEntity.ok(saved);
     }
 
     /** 보드게임 수정 */
@@ -106,6 +114,13 @@ public class AdminController {
                 ((Number) body.getOrDefault("maxPlayers", 6)).intValue(),
                 schemaJson
         );
+        // 매장 기록 시간: 보낸 경우만 바꾼다 (게임 탭 수정 폼은 안 보낸다)
+        if (body.containsKey("minMinutes") || body.containsKey("maxMinutes")) {
+            Integer minMinutes = intOrNull(body.get("minMinutes"));
+            Integer maxMinutes = intOrNull(body.get("maxMinutes"));
+            StoreAdminService.validateRecordMinutes(minMinutes, maxMinutes);
+            game.updateRecordMinutes(minMinutes, maxMinutes);
+        }
         return ResponseEntity.ok(game);
     }
 
@@ -113,6 +128,7 @@ public class AdminController {
     @DeleteMapping("/games/{id}")
     public ResponseEntity<String> deleteGame(@PathVariable Long id) {
         checkAdmin();
+        storeAdminService.deleteRoomsForGame(id);
         boardGameRepository.deleteById(id);
         return ResponseEntity.ok("삭제되었습니다.");
     }
@@ -165,5 +181,9 @@ public class AdminController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    private static Integer intOrNull(Object value) {
+        return value instanceof Number n ? n.intValue() : null;
     }
 }
