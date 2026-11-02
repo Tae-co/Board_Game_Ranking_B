@@ -61,4 +61,17 @@ public class StoreAdminController {
             @PathVariable Long memberId) {
         return ResponseEntity.ok(storeAdminService.unassignStaff(storeId, memberId));
     }
+
+    @GetMapping("/{storeId}/rooms")
+    public ResponseEntity<List<StoreDto.AdminRoomItem>> getRooms(@PathVariable Long storeId) {
+        return ResponseEntity.ok(storeAdminService.rooms(storeId));
+    }
+
+    @PutMapping("/{storeId}/rooms/{roomId}/closed")
+    public ResponseEntity<List<StoreDto.AdminRoomItem>> setRoomClosed(
+            @PathVariable Long storeId,
+            @PathVariable Long roomId,
+            @RequestBody java.util.Map<String, Boolean> body) {
+        return ResponseEntity.ok(storeAdminService.setRoomClosed(storeId, roomId, Boolean.TRUE.equals(body.get("closed"))));
+    }
 }

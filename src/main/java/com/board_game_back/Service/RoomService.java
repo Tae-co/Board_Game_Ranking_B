@@ -20,6 +20,7 @@ import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
 import com.board_game_back.Repository.StoreMemberRepository;
+import com.board_game_back.Repository.StoreRatingRepository;
 import com.board_game_back.Repository.StoreStaffRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -52,6 +53,8 @@ public class RoomService {
     private final RoomSeasonService roomSeasonService;
     private final StoreMemberRepository storeMemberRepository;
     private final StoreStaffRepository storeStaffRepository;
+    private final StoreRatingRepository storeRatingRepository;
+    private final StorePartyService storePartyService;
 
     @Transactional
     public Room createRoom(String roomName, Long memberId, Long boardGameId, Long communityId,
@@ -251,6 +254,8 @@ public class RoomService {
         communityMemberRepository.deleteByMemberId(memberId);
 
         // 매장 멤버·STAFF 지정도 지운다 (plan-store §1 회원 탈퇴)
+        storePartyService.onMemberDeleted(memberId);
+        storeRatingRepository.deleteByMemberId(memberId);
         storeMemberRepository.deleteByMemberId(memberId);
         storeStaffRepository.deleteByMemberId(memberId);
 

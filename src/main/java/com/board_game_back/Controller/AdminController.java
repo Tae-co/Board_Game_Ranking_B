@@ -87,6 +87,10 @@ public class AdminController {
                 .maxPlayers(((Number) body.getOrDefault("maxPlayers", 6)).intValue())
                 .schemaJson(schemaJson)
                 .build();
+        Integer minMinutes = intOrNull(body.get("minMinutes"));
+        Integer maxMinutes = intOrNull(body.get("maxMinutes"));
+        StoreAdminService.validateRecordMinutes(minMinutes, maxMinutes);
+        game.updateRecordMinutes(minMinutes, maxMinutes);
         BoardGame saved = boardGameRepository.save(game);
         storeAdminService.createRoomsForGame(saved);
         return ResponseEntity.ok(saved);
@@ -110,6 +114,13 @@ public class AdminController {
                 ((Number) body.getOrDefault("maxPlayers", 6)).intValue(),
                 schemaJson
         );
+        // 매장 기록 시간: 보낸 경우만 바꾼다 (게임 탭 수정 폼은 안 보낸다)
+        if (body.containsKey("minMinutes") || body.containsKey("maxMinutes")) {
+            Integer minMinutes = intOrNull(body.get("minMinutes"));
+            Integer maxMinutes = intOrNull(body.get("maxMinutes"));
+            StoreAdminService.validateRecordMinutes(minMinutes, maxMinutes);
+            game.updateRecordMinutes(minMinutes, maxMinutes);
+        }
         return ResponseEntity.ok(game);
     }
 
@@ -170,5 +181,9 @@ public class AdminController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    private static Integer intOrNull(Object value) {
+        return value instanceof Number n ? n.intValue() : null;
     }
 }

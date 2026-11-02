@@ -39,4 +39,8 @@ public class StoreRoom {
         this.storeId = storeId;
         this.boardGameId = boardGameId;
     }
+
+    public void setClosed(boolean closed) {
+        this.closed = closed;
+    }
 }

@@ -65,6 +65,10 @@ public class StoreMember {
         if (checkedInAt == null || scannedAt.isAfter(checkedInAt)) checkedInAt = scannedAt;
     }
 
+    public void recorded(LocalDateTime now) {
+        if (lastRecordedAt == null || now.isAfter(lastRecordedAt)) lastRecordedAt = now;
+    }
+
     /** null = 체크인한 적 없음 */
     public LocalDateTime checkinExpiresAt() {
         LocalDateTime base = latest(checkedInAt, lastRecordedAt);

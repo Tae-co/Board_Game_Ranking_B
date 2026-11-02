@@ -13,6 +13,8 @@ public interface StoreRoomRepository extends JpaRepository<StoreRoom, Long> {
 
     List<StoreRoom> findByStoreIdAndClosedFalse(Long storeId);
 
+    List<StoreRoom> findByStoreId(Long storeId);
+
     @Query("""
         SELECT sr.storeId, COUNT(sr)
         FROM StoreRoom sr

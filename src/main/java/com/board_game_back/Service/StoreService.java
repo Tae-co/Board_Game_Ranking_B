@@ -1,15 +1,14 @@
 package com.board_game_back.Service;
 
 import com.board_game_back.DTO.StoreDto;
-import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Store;
 import com.board_game_back.Entity.StoreMember;
-import com.board_game_back.Entity.StoreRoom;
 import com.board_game_back.Exception.StoreErrorCode;
 import com.board_game_back.Exception.StoreException;
-import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.StoreMemberRepository;
 import com.board_game_back.Repository.StoreRepository;
+import com.board_game_back.Repository.StoreMatchParticipantRepository;
+import com.board_game_back.Repository.StoreRatingRepository;
 import com.board_game_back.Repository.StoreRoomRepository;
 import com.board_game_back.Service.StoreAccessService.ViewerRole;
 import java.time.LocalDateTime;
@@ -38,10 +37,13 @@ public class StoreService {
     private final StoreRepository storeRepository;
     private final StoreMemberRepository storeMemberRepository;
     private final StoreRoomRepository storeRoomRepository;
-    private final BoardGameRepository boardGameRepository;
+    private final StoreRatingRepository storeRatingRepository;
+    private final StoreMatchParticipantRepository storeMatchParticipantRepository;
     private final StoreAccessService storeAccessService;
     private final StoreQrService storeQrService;
     private final StoreScanTicketService storeScanTicketService;
+    private final StorePartyService storePartyService;
+    private final StoreRankingService storeRankingService;
 
     private static LocalDateTime now() {
         return LocalDateTime.now(ZoneOffset.UTC);
@@ -106,6 +108,10 @@ public class StoreService {
         }
         StoreMember member = storeMemberRepository.findByStoreIdAndMemberId(storeId, memberId)
             .orElseThrow(() -> new StoreException(StoreErrorCode.NOT_MEMBER));
+        // 판이 열려 있으면 막고(MATCH_OPEN), 그룹에서도 빠진다 (1c)
+        storePartyService.leaveStore(storeId, memberId);
+        storeRatingRepository.deleteByStoreIdAndMemberId(storeId, memberId);
+        storeMatchParticipantRepository.anonymizeMemberInStore(storeId, memberId);
         storeMemberRepository.delete(member);
     }
 
@@ -185,25 +191,23 @@ public class StoreService {
             checkin = new StoreDto.Checkin(member.isCheckedIn(now), StoreDto.iso(member.checkinExpiresAt()));
         }
 
-        List<StoreRoom> rooms = storeRoomRepository.findByStoreIdAndClosedFalse(storeId);
-        Map<Long, BoardGame> games = boardGameRepository.findByIdIn(
-                rooms.stream().map(StoreRoom::getBoardGameId).toList()).stream()
-            .collect(Collectors.toMap(BoardGame::getId, Function.identity()));
-        List<StoreDto.GameItem> gameItems = rooms.stream()
-            .filter(r -> games.containsKey(r.getBoardGameId()))
-            .sorted(Comparator.comparing(StoreRoom::getBoardGameId))
-            .map(r -> {
-                BoardGame g = games.get(r.getBoardGameId());
-                return new StoreDto.GameItem(r.getId(), g.getId(), g.getName(), g.getImageUrl(),
-                    g.getMinPlayers(), g.getMaxPlayers());
-            })
-            .toList();
+        List<StoreDto.GameItem> gameItems = storeRankingService.visibleGames(storeId);
+        List<StoreDto.GameRanking> rankings = storeRankingService.homeRankings(storeId, gameItems, memberId);
+
+        StoreDto.PartyBrief party = storePartyService.membership(memberId)
+            .flatMap(pm -> storePartyService.findParty(pm.getPartyId()))
+            .filter(p -> p.isActive() && p.getStoreId().equals(storeId))
+            .map(storePartyService::brief)
+            .orElse(null);
 
         return new StoreDto.HomeResponse(
             info(store),
             new StoreDto.Viewer(role.name(), checkin),
             storeMemberRepository.countByStoreId(storeId),
-            gameItems);
+            gameItems,
+            party,
+            storeRankingService.mvp(storeId, rankings),
+            rankings);
     }
 
     // ── 공통 ──

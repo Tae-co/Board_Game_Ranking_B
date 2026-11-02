@@ -43,6 +43,10 @@ class StoreServiceJoinTest {
     @Mock private StoreRoomRepository storeRoomRepository;
     @Mock private BoardGameRepository boardGameRepository;
     @Mock private StoreAccessService storeAccessService;
+    @Mock private com.board_game_back.Repository.StoreRatingRepository storeRatingRepository;
+    @Mock private com.board_game_back.Repository.StoreMatchParticipantRepository storeMatchParticipantRepository;
+    @Mock private StorePartyService storePartyService;
+    @Mock private StoreRankingService storeRankingService;
 
     private final StoreQrService qr = new StoreQrService();
     private final StoreScanTicketService tickets = new StoreScanTicketService("test-jwt-secret");
@@ -51,8 +55,9 @@ class StoreServiceJoinTest {
 
     @BeforeEach
     void setUp() {
-        service = new StoreService(storeRepository, storeMemberRepository, storeRoomRepository, boardGameRepository,
-            storeAccessService, qr, tickets);
+        service = new StoreService(storeRepository, storeMemberRepository, storeRoomRepository, storeRatingRepository,
+            storeMatchParticipantRepository,
+            storeAccessService, qr, tickets, storePartyService, storeRankingService);
         store = Store.builder().name("야다").address("서울").region("South Korea")
             .openTime(LocalTime.of(10, 0)).closeTime(LocalTime.of(22, 0)).qrSecret("secret").build();
         ReflectionTestUtils.setField(store, "id", STORE_ID);

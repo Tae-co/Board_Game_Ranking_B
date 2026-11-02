@@ -58,6 +58,8 @@ class RoomServiceDeleteMemberTest {
     @Mock private CommunityRepository communityRepository;
     @Mock private StoreMemberRepository storeMemberRepository;
     @Mock private StoreStaffRepository storeStaffRepository;
+    @Mock private com.board_game_back.Repository.StoreRatingRepository storeRatingRepository;
+    @Mock private StorePartyService storePartyService;
 
     @InjectMocks private RoomService roomService;
 
@@ -76,6 +78,8 @@ class RoomServiceDeleteMemberTest {
 
         verify(storeMemberRepository).deleteByMemberId(OWNER);
         verify(storeStaffRepository).deleteByMemberId(OWNER);
+        verify(storePartyService).onMemberDeleted(OWNER);
+        verify(storeRatingRepository).deleteByMemberId(OWNER);
     }
 
     @Test

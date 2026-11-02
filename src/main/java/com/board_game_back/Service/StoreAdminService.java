@@ -10,6 +10,7 @@ import com.board_game_back.Exception.StoreErrorCode;
 import com.board_game_back.Exception.StoreException;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.Repository.StoreMatchRepository;
 import com.board_game_back.Repository.StoreMemberRepository;
 import com.board_game_back.Repository.StoreRepository;
 import com.board_game_back.Repository.StoreRoomRepository;
@@ -42,6 +43,7 @@ public class StoreAdminService {
     private final BoardGameRepository boardGameRepository;
     private final MemberRepository memberRepository;
     private final StoreAccessService storeAccessService;
+    private final StoreMatchRepository storeMatchRepository;
 
     public List<StoreDto.AdminStoreItem> list() {
         List<Store> stores = storeRepository.findAll();
@@ -139,6 +141,43 @@ public class StoreAdminService {
         if (!isStoreGame(game)) return;
         for (Store store : storeRepository.findAll()) {
             storeRoomRepository.save(new StoreRoom(store.getId(), game.getId()));
+        }
+    }
+
+    /** 6i 게임방 관리: 이 매장 게임방 전체 */
+    public List<StoreDto.AdminRoomItem> rooms(Long storeId) {
+        getStore(storeId);
+        List<StoreRoom> rooms = storeRoomRepository.findByStoreId(storeId);
+        Map<Long, BoardGame> games = boardGameRepository.findByIdIn(rooms.stream().map(StoreRoom::getBoardGameId).toList())
+            .stream().collect(Collectors.toMap(BoardGame::getId, g -> g));
+        Map<Long, Long> matchCounts = new HashMap<>();
+        for (Object[] row : storeMatchRepository.countRecordedByRoom(storeId)) matchCounts.put((Long) row[0], (Long) row[1]);
+        return rooms.stream()
+            .filter(r -> games.containsKey(r.getBoardGameId()))
+            .sorted(Comparator.comparing(StoreRoom::getBoardGameId))
+            .map(r -> {
+                BoardGame g = games.get(r.getBoardGameId());
+                return new StoreDto.AdminRoomItem(r.getId(), g.getId(), g.getName(), g.getImageUrl(),
+                    g.getMinMinutes(), g.getMaxMinutes(), r.isClosed(), matchCounts.getOrDefault(r.getId(), 0L));
+            })
+            .toList();
+    }
+
+    /** 잠시 닫기 / 다시 열기. 열린 판은 끝날 때까지 두고 새 시작만 막는다 */
+    @Transactional
+    public List<StoreDto.AdminRoomItem> setRoomClosed(Long storeId, Long storeRoomId, boolean closed) {
+        StoreRoom room = storeRoomRepository.findById(storeRoomId)
+            .filter(r -> r.getStoreId().equals(storeId))
+            .orElseThrow(() -> new StoreException(StoreErrorCode.ROOM_CLOSED));
+        room.setClosed(closed);
+        return rooms(storeId);
+    }
+
+    /** 6d 기록 시간. 둘 다 비우거나 0 < 최소 ≤ 최대 */
+    public static void validateRecordMinutes(Integer min, Integer max) {
+        if (min == null && max == null) return;
+        if (min == null || max == null || min < 1 || max < min || max > 600) {
+            throw new StoreException(StoreErrorCode.INVALID_RECORD_MINUTES);
         }
     }
 
