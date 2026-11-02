@@ -220,7 +220,8 @@ public class StoreService {
 
     static StoreDto.StoreInfo info(Store s) {
         return new StoreDto.StoreInfo(s.getId(), s.getName(), s.getBranch(), s.getAddress(), s.getRegion(),
-            s.getPhone(), s.getImageUrl(), StoreDto.hhmm(s.getOpenTime()), StoreDto.hhmm(s.getCloseTime()), s.isClosed());
+            s.getPhone(), s.getImageUrl(), StoreDto.hhmm(s.getOpenTime()), StoreDto.hhmm(s.getCloseTime()), s.isClosed(),
+            StoreDto.iso(s.getClosedAt()));
     }
 
     private Store getStore(Long storeId) {

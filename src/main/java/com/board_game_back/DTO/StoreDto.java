@@ -52,7 +52,7 @@ public class StoreDto {
                                SeasonInfo season, ResetNotice resetNotice, ClosedRecord closedRecord) {}
 
     public record StoreInfo(Long id, String name, String branch, String address, String region, String phone,
-                            String imageUrl, String openTime, String closeTime, boolean closed) {}
+                            String imageUrl, String openTime, String closeTime, boolean closed, String closedAt) {}
 
     /** role: STAFF / STAFF_OTHER / MEMBER / VISITOR. checkin은 MEMBER일 때만 */
     public record Viewer(String role, Checkin checkin) {}
@@ -93,7 +93,7 @@ public class StoreDto {
     public record StartState(String block, PartyBrief party, String busyGameName, String closesAt,
                              List<String> expiredNicknames) {}
 
-    public record MatchSummary(Long id, String endedAt, List<MatchParticipantItem> participants) {}
+    public record MatchSummary(Long id, String startedAt, String endedAt, List<MatchParticipantItem> participants) {}
 
     // ── 오늘의 그룹 (2i·3b·3c) ──
 

@@ -184,7 +184,7 @@ public class StoreRankingService {
         Map<Long, String> names = partyService.nicknames(byMatch.values().stream().flatMap(List::stream)
             .map(StoreMatchParticipant::getMemberId).filter(Objects::nonNull).toList());
         return matches.stream()
-            .map(m -> new StoreDto.MatchSummary(m.getId(), StoreDto.iso(m.getEndedAt()),
+            .map(m -> new StoreDto.MatchSummary(m.getId(), StoreDto.iso(m.getStartedAt()), StoreDto.iso(m.getEndedAt()),
                 byMatch.getOrDefault(m.getId(), List.of()).stream()
                     .sorted(Comparator.comparing(StoreMatchParticipant::getPlacement, Comparator.nullsLast(Comparator.naturalOrder())))
                     .map(p -> StoreMatchService.participantItem(p, names, true))
