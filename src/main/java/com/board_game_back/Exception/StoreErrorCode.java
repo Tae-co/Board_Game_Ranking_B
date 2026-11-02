@@ -39,7 +39,14 @@ public enum StoreErrorCode {
     SAVE_TOO_EARLY(HttpStatus.CONFLICT, "아직 저장할 수 없어요."),
     SAVE_DEADLINE_PASSED(HttpStatus.CONFLICT, "기록 시간이 지났어요."),
     INVALID_RESULT(HttpStatus.BAD_REQUEST, "결과를 확인해 주세요."),
-    INVALID_RECORD_MINUTES(HttpStatus.BAD_REQUEST, "기록 시간을 확인해 주세요.");
+    INVALID_RECORD_MINUTES(HttpStatus.BAD_REQUEST, "기록 시간을 확인해 주세요."),
+    // ── 매장 기기 (3단계) ──
+    PAIR_CODE_INVALID(HttpStatus.BAD_REQUEST, "코드가 맞지 않거나 10분이 지났어요."),
+    DEVICE_LIMIT(HttpStatus.CONFLICT, "매장 기기는 최대 30대까지 등록할 수 있어요."),
+    DEVICE_NOT_FOUND(HttpStatus.NOT_FOUND, "기기를 찾을 수 없어요."),
+    DEVICE_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "등록이 해제된 기기예요."),
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 시도해 주세요."),
+    INVALID_TV_SETTING(HttpStatus.BAD_REQUEST, "TV 화면 설정을 확인해 주세요.");
 
     private final HttpStatus status;
     private final String message;

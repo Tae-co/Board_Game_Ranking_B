@@ -2,6 +2,7 @@ package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.StoreDto;
 import com.board_game_back.Service.StoreAdminService;
+import com.board_game_back.Service.StoreDeviceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +16,7 @@ import java.util.List;
 public class StoreAdminController {
 
     private final StoreAdminService storeAdminService;
+    private final StoreDeviceService storeDeviceService;
 
     @GetMapping
     public ResponseEntity<List<StoreDto.AdminStoreItem>> getStores() {
@@ -73,5 +75,37 @@ public class StoreAdminController {
             @PathVariable Long roomId,
             @RequestBody java.util.Map<String, Boolean> body) {
         return ResponseEntity.ok(storeAdminService.setRoomClosed(storeId, roomId, Boolean.TRUE.equals(body.get("closed"))));
+    }
+
+    // ── 매장 기기 (6g) · TV 화면 (6k) ──
+
+    @GetMapping("/{storeId}/devices")
+    public ResponseEntity<List<StoreDto.DeviceItem>> getDevices(@PathVariable Long storeId) {
+        return ResponseEntity.ok(storeDeviceService.adminDevices(storeId));
+    }
+
+    @DeleteMapping("/{storeId}/devices/{deviceId}")
+    public ResponseEntity<List<StoreDto.DeviceItem>> revokeDevice(
+            @PathVariable Long storeId,
+            @PathVariable Long deviceId) {
+        return ResponseEntity.ok(storeDeviceService.revoke(storeId, deviceId));
+    }
+
+    @PostMapping("/{storeId}/qr-secret")
+    public ResponseEntity<Void> rotateQrSecret(@PathVariable Long storeId) {
+        storeDeviceService.rotateQrSecret(storeId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{storeId}/tv-setting")
+    public ResponseEntity<StoreDto.TvSettingResponse> getTvSetting(@PathVariable Long storeId) {
+        return ResponseEntity.ok(storeDeviceService.tvSetting(storeId));
+    }
+
+    @PutMapping("/{storeId}/tv-setting")
+    public ResponseEntity<StoreDto.TvSettingResponse> saveTvSetting(
+            @PathVariable Long storeId,
+            @RequestBody StoreDto.TvSetting setting) {
+        return ResponseEntity.ok(storeDeviceService.saveTvSetting(storeId, setting));
     }
 }

@@ -60,6 +60,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/events").permitAll()
                 // 매장 QR은 찍은 순간 확인해야 해서 로그인 전에도 연다. 응답은 서명된 티켓뿐이다 (plan-store §6.6).
                 .requestMatchers(HttpMethod.POST, "/api/stores/*/scan").permitAll()
+                // 매장 기기(TV·테이블)는 사람 로그인이 없다. 기기 토큰은 StoreDeviceService가 요청마다 DB로 확인한다 (§6.6).
+                .requestMatchers("/api/stores/device/**").permitAll()
                 // 관리자 전용
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/matches/admin/**").hasRole("ADMIN")

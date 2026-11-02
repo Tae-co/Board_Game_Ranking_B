@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,10 @@ public interface StoreMatchRepository extends JpaRepository<StoreMatch, Long> {
     List<StoreMatch> findByStoreRoomIdAndStatusOrderByEndedAtDesc(Long storeRoomId, StoreMatch.Status status, Pageable pageable);
 
     List<StoreMatch> findByStoreIdAndStatus(Long storeId, StoreMatch.Status status);
+
+    /** 매장 TV 4e: 방금 기록된 판 */
+    List<StoreMatch> findByStoreIdAndStatusAndEndedAtAfterOrderByEndedAtAsc(Long storeId, StoreMatch.Status status,
+                                                                         LocalDateTime after);
 
     @Query("""
         SELECT COUNT(m) FROM StoreMatch m
