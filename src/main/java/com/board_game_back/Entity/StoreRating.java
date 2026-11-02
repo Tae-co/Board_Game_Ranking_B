@@ -59,6 +59,11 @@ public class StoreRating {
         this.lastPlayedAt = playedAt;
     }
 
+    /** 신고 초기화 (6b): 점수만 500으로. 판 수는 그대로 (첫 3판 K는 판 수 기준) */
+    public void resetRating() {
+        this.rating = RatingConstants.INITIAL_RATING;
+    }
+
     /** 표시 점수 (커뮤니티 getDisplayScore와 같은 규칙) */
     public int displayScore() {
         if (Double.isNaN(rating)) return (int) RatingConstants.INITIAL_RATING;

@@ -14,7 +14,10 @@ import com.board_game_back.Exception.StoreErrorCode;
 import com.board_game_back.Exception.StoreException;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.Repository.ScoreSheetRequestEntryRepository;
 import com.board_game_back.Repository.StoreMatchParticipantRepository;
+import com.board_game_back.Repository.StoreRatingResetRepository;
+import com.board_game_back.Repository.StoreReportRepository;
 import com.board_game_back.Repository.StoreMatchRepository;
 import com.board_game_back.Repository.StoreMemberRepository;
 import com.board_game_back.Repository.StorePartyMemberRepository;
@@ -54,6 +57,9 @@ public class StorePartyService {
     private final StorePartyMemberRepository storePartyMemberRepository;
     private final StoreMatchRepository storeMatchRepository;
     private final StoreMatchParticipantRepository storeMatchParticipantRepository;
+    private final StoreReportRepository storeReportRepository;
+    private final StoreRatingResetRepository storeRatingResetRepository;
+    private final ScoreSheetRequestEntryRepository scoreSheetRequestEntryRepository;
     private final BoardGameRepository boardGameRepository;
     private final MemberRepository memberRepository;
     private final StoreAccessService storeAccessService;
@@ -203,6 +209,11 @@ public class StorePartyService {
         });
         storeMatchParticipantRepository.anonymizeMember(memberId);
         storeMatchRepository.anonymizeRecorder(memberId);
+        // 신고·초기화·점수판 요청은 기록으로 남기고 사람만 지운다
+        storeReportRepository.anonymizeReporter(memberId);
+        storeReportRepository.anonymizeTarget(memberId);
+        storeRatingResetRepository.anonymizeMember(memberId);
+        scoreSheetRequestEntryRepository.anonymizeMember(memberId);
     }
 
     // ── 공통 (StoreMatchService도 쓴다) ──

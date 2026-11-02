@@ -44,6 +44,9 @@ public class StoreService {
     private final StoreScanTicketService storeScanTicketService;
     private final StorePartyService storePartyService;
     private final StoreRankingService storeRankingService;
+    private final StoreSeasonService storeSeasonService;
+    private final StoreReportService storeReportService;
+    private final StoreInsightService storeInsightService;
 
     private static LocalDateTime now() {
         return LocalDateTime.now(ZoneOffset.UTC);
@@ -207,7 +210,10 @@ public class StoreService {
             gameItems,
             party,
             storeRankingService.mvp(storeId, rankings),
-            rankings);
+            rankings,
+            storeSeasonService.currentInfo(storeId),
+            role == ViewerRole.MEMBER ? storeReportService.unseenNotice(storeId, memberId) : null,
+            role == ViewerRole.MEMBER && store.isClosed() ? storeInsightService.closedRecord(store, memberId) : null);
     }
 
     // ── 공통 ──

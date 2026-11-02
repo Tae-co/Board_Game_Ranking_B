@@ -18,6 +18,10 @@ public interface StoreMemberRepository extends JpaRepository<StoreMember, Long> 
 
     long countByStoreId(Long storeId);
 
+    @Query("SELECT COUNT(sm) FROM StoreMember sm WHERE sm.storeId = :storeId AND sm.joinedAt >= :from AND sm.joinedAt < :to")
+    long countJoinedBetween(@Param("storeId") Long storeId, @Param("from") java.time.LocalDateTime from,
+                            @Param("to") java.time.LocalDateTime to);
+
     @Query("""
         SELECT sm.storeId, COUNT(sm)
         FROM StoreMember sm

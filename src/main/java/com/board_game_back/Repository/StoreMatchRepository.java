@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +27,10 @@ public interface StoreMatchRepository extends JpaRepository<StoreMatch, Long> {
     List<StoreMatch> findByStoreRoomIdAndStatusOrderByEndedAtDesc(Long storeRoomId, StoreMatch.Status status, Pageable pageable);
 
     List<StoreMatch> findByStoreIdAndStatus(Long storeId, StoreMatch.Status status);
+
+    /** 시즌 점수 다시 계산·리포트: 기간 안 기록된 판 (기록 순) */
+    List<StoreMatch> findByStoreIdAndStatusAndBusinessDateBetweenOrderByEndedAtAsc(Long storeId, StoreMatch.Status status,
+                                                                                LocalDate from, LocalDate to);
 
     /** 매장 TV 4e: 방금 기록된 판 */
     List<StoreMatch> findByStoreIdAndStatusAndEndedAtAfterOrderByEndedAtAsc(Long storeId, StoreMatch.Status status,

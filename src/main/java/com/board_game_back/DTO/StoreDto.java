@@ -48,7 +48,8 @@ public class StoreDto {
 
     /** party·mvp·rankings는 2단계부터. party는 내가 이 매장 그룹에 있을 때만 */
     public record HomeResponse(StoreInfo store, Viewer viewer, long memberCount, List<GameItem> games,
-                               PartyBrief party, Mvp mvp, List<GameRanking> rankings) {}
+                               PartyBrief party, Mvp mvp, List<GameRanking> rankings,
+                               SeasonInfo season, ResetNotice resetNotice, ClosedRecord closedRecord) {}
 
     public record StoreInfo(Long id, String name, String branch, String address, String region, String phone,
                             String imageUrl, String openTime, String closeTime, boolean closed) {}
@@ -77,7 +78,7 @@ public class StoreDto {
 
     /** 2b. me는 순위권 밖이어도 내 순위 */
     public record RankingResponse(Long storeRoomId, Long boardGameId, String name, long playerCount,
-                                  List<RankItem> items, RankItem me) {}
+                                  List<RankItem> items, RankItem me, SeasonInfo season) {}
 
     // ── 매장 게임방 (3) ──
 
@@ -168,13 +169,103 @@ public class StoreDto {
      * qr은 매장 지역 정각에 바뀐다 — 기기는 expiresAt(서버 시각 기준)에 다시 부른다 (§6.6).
      */
     public record DisplayResponse(DeviceBrief device, StoreBrief store, String serverNow, QrInfo qr,
-                                  TvSetting setting, Mvp mvp, List<Top10> top10, List<JustFinished> justFinished) {}
+                                  TvSetting setting, Mvp mvp, List<Top10> top10, List<JustFinished> justFinished,
+                                  SeasonInfo season, SeasonResult seasonResult) {}
 
     /** 6k: 설정 + TOP 10 게임 후보(열린 게임) + 미리 보기 데이터 */
     public record TvSettingResponse(TvSetting setting, List<TvGame> games, long tvCount, String tvLastSeenAt,
-                                    Mvp mvp, List<Top10> top10) {}
+                                    Mvp mvp, List<Top10> top10, SeasonResult seasonResult) {}
 
     public record TvGame(Long boardGameId, String name, long matchCount) {}
+
+    // ── 시즌 (3l·4b·6 시즌) — 날짜는 매장 영업일 "yyyy-MM-dd" ──
+
+    public record SeasonInfo(Long id, String name, String startDate, String endDate, long daysLeft) {}
+
+    /** cycle: MONTHLY / QUARTERLY / CUSTOM. next 날짜는 CUSTOM일 때만 쓰고, 시작일은 늘 이번 시즌 종료 다음 날 */
+    public record SeasonForm(String currentName, String currentStart, String currentEnd, String cycle,
+                             String nextName, String nextEnd) {}
+
+    public record AdminSeasonResponse(SeasonInfo current, SeasonInfo next, String cycle, String today) {}
+
+    public record SeasonTabResponse(SeasonInfo current, long players, MySeason mine, List<PastSeason> past) {}
+
+    public record MySeason(int rank, int score, int games, int first, int second, int third, int fourthPlus,
+                           Double avgPlacement) {}
+
+    public record PastSeason(Long id, String name, String startDate, String endDate, long players, Integer myRank,
+                             List<RankItem> top) {}
+
+    /** 4b: 끝난 뒤 1주일. winners = 게임별 1위 */
+    public record SeasonResult(String name, List<GameLeader> winners, MvpItem mostVisits, MvpItem mostGames,
+                               String nextStart) {}
+
+    // ── 신고 · 점수 초기화 (3g·6b·2 안내 카드) ──
+
+    /** reason: NOT_PLAYED / THROWING / OTHER */
+    public record ReportRequest(String reason, String memo) {}
+
+    /** status: OPEN / RESET / UNDONE / CLOSED */
+    public record AdminReportGroup(Long boardGameId, String gameName, Long targetMemberId, String targetNickname,
+                                   long count, String lastAt, String status) {}
+
+    public record AdminReportDetail(Long boardGameId, String gameName, Long targetMemberId, String targetNickname,
+                                    Integer targetRank, Integer targetScore, Integer targetGames,
+                                    List<ReportItem> reports, List<TargetMatch> recent, long recentWins,
+                                    long recentTotal, List<ResetCandidate> candidates, String status,
+                                    String resolvedAt, String batch, List<ResetResult> resets) {}
+
+    public record ReportItem(String reason, String memo, String createdAt) {}
+
+    public record TargetMatch(String endedAt, List<String> others, Integer placement) {}
+
+    /** together = 대상과 이 게임을 같이 한 판 수 */
+    public record ResetCandidate(Long memberId, String nickname, boolean target, long together) {}
+
+    public record ResetResult(String nickname, int before) {}
+
+    public record ResetRequest(List<Long> memberIds) {}
+
+    public record ResetNotice(Long id, String gameName, String matchEndedAt, String resetAt) {}
+
+    // ── 점수판 요청 (2g·6c) ──
+
+    public record ScoreRequestForm(String name, String howToScore, String imageUrl, Long storeId) {}
+
+    public record ScoreRequestItem(Long id, String name, long count, boolean voted) {}
+
+    /** status: REVIEW / MAKING / ADDED / HOLD */
+    public record MyScoreRequest(Long id, String name, String status, String createdAt) {}
+
+    public record ScoreRequestsResponse(List<ScoreRequestItem> popular, List<MyScoreRequest> mine) {}
+
+    public record AdminScoreRequest(Long id, String name, String status, long count, List<StoreCount> stores,
+                                    String lastAt, List<ScoreNote> notes, List<String> photos) {}
+
+    public record StoreCount(String name, long count) {}
+
+    /** visitor = 그 매장 멤버가 아닌 사람이 남긴 요청 */
+    public record ScoreNote(String text, String nickname, String storeName, boolean visitor) {}
+
+    public record StatusRequest(String status) {}
+
+    // ── 프로필 매장 탭 (7) · 운영 끝난 매장 (2h) · 월간 리포트 (8) ──
+
+    public record StoreProfile(Long storeId, String name, String branch, boolean closed, String seasonName,
+                               int bestScore, int wins, int losses, Integer rank, Integer rankTotal,
+                               String topGameName, int topGameCount, int visits, List<ResetNotice> resets) {}
+
+    public record ClosedRecord(Integer lastRank, int games, int visits) {}
+
+    /** heat[요일 0=월..6=일][칸] = 그 시간에 시작한 판 수. 칸은 영업 시작 시각부터 3시간씩 4칸 (heatHours) */
+    public record MonthlyReport(String month, StoreBrief store, long matches, long matchesPrev, long visitors,
+                                long visitorsPrev, long newMembers, long newMembersPrev, int revisitRate,
+                                List<GameCount> popular, List<Integer> heatHours, List<List<Integer>> heat,
+                                List<Regular> regulars) {}
+
+    public record GameCount(String name, long count) {}
+
+    public record Regular(String nickname, long days, long games) {}
 
     // ── 어드민 ──
 

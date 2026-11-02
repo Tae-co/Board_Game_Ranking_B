@@ -336,7 +336,7 @@ public class StoreMatchService {
             rankBefore, rankAfter);
     }
 
-    private static String nameOf(Map<Long, String> names, Long memberId) {
+    static String nameOf(Map<Long, String> names, Long memberId) {
         return memberId == null ? null : names.get(memberId);
     }
 

@@ -46,7 +46,13 @@ public enum StoreErrorCode {
     DEVICE_NOT_FOUND(HttpStatus.NOT_FOUND, "기기를 찾을 수 없어요."),
     DEVICE_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "등록이 해제된 기기예요."),
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 시도해 주세요."),
-    INVALID_TV_SETTING(HttpStatus.BAD_REQUEST, "TV 화면 설정을 확인해 주세요.");
+    INVALID_TV_SETTING(HttpStatus.BAD_REQUEST, "TV 화면 설정을 확인해 주세요."),
+    // ── 시즌 · 신고 · 점수판 요청 (4단계) ──
+    INVALID_SEASON(HttpStatus.BAD_REQUEST, "시즌 이름과 날짜를 확인해 주세요."),
+    ALREADY_REPORTED(HttpStatus.CONFLICT, "이미 신고한 경기예요."),
+    REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "신고를 찾을 수 없어요."),
+    REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "요청을 찾을 수 없어요."),
+    NOT_IN_MATCH(HttpStatus.BAD_REQUEST, "그 경기를 같이 한 사람만 고를 수 있어요.");
 
     private final HttpStatus status;
     private final String message;

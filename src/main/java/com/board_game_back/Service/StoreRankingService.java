@@ -9,6 +9,7 @@ import com.board_game_back.Entity.StoreMatchParticipant;
 import com.board_game_back.Entity.StoreParty;
 import com.board_game_back.Entity.StoreRating;
 import com.board_game_back.Entity.StoreRoom;
+import com.board_game_back.Entity.StoreSeason;
 import com.board_game_back.Exception.StoreErrorCode;
 import com.board_game_back.Exception.StoreException;
 import com.board_game_back.Repository.BoardGameRepository;
@@ -18,7 +19,9 @@ import com.board_game_back.Repository.StoreMatchRepository;
 import com.board_game_back.Repository.StoreRatingRepository;
 import com.board_game_back.Repository.StoreRepository;
 import com.board_game_back.Repository.StoreRoomRepository;
+import com.board_game_back.Repository.StoreSeasonRepository;
 import com.board_game_back.Utils.StoreClock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -57,6 +61,10 @@ public class StoreRankingService {
     private final MemberRepository memberRepository;
     private final StorePartyService partyService;
     private final StoreMatchService matchService;
+    private final StoreSeasonRepository seasonRepository;
+
+    public static final LocalDate EPOCH = LocalDate.of(2000, 1, 1);
+    public static final LocalDate FAR_FUTURE = LocalDate.of(9999, 12, 31);
 
     /** 손님 화면에 보이는 게임방 = 열려 있고 기록 시간이 정해진 게임 (값이 없는 게임은 잠시 닫힘으로 시작, impl §7-5) */
     public List<StoreDto.GameItem> visibleGames(Long storeId) {
@@ -87,8 +95,16 @@ public class StoreRankingService {
         return result;
     }
 
+    /** 이번 시즌 MVP. 시즌이 아직 없으면 전체 기간 */
     public StoreDto.Mvp mvp(Long storeId, List<StoreDto.GameRanking> rankings) {
-        List<Object[]> rows = participantRepository.activityByStore(storeId);
+        Store store = storeRepository.findById(storeId).orElseThrow(() -> new StoreException(StoreErrorCode.STORE_NOT_FOUND));
+        LocalDate from = currentSeason(store, StorePartyService.now()).map(StoreSeason::getStartDate).orElse(EPOCH);
+        return mvpBetween(storeId, from, FAR_FUTURE, rankings);
+    }
+
+    /** 기간 안 최다 방문·최다 참여 + 게임별 1위(rankings 첫 줄) */
+    public StoreDto.Mvp mvpBetween(Long storeId, LocalDate from, LocalDate to, List<StoreDto.GameRanking> rankings) {
+        List<Object[]> rows = participantRepository.activityBetween(storeId, from, to);
         Map<Long, Member> members = members(rows.stream().map(r -> (Long) r[0]).toList());
         rows = rows.stream().filter(r -> isRankable(members.get((Long) r[0]))).toList();
         Comparator<Object[]> recent = Comparator.comparing(r -> (LocalDateTime) r[3], Comparator.nullsFirst(Comparator.naturalOrder()));
@@ -117,8 +133,12 @@ public class StoreRankingService {
         List<StoreRating> ratings = storeRatingRepository.findByStoreIdAndBoardGameId(storeId, game.getId());
         List<StoreDto.RankItem> ranked = rank(ratings, members(ratings.stream().map(StoreRating::getMemberId).toList()), memberId);
         StoreDto.RankItem me = ranked.stream().filter(StoreDto.RankItem::me).findFirst().orElse(null);
+        Store store = storeRepository.findById(storeId).orElseThrow();
+        LocalDateTime now = StorePartyService.now();
+        StoreDto.SeasonInfo season = currentSeason(store, now)
+            .map(s -> StoreSeasonService.info(s, StoreClock.businessDate(store, now))).orElse(null);
         return new StoreDto.RankingResponse(room.getId(), game.getId(), game.getName(), ranked.size(),
-            ranked.subList(0, Math.min(FULL_TOP, ranked.size())), me);
+            ranked.subList(0, Math.min(FULL_TOP, ranked.size())), me, season);
     }
 
     /** 3 매장 게임방 */
@@ -172,6 +192,16 @@ public class StoreRankingService {
             .toList();
     }
 
+    /**
+     * 지금 시즌: 아직 끝나지 않았고 이미 시작한 것 중 가장 늦게 시작한 것. 시즌 경계 처리 전 잠깐은 지난 시즌이 나올 수 있다
+     */
+    public Optional<StoreSeason> currentSeason(Store store, LocalDateTime now) {
+        LocalDate today = StoreClock.businessDate(store, now);
+        return seasonRepository.findByStoreIdOrderByStartDateAsc(store.getId()).stream()
+            .filter(s -> s.getFinalizedAt() == null && !s.getStartDate().isAfter(today))
+            .reduce((a, b) -> b);
+    }
+
     // ── 공통 ──
 
     List<StoreDto.RankItem> rank(Collection<StoreRating> ratings, Map<Long, Member> members, Long memberId) {
@@ -193,7 +223,7 @@ public class StoreRankingService {
         return m != null && !StoreAccessService.STAFF_ROLE.equals(m.getRole());
     }
 
-    private Map<Long, Member> members(Collection<Long> ids) {
+    Map<Long, Member> members(Collection<Long> ids) {
         Set<Long> unique = new HashSet<>(ids);
         return memberRepository.findAllById(unique).stream().collect(Collectors.toMap(Member::getId, Function.identity()));
     }

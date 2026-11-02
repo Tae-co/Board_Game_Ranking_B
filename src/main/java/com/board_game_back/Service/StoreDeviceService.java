@@ -84,6 +84,7 @@ public class StoreDeviceService {
     private final StoreQrService storeQrService;
     private final StoreRankingService storeRankingService;
     private final StorePartyService storePartyService;
+    private final StoreSeasonService storeSeasonService;
 
     static LocalDateTime now() {
         return LocalDateTime.now(ZoneOffset.UTC);
@@ -202,14 +203,15 @@ public class StoreDeviceService {
         StoreDto.StoreBrief storeBrief = new StoreDto.StoreBrief(store.getId(), store.getName(), store.getBranch());
         StoreDto.QrInfo qrInfo = new StoreDto.QrInfo(qr.url(), StoreDto.iso(qr.expiresAt()));
         if (device.getKind() == StoreDevice.Kind.TABLE) {
-            return new StoreDto.DisplayResponse(brief, storeBrief, StoreDto.iso(now), qrInfo, null, null, null, null);
+            return new StoreDto.DisplayResponse(brief, storeBrief, StoreDto.iso(now), qrInfo, null, null, null, null, null, null);
         }
         StoreTvSetting setting = setting(store.getId(), now);
         List<StoreDto.GameItem> games = storeRankingService.visibleGames(store.getId());
         return new StoreDto.DisplayResponse(brief, storeBrief, StoreDto.iso(now), qrInfo, settingDto(setting),
             storeRankingService.mvp(store.getId(), storeRankingService.homeRankings(store.getId(), games, null)),
             top10(store.getId(), games, setting.hiddenGameIds()),
-            setting.isShowJustFinished() ? justFinished(store.getId(), now) : List.of());
+            setting.isShowJustFinished() ? justFinished(store.getId(), now) : List.of(),
+            storeSeasonService.currentInfo(store.getId()), storeSeasonService.recentResult(store.getId(), now));
     }
 
     StoreDevice authenticate(String rawToken) {
@@ -238,7 +240,7 @@ public class StoreDeviceService {
             games.stream().map(g -> new StoreDto.TvGame(g.boardGameId(), g.name(), matchCounts.getOrDefault(g.storeRoomId(), 0L))).toList(),
             tvs.size(), StoreDto.iso(lastSeen),
             storeRankingService.mvp(storeId, storeRankingService.homeRankings(storeId, games, null)),
-            top10(storeId, games, List.of()));
+            top10(storeId, games, List.of()), storeSeasonService.recentResult(storeId, now));
     }
 
     @Transactional
