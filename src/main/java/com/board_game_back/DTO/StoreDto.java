@@ -180,7 +180,8 @@ public class StoreDto {
 
     /** 6k: 설정 + TOP 10 게임 후보(열린 게임) + 미리 보기 데이터 */
     public record TvSettingResponse(TvSetting setting, List<TvGame> games, long tvCount, String tvLastSeenAt,
-                                    Mvp mvp, List<Top10> top10, SeasonResult seasonResult) {}
+                                    Mvp mvp, List<Top10> top10, SeasonResult seasonResult, List<EventCard> events,
+                                    List<ContestCard> recruiting, ContestBoard contestBoard) {}
 
     public record TvGame(Long boardGameId, String name, long matchCount) {}
 
@@ -339,7 +340,7 @@ public class StoreDto {
     /** 6i 게임방 관리 */
     public record AdminRoomItem(Long storeRoomId, Long boardGameId, String name, String imageUrl,
                                 Integer minMinutes, Integer maxMinutes, boolean closed, long matchCount,
-                                long upcomingContests) {}
+                                long upcomingContests, int minPlayers, int maxPlayers) {}
 
     /** assignedAt은 지정된 STAFF일 때만 (후보는 null) */
     public record StaffInfo(Long memberId, String nickname, String assignedAt) {}

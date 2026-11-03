@@ -167,7 +167,7 @@ public class StoreAdminService {
                 BoardGame g = games.get(r.getBoardGameId());
                 return new StoreDto.AdminRoomItem(r.getId(), g.getId(), g.getName(), g.getImageUrl(),
                     g.getMinMinutes(), g.getMaxMinutes(), r.isClosed(), matchCounts.getOrDefault(r.getId(), 0L),
-                    storeContestService.upcomingCount(r.getId()));
+                    storeContestService.upcomingCount(r.getId()), g.getMinPlayers(), g.getMaxPlayers());
             })
             .toList();
     }

@@ -235,7 +235,7 @@ public class StoreDeviceService {
 
     public StoreDto.TvSettingResponse tvSetting(Long storeId) {
         LocalDateTime now = now();
-        getStore(storeId);
+        Store store = getStore(storeId);
         StoreTvSetting setting = setting(storeId, now);
         List<StoreDto.GameItem> games = storeRankingService.visibleGames(storeId);
         Map<Long, Long> matchCounts = new HashMap<>();
@@ -248,7 +248,8 @@ public class StoreDeviceService {
             games.stream().map(g -> new StoreDto.TvGame(g.boardGameId(), g.name(), matchCounts.getOrDefault(g.storeRoomId(), 0L))).toList(),
             tvs.size(), StoreDto.iso(lastSeen),
             storeRankingService.mvp(storeId, storeRankingService.homeRankings(storeId, games, null)),
-            top10(storeId, games, List.of()), storeSeasonService.recentResult(storeId, now));
+            top10(storeId, games, List.of()), storeSeasonService.recentResult(storeId, now),
+            storeEventService.activeCards(store), storeContestService.recruitingCards(store), storeContestService.board(store, now));
     }
 
     @Transactional

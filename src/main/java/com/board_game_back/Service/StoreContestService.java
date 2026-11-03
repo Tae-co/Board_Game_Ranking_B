@@ -345,7 +345,12 @@ public class StoreContestService {
                 case PLAYING -> true;
                 case FINISHED, CANCELLED -> c.getBusinessDate().equals(today);
             })
-            .sorted(Comparator.comparing(StoreContest::getStartsAt))
+            // 진행 중 → 모집 중 → 오늘 끝남·취소 순, 같은 칸 안에선 시작 시각 순
+            .sorted(Comparator.comparingInt((StoreContest c) -> switch (c.getStatus()) {
+                case PLAYING -> 0;
+                case RECRUITING -> 1;
+                default -> 2;
+            }).thenComparing(StoreContest::getStartsAt))
             .toList();
         return cards(store, contests, memberIdOrNull, today);
     }
