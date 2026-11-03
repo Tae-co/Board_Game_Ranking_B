@@ -115,6 +115,8 @@ public class StorePlayController {
     public ResponseEntity<StoreDto.MatchResponse> getMatch(
             @PathVariable Long matchId,
             @AuthenticationPrincipal Long memberId) {
+        // 마감이 지난 판은 스케줄러(30초)를 기다리지 않고 보는 순간 닫는다 — 60분이 되면 바로 3m으로
+        matchService.closeIfDue(matchId);
         return ResponseEntity.ok(matchService.view(matchId, memberId));
     }
 

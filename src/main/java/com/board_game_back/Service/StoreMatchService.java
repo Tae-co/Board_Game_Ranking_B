@@ -217,6 +217,12 @@ public class StoreMatchService {
 
     // ── 자동 종료 (스케줄러) ──
 
+    /** 판 조회 때 — 스케줄러를 기다리지 않고 지금 시각으로 닫는다 */
+    @Transactional
+    public boolean closeIfDue(Long matchId) {
+        return closeIfDue(matchId, StorePartyService.now());
+    }
+
     /** 저장 마감·영업 마감·5분 확인이 지난 판을 닫는다. 바뀌었으면 true */
     @Transactional
     public boolean closeIfDue(Long matchId, LocalDateTime now) {
