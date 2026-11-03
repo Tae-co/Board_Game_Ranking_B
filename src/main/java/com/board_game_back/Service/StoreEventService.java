@@ -31,7 +31,7 @@ public class StoreEventService {
             .toList();
     }
 
-    /** 어드민 6 이벤트 목록·6k: 진행 중 + 예정 */
+    /** 어드민 6 이벤트 목록·6k, 손님 2 이벤트 더보기: 진행 중 + 예정 */
     public List<StoreDto.EventCard> adminList(Long storeId) {
         Store store = getStore(storeId);
         LocalDate today = today(store);

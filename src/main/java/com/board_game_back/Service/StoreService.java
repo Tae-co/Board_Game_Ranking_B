@@ -186,6 +186,13 @@ public class StoreService {
 
     // ── 매장 홈 ──
 
+    /** 2 이벤트 더보기: 대회(지난 끝난 대회까지) + 매장 이벤트(진행 중·예정). 운영 끝난 매장은 홈처럼 비움 */
+    public StoreDto.EventsResponse events(Long storeId, Long memberId) {
+        Store store = getStore(storeId);
+        if (store.isClosed()) return new StoreDto.EventsResponse(List.of(), List.of());
+        return new StoreDto.EventsResponse(storeContestService.listCards(store, memberId), storeEventService.adminList(storeId));
+    }
+
     public StoreDto.HomeResponse home(Long storeId, Long memberId) {
         LocalDateTime now = now();
         Store store = getStore(storeId);

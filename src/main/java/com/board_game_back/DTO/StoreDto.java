@@ -52,6 +52,9 @@ public class StoreDto {
                                SeasonInfo season, ResetNotice resetNotice, ClosedRecord closedRecord,
                                List<ContestCard> contests, List<EventCard> events) {}
 
+    /** 2 이벤트 더보기 */
+    public record EventsResponse(List<ContestCard> contests, List<EventCard> events) {}
+
     public record StoreInfo(Long id, String name, String branch, String address, String region, String phone,
                             String imageUrl, String openTime, String closeTime, boolean closed, String closedAt) {}
 

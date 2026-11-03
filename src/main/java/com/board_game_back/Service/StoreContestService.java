@@ -355,6 +355,17 @@ public class StoreContestService {
         return cards(store, contests, memberIdOrNull, today);
     }
 
+    /** 2 이벤트 더보기: 홈 카드(진행 중 → 모집 중 → 오늘 끝남·취소) 뒤에 지난 끝난 대회를 최근 순으로 */
+    public List<StoreDto.ContestCard> listCards(Store store, Long memberIdOrNull) {
+        LocalDate today = StoreClock.businessDate(store, StorePartyService.now());
+        List<StoreContest> past = contestRepository.findByStoreIdOrderByStartsAtDesc(store.getId()).stream()
+            .filter(c -> c.getStatus() == StoreContest.Status.FINISHED && c.getBusinessDate().isBefore(today))
+            .toList();
+        List<StoreDto.ContestCard> result = new ArrayList<>(cards(store, memberIdOrNull));
+        result.addAll(cards(store, past, memberIdOrNull, today));
+        return result;
+    }
+
     /** TV 4d: 모집 중인 대회만 */
     public List<StoreDto.ContestCard> recruitingCards(Store store) {
         return cards(store, null).stream()

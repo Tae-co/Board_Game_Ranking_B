@@ -44,6 +44,13 @@ public class StoreController {
         return ResponseEntity.ok(storeService.home(storeId, memberId));
     }
 
+    @GetMapping("/{storeId}/events")
+    public ResponseEntity<StoreDto.EventsResponse> getEvents(
+            @PathVariable Long storeId,
+            @AuthenticationPrincipal Long memberId) {
+        return ResponseEntity.ok(storeService.events(storeId, memberId));
+    }
+
     @PostMapping("/{storeId}/join")
     public ResponseEntity<StoreDto.CheckinResponse> join(
             @PathVariable Long storeId,
