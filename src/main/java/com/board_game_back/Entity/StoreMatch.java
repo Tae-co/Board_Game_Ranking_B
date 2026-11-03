@@ -22,6 +22,9 @@ import lombok.NoArgsConstructor;
  *
  * <p>PLAYING → AWAITING_CONFIRM → (DISPUTED|PLAYING → AWAITING_CONFIRM)* → RECORDED / CANCELLED / EXPIRED.
  * 기록자가 "점수 고치기"를 누르면 PLAYING으로 돌아가되 {@code firstSavedAt}은 남는다.
+ *
+ * <p>대회 판({@code contestId != null})은 참가자 확인 뒤 AWAITING_STAFF로 가고, STAFF가 확인하면 RECORDED,
+ * 돌려보내면 DISPUTED. 기록 시간·영업 마감 제한과 게임 취소가 없고 매장 Elo에 안 들어간다 (plan-store §1 대회 시작).
  */
 @Entity
 @Table(name = "store_match")
@@ -29,7 +32,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class StoreMatch {
 
-    public enum Status { PLAYING, AWAITING_CONFIRM, DISPUTED, RECORDED, CANCELLED, EXPIRED }
+    public enum Status { PLAYING, AWAITING_CONFIRM, DISPUTED, AWAITING_STAFF, RECORDED, CANCELLED, EXPIRED }
 
     public enum EndReason { CANCELLED, EXPIRED_MAX, EXPIRED_CLOSE, CONFIRMED, TIMEOUT }
 
@@ -87,6 +90,10 @@ public class StoreMatch {
 
     private LocalDateTime endedAt;
 
+    private Long contestId;
+
+    private Integer contestRound;
+
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private EndReason endReason;
@@ -94,7 +101,7 @@ public class StoreMatch {
     @Builder
     public StoreMatch(Long storeId, Long storeRoomId, Long boardGameId, Long partyId, Long recorderMemberId,
                       LocalDate businessDate, int minMinutes, int maxMinutes, LocalDateTime startedAt,
-                      LocalDateTime saveDeadline, LocalDateTime closesAt) {
+                      LocalDateTime saveDeadline, LocalDateTime closesAt, Long contestId, Integer contestRound) {
         this.storeId = storeId;
         this.storeRoomId = storeRoomId;
         this.boardGameId = boardGameId;
@@ -106,11 +113,18 @@ public class StoreMatch {
         this.startedAt = startedAt;
         this.saveDeadline = saveDeadline;
         this.closesAt = closesAt;
+        this.contestId = contestId;
+        this.contestRound = contestRound;
         this.status = Status.PLAYING;
     }
 
+    public boolean isContest() {
+        return contestId != null;
+    }
+
     public boolean isOpen() {
-        return status == Status.PLAYING || status == Status.AWAITING_CONFIRM || status == Status.DISPUTED;
+        return status == Status.PLAYING || status == Status.AWAITING_CONFIRM || status == Status.DISPUTED
+            || status == Status.AWAITING_STAFF;
     }
 
     /** 점수판을 고칠 수 있는 상태 (처음 입력 · 점수가 달라요 받음 · 점수 고치기) */
@@ -140,6 +154,12 @@ public class StoreMatch {
         this.confirmDeadline = null;
     }
 
+    /** 대회 판: 참가자 확인(전원 또는 5분)이 끝나 STAFF 확인(5c)을 기다린다 */
+    public void awaitStaff() {
+        this.status = Status.AWAITING_STAFF;
+        this.confirmDeadline = null;
+    }
+
     /** 기록자가 3i에서 "점수 고치기" */
     public void reopen() {
         this.status = Status.PLAYING;
@@ -164,6 +184,11 @@ public class StoreMatch {
         this.endReason = reason;
         this.endedAt = now;
         this.confirmDeadline = null;
+    }
+
+    /** 대회 판: 저장 전에 기록자가 대회에서 빠지면 그룹의 새 기록자로 */
+    public void changeRecorder(Long memberId) {
+        this.recorderMemberId = memberId;
     }
 
     public void anonymizeRecorder() {

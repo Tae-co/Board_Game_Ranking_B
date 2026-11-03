@@ -212,6 +212,8 @@ public class StoreSeasonService {
         Map<String, StoreRating> ratings = new HashMap<>();
         int ri = 0;
         for (StoreMatch m : matches) {
+            // 대회 판은 매장 Elo에 안 들어간다
+            if (m.isContest()) continue;
             while (ri < resets.size() && resets.get(ri).getResetAt().isBefore(m.getEndedAt())) applyReset(ratings, resets.get(ri++));
             List<StoreMatchParticipant> rated = byMatch.getOrDefault(m.getId(), List.of()).stream()
                 .filter(p -> p.getMemberId() != null && p.getPlacement() != null)

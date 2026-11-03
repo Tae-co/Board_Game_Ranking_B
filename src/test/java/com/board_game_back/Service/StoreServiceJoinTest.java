@@ -57,7 +57,7 @@ class StoreServiceJoinTest {
     void setUp() {
         service = new StoreService(storeRepository, storeMemberRepository, storeRoomRepository, storeRatingRepository,
             storeMatchParticipantRepository,
-            storeAccessService, qr, tickets, storePartyService, storeRankingService, null, null, null);
+            storeAccessService, qr, tickets, storePartyService, storeRankingService, null, null, null, null, null);
         store = Store.builder().name("야다").address("서울").region("South Korea")
             .openTime(LocalTime.of(10, 0)).closeTime(LocalTime.of(22, 0)).qrSecret("secret").build();
         ReflectionTestUtils.setField(store, "id", STORE_ID);

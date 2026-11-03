@@ -63,7 +63,7 @@ public class StoreReportService {
     @Transactional
     public void report(Long matchId, Long memberId, StoreDto.ReportRequest request) {
         StoreMatch match = matchRepository.findById(matchId)
-            .filter(m -> m.getStatus() == StoreMatch.Status.RECORDED)
+            .filter(m -> m.getStatus() == StoreMatch.Status.RECORDED && !m.isContest())
             .orElseThrow(() -> new StoreException(StoreErrorCode.MATCH_NOT_FOUND));
         storeMemberRepository.findByStoreIdAndMemberId(match.getStoreId(), memberId)
             .orElseThrow(() -> new StoreException(StoreErrorCode.NOT_MEMBER));
@@ -119,7 +119,7 @@ public class StoreReportService {
         // 대상의 최근 이 게임 경기
         List<StoreMatch> recentMatches = targetMemberId == null ? List.of()
             : matchRepository.findByStoreIdAndStatus(storeId, StoreMatch.Status.RECORDED).stream()
-                .filter(m -> m.getBoardGameId().equals(boardGameId))
+                .filter(m -> m.getBoardGameId().equals(boardGameId) && !m.isContest())
                 .sorted(Comparator.comparing(StoreMatch::getEndedAt).reversed())
                 .toList();
         Map<Long, List<StoreMatchParticipant>> byMatch = recentMatches.isEmpty() ? Map.of()

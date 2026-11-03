@@ -19,7 +19,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class StorePartyMember {
 
-    public enum LeftReason { LEAVE, KICK, EXPIRED, DISBAND, MOVE, WITHDRAW }
+    /** CONTEST = 대회가 시작돼 잠시 빠짐, CONTEST_END = 대회가 끝나 대회 그룹이 해산됨 */
+    public enum LeftReason { LEAVE, KICK, EXPIRED, DISBAND, MOVE, WITHDRAW, CONTEST, CONTEST_END }
 
     @Id
     @GeneratedValue(strategy = IDENTITY)

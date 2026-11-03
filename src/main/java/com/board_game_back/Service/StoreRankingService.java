@@ -173,10 +173,10 @@ public class StoreRankingService {
             new StoreDto.StartState(block, party, busyGame, closesAt, expired));
     }
 
-    /** 3 매치기록 탭: 최근 25경기 */
+    /** 3 매치기록 탭: 최근 25경기 (대회 판은 매장 점수가 없어 뺀다) */
     public List<StoreDto.MatchSummary> recentMatches(Long storeId, Long storeRoomId) {
         room(storeId, storeRoomId);
-        List<StoreMatch> matches = storeMatchRepository.findByStoreRoomIdAndStatusOrderByEndedAtDesc(
+        List<StoreMatch> matches = storeMatchRepository.findByStoreRoomIdAndStatusAndContestIdIsNullOrderByEndedAtDesc(
             storeRoomId, StoreMatch.Status.RECORDED, PageRequest.of(0, RECENT_MATCHES));
         Map<Long, List<StoreMatchParticipant>> byMatch = matches.isEmpty() ? Map.of()
             : participantRepository.findByStoreMatchIdIn(matches.stream().map(StoreMatch::getId).toList()).stream()

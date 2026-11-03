@@ -22,9 +22,13 @@ public interface StoreMatchRepository extends JpaRepository<StoreMatch, Long> {
 
     Optional<StoreMatch> findFirstByPartyIdOrderByIdDesc(Long partyId);
 
+    List<StoreMatch> findByContestIdOrderByIdAsc(Long contestId);
+
+    List<StoreMatch> findByContestIdInAndStatus(Collection<Long> contestIds, StoreMatch.Status status);
+
     List<StoreMatch> findByStatusIn(Collection<StoreMatch.Status> statuses);
 
-    List<StoreMatch> findByStoreRoomIdAndStatusOrderByEndedAtDesc(Long storeRoomId, StoreMatch.Status status, Pageable pageable);
+    List<StoreMatch> findByStoreRoomIdAndStatusAndContestIdIsNullOrderByEndedAtDesc(Long storeRoomId, StoreMatch.Status status, Pageable pageable);
 
     List<StoreMatch> findByStoreIdAndStatus(Long storeId, StoreMatch.Status status);
 

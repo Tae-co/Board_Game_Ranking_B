@@ -49,6 +49,8 @@ public class StoreInsightService {
     private final StoreAccessService accessService;
     private final StoreReportService reportService;
     private final StorePartyService partyService;
+    private final StoreContestService contestService;
+    private final StoreEventService eventService;
 
     // ── 7 프로필 매장 탭 ──
 
@@ -160,7 +162,14 @@ public class StoreInsightService {
 
         return new StoreDto.MonthlyReport(ym.toString(), new StoreDto.StoreBrief(store.getId(), store.getName(), store.getBranch()),
             cur.matches.size(), prev.matches.size(), cur.activity.size(), prev.activity.size(), cur.newMembers, prev.newMembers,
-            revisitRate, popular, heatHours, heatRows, regulars);
+            revisitRate, popular, heatHours, heatRows, regulars, events(store, ym));
+    }
+
+    /** "이번 달 이벤트 결과": 그 달 하루 대회와 겹친 매장 이벤트 */
+    private List<StoreDto.ReportEvent> events(Store store, YearMonth ym) {
+        List<StoreDto.ReportEvent> result = new ArrayList<>(contestService.reportContests(store, ym.atDay(1), ym.atEndOfMonth()));
+        result.addAll(eventService.reportEvents(store.getId(), ym.atDay(1), ym.atEndOfMonth()));
+        return result;
     }
 
     private record Month(List<StoreMatch> matches, List<Object[]> activity, long newMembers) {}

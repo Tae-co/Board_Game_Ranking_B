@@ -10,7 +10,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * 매장 판 자동 종료 (plan-store-impl §3.3). 30초마다:
- * 저장 마감이 지난 판 → EXPIRED(3m), 5분 확인이 지난 판 → RECORDED, 체크인이 끝난 사람 → 그룹에서 뺌.
+ * 저장 마감이 지난 판 → EXPIRED(3m), 5분 확인이 지난 판 → RECORDED(대회 판은 STAFF 확인 대기),
+ * 체크인이 끝난 사람 → 그룹에서 뺌, 그날 시작 안 된 하루 대회 → 취소.
  * 판·그룹마다 따로 트랜잭션이라 하나가 실패해도 나머지는 돈다.
  */
 @Slf4j
@@ -21,6 +22,7 @@ public class StorePlayScheduler {
     private final StoreMatchService matchService;
     private final StorePartyService partyService;
     private final StorePartyRepository partyRepository;
+    private final StoreContestService contestService;
 
     @Scheduled(fixedDelay = 30_000, initialDelay = 30_000)
     public void tick() {
@@ -37,6 +39,13 @@ public class StorePlayScheduler {
                 partyService.expireCheckins(party.getId(), now);
             } catch (Exception e) {
                 log.error("매장 그룹 체크인 만료 처리 실패 party={}", party.getId(), e);
+            }
+        }
+        for (Long contestId : contestService.recruitingIds()) {
+            try {
+                contestService.cancelIfDayOver(contestId, now);
+            } catch (Exception e) {
+                log.error("하루 대회 자동 취소 실패 contest={}", contestId, e);
             }
         }
     }

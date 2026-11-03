@@ -47,6 +47,8 @@ public class StoreService {
     private final StoreSeasonService storeSeasonService;
     private final StoreReportService storeReportService;
     private final StoreInsightService storeInsightService;
+    private final StoreContestService storeContestService;
+    private final StoreEventService storeEventService;
 
     private static LocalDateTime now() {
         return LocalDateTime.now(ZoneOffset.UTC);
@@ -111,7 +113,8 @@ public class StoreService {
         }
         StoreMember member = storeMemberRepository.findByStoreIdAndMemberId(storeId, memberId)
             .orElseThrow(() -> new StoreException(StoreErrorCode.NOT_MEMBER));
-        // 판이 열려 있으면 막고(MATCH_OPEN), 그룹에서도 빠진다 (1c)
+        // 판이 열려 있으면 막고(MATCH_OPEN), 그룹·대회에서도 빠진다 (1c)
+        storeContestService.onLeaveStore(storeId, memberId);
         storePartyService.leaveStore(storeId, memberId);
         storeRatingRepository.deleteByStoreIdAndMemberId(storeId, memberId);
         storeMatchParticipantRepository.anonymizeMemberInStore(storeId, memberId);
@@ -199,7 +202,7 @@ public class StoreService {
 
         StoreDto.PartyBrief party = storePartyService.membership(memberId)
             .flatMap(pm -> storePartyService.findParty(pm.getPartyId()))
-            .filter(p -> p.isActive() && p.getStoreId().equals(storeId))
+            .filter(p -> p.isActive() && !p.isContest() && p.getStoreId().equals(storeId))
             .map(storePartyService::brief)
             .orElse(null);
 
@@ -213,7 +216,9 @@ public class StoreService {
             rankings,
             storeSeasonService.currentInfo(storeId),
             role == ViewerRole.MEMBER ? storeReportService.unseenNotice(storeId, memberId) : null,
-            role == ViewerRole.MEMBER && store.isClosed() ? storeInsightService.closedRecord(store, memberId) : null);
+            role == ViewerRole.MEMBER && store.isClosed() ? storeInsightService.closedRecord(store, memberId) : null,
+            store.isClosed() ? List.of() : storeContestService.cards(store, memberId),
+            store.isClosed() ? List.of() : storeEventService.activeCards(store));
     }
 
     // ── 공통 ──

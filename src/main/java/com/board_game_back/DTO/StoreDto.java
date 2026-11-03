@@ -49,7 +49,8 @@ public class StoreDto {
     /** party·mvp·rankings는 2단계부터. party는 내가 이 매장 그룹에 있을 때만 */
     public record HomeResponse(StoreInfo store, Viewer viewer, long memberCount, List<GameItem> games,
                                PartyBrief party, Mvp mvp, List<GameRanking> rankings,
-                               SeasonInfo season, ResetNotice resetNotice, ClosedRecord closedRecord) {}
+                               SeasonInfo season, ResetNotice resetNotice, ClosedRecord closedRecord,
+                               List<ContestCard> contests, List<EventCard> events) {}
 
     public record StoreInfo(Long id, String name, String branch, String address, String region, String phone,
                             String imageUrl, String openTime, String closeTime, boolean closed, String closedAt) {}
@@ -107,7 +108,7 @@ public class StoreDto {
      */
     public record PartyResponse(Long id, StoreBrief store, String code, Long recorderMemberId,
                                 List<PartyMemberItem> members, List<String> expiredNicknames,
-                                MatchBrief currentMatch, MatchBrief lastMatch) {}
+                                MatchBrief currentMatch, MatchBrief lastMatch, Long contestId) {}
 
     public record MatchBrief(Long id, String status, Long storeRoomId, Long boardGameId, String gameName,
                              List<Long> participantIds) {}
@@ -122,7 +123,10 @@ public class StoreDto {
                                 String saveOpensAt, String saveDeadline, String closesAt, String firstSavedAt,
                                 String confirmDeadline, String endedAt, String serverNow, Long disputedByMemberId, String disputedByNickname,
                                 String draftJson, int draftVersion, List<MatchParticipantItem> participants,
-                                Integer myRankBefore, Integer myRankAfter) {}
+                                Integer myRankBefore, Integer myRankAfter, ContestMatchInfo contest) {}
+
+    /** 대회 판일 때만. staffReturned = STAFF가 5c에서 돌려보냈다 (3k 문구) */
+    public record ContestMatchInfo(Long id, String title, int round, int rounds, boolean staffReturned) {}
 
     /** ratingChange 등은 기록된 판만 */
     public record MatchParticipantItem(Long memberId, String nickname, Integer placement, Double gameScore,
@@ -161,8 +165,9 @@ public class StoreDto {
 
     public record JustFinishedPlayer(Integer placement, String nickname, Double gameScore, Integer ratingChange) {}
 
+    /** contestTitle·contestRound는 대회 판일 때만 (점수 변동 대신 순위 점수) */
     public record JustFinished(Long matchId, String gameName, String startedAt, String endedAt,
-                               List<JustFinishedPlayer> players) {}
+                               List<JustFinishedPlayer> players, String contestTitle, Integer contestRound) {}
 
     /**
      * 기기 화면. 테이블 기기는 store·device·qr만 (mvp·top10·justFinished·setting은 null).
@@ -170,7 +175,8 @@ public class StoreDto {
      */
     public record DisplayResponse(DeviceBrief device, StoreBrief store, String serverNow, QrInfo qr,
                                   TvSetting setting, Mvp mvp, List<Top10> top10, List<JustFinished> justFinished,
-                                  SeasonInfo season, SeasonResult seasonResult) {}
+                                  SeasonInfo season, SeasonResult seasonResult, List<EventCard> events,
+                                  List<ContestCard> recruiting, ContestBoard contestBoard) {}
 
     /** 6k: 설정 + TOP 10 게임 후보(열린 게임) + 미리 보기 데이터 */
     public record TvSettingResponse(TvSetting setting, List<TvGame> games, long tvCount, String tvLastSeenAt,
@@ -261,11 +267,66 @@ public class StoreDto {
     public record MonthlyReport(String month, StoreBrief store, long matches, long matchesPrev, long visitors,
                                 long visitorsPrev, long newMembers, long newMembersPrev, int revisitRate,
                                 List<GameCount> popular, List<Integer> heatHours, List<List<Integer>> heat,
-                                List<Regular> regulars) {}
+                                List<Regular> regulars, List<ReportEvent> events) {}
 
     public record GameCount(String name, long count) {}
 
     public record Regular(String nickname, long days, long games) {}
+
+    /** kind: CONTEST / EVENT. date = 대회 날 또는 "시작일~종료일". winners는 끝난 대회만 */
+    public record ReportEvent(String kind, String title, String date, long participants, List<String> winners,
+                              String status) {}
+
+    // ── 하루 대회 · 매장 이벤트 (5a~5e·4d·4g·6j) ──
+
+    /**
+     * 매장 홈 카드·TV 4d. status: RECRUITING / PLAYING / FINISHED / CANCELLED.
+     * myStatus: null(신청 안 함) / APPLIED / PLAYING / EXCLUDED / LEFT
+     */
+    public record ContestCard(Long id, String title, Long boardGameId, String gameName, String startsAt, boolean today,
+                              int capacity, long applied, int rounds, String prizeText, String status,
+                              boolean roomClosed, String myStatus, boolean arrived) {}
+
+    public record EventCard(Long id, String title, String benefitText, String imageUrl, String startsOn,
+                            String endsOn, boolean active) {}
+
+    /** status: APPLIED / PLAYING / EXCLUDED / LEFT */
+    public record ContestEntryItem(Long memberId, String nickname, boolean arrived, String status, boolean me) {}
+
+    /** status: WAITING(아직 안 열림) / PLAYING / AWAITING_CONFIRM / DISPUTED / AWAITING_STAFF / DONE / CANCELLED */
+    public record ContestRound(int round, Long matchId, String status, Integer myPlacement, Integer myPoints) {}
+
+    /** points[판-1] = 그 판 순위 점수 (안 했거나 아직 반영 전이면 null). left = 대회 중 나가서 순위에서 빠짐 */
+    public record ContestStanding(Integer rank, Long memberId, String nickname, List<Integer> points, int total,
+                                  double gameScore, boolean me, boolean left) {}
+
+    /** viewer: STAFF / STAFF_OTHER / MEMBER / VISITOR. endReason: COMPLETED / SHORT_HANDED / STAFF_CANCEL / DAY_OVER / STORE_CLOSED */
+    public record ContestResponse(Long id, StoreBrief store, String title, Long storeRoomId, Long boardGameId,
+                                  String gameName, int minPlayers, int maxPlayers, String startsAt, boolean today,
+                                  int capacity, int rounds, String prizeText, String status, String endReason,
+                                  boolean roomClosed, String viewer, String myStatus, boolean myArrived,
+                                  List<ContestEntryItem> entries, Long recorderMemberId, String recorderNickname,
+                                  List<ContestRound> roundStates, List<ContestStanding> standings,
+                                  Long currentMatchId, String serverNow) {}
+
+    public record ContestStartRequest(Long recorderMemberId) {}
+
+    public record ArrivalRequest(boolean arrived) {}
+
+    /** 4g. 진행 중이거나 끝난 지 1시간 안 */
+    public record ContestBoard(Long id, String title, String gameName, int rounds, int roundsDone, String status,
+                               List<ContestStanding> standings) {}
+
+    /** 6j 대회. date "yyyy-MM-dd", time "HH:mm" (매장 지역 시간) */
+    public record ContestForm(String title, Long boardGameId, String date, String time, Integer capacity,
+                              Integer rounds, String prizeText) {}
+
+    public record AdminContestItem(Long id, String title, Long boardGameId, String gameName, String date, String time,
+                                   int capacity, int rounds, String prizeText, String status, long applied,
+                                   boolean roomClosed) {}
+
+    /** 6j 매장 이벤트. 날짜 "yyyy-MM-dd" (매장 영업일) */
+    public record EventForm(String title, String benefitText, String imageUrl, String startsOn, String endsOn) {}
 
     // ── 어드민 ──
 
@@ -277,7 +338,8 @@ public class StoreDto {
 
     /** 6i 게임방 관리 */
     public record AdminRoomItem(Long storeRoomId, Long boardGameId, String name, String imageUrl,
-                                Integer minMinutes, Integer maxMinutes, boolean closed, long matchCount) {}
+                                Integer minMinutes, Integer maxMinutes, boolean closed, long matchCount,
+                                long upcomingContests) {}
 
     /** assignedAt은 지정된 STAFF일 때만 (후보는 null) */
     public record StaffInfo(Long memberId, String nickname, String assignedAt) {}

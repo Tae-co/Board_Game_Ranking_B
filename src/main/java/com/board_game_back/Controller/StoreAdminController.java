@@ -2,6 +2,8 @@ package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.StoreDto;
 import com.board_game_back.Service.StoreAdminService;
+import com.board_game_back.Service.StoreContestService;
+import com.board_game_back.Service.StoreEventService;
 import com.board_game_back.Service.StoreDeviceService;
 import com.board_game_back.Service.StoreInsightService;
 import com.board_game_back.Service.StoreReportService;
@@ -23,6 +25,8 @@ public class StoreAdminController {
     private final StoreSeasonService storeSeasonService;
     private final StoreReportService storeReportService;
     private final StoreInsightService storeInsightService;
+    private final StoreContestService storeContestService;
+    private final StoreEventService storeEventService;
 
     @GetMapping
     public ResponseEntity<List<StoreDto.AdminStoreItem>> getStores() {
@@ -169,5 +173,61 @@ public class StoreAdminController {
 
     private static Long target(Long targetId) {
         return targetId == null || targetId == 0 ? null : targetId;
+    }
+
+    // ── 이벤트 (6j·6k) ──
+
+    @GetMapping("/{storeId}/contests")
+    public ResponseEntity<List<StoreDto.AdminContestItem>> getContests(@PathVariable Long storeId) {
+        return ResponseEntity.ok(storeContestService.adminList(storeId));
+    }
+
+    @PostMapping("/{storeId}/contests")
+    public ResponseEntity<List<StoreDto.AdminContestItem>> createContest(
+            @PathVariable Long storeId,
+            @RequestBody StoreDto.ContestForm form) {
+        return ResponseEntity.ok(storeContestService.create(storeId, form));
+    }
+
+    @PutMapping("/{storeId}/contests/{contestId}")
+    public ResponseEntity<List<StoreDto.AdminContestItem>> updateContest(
+            @PathVariable Long storeId,
+            @PathVariable Long contestId,
+            @RequestBody StoreDto.ContestForm form) {
+        return ResponseEntity.ok(storeContestService.update(storeId, contestId, form));
+    }
+
+    @DeleteMapping("/{storeId}/contests/{contestId}")
+    public ResponseEntity<List<StoreDto.AdminContestItem>> deleteContest(
+            @PathVariable Long storeId,
+            @PathVariable Long contestId) {
+        return ResponseEntity.ok(storeContestService.delete(storeId, contestId));
+    }
+
+    @GetMapping("/{storeId}/events")
+    public ResponseEntity<List<StoreDto.EventCard>> getEvents(@PathVariable Long storeId) {
+        return ResponseEntity.ok(storeEventService.adminList(storeId));
+    }
+
+    @PostMapping("/{storeId}/events")
+    public ResponseEntity<List<StoreDto.EventCard>> createEvent(
+            @PathVariable Long storeId,
+            @RequestBody StoreDto.EventForm form) {
+        return ResponseEntity.ok(storeEventService.create(storeId, form));
+    }
+
+    @PutMapping("/{storeId}/events/{eventId}")
+    public ResponseEntity<List<StoreDto.EventCard>> updateEvent(
+            @PathVariable Long storeId,
+            @PathVariable Long eventId,
+            @RequestBody StoreDto.EventForm form) {
+        return ResponseEntity.ok(storeEventService.update(storeId, eventId, form));
+    }
+
+    @DeleteMapping("/{storeId}/events/{eventId}")
+    public ResponseEntity<List<StoreDto.EventCard>> deleteEvent(
+            @PathVariable Long storeId,
+            @PathVariable Long eventId) {
+        return ResponseEntity.ok(storeEventService.delete(storeId, eventId));
     }
 }
