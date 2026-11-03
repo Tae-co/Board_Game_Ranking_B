@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 점수판 요청 (2g 손님 · 6c 관리자). 같은 게임 이름(공백·대소문자 무시)은 한 줄로 묶고,
- * 요청 수 = 요청하거나 공감한 사람 수. 알림은 없다 — 상태는 "내 요청"에서 본다.
+ * 요청 수(6c) = 요청하거나 공감한 사람 수, 2g 공감 버튼 숫자 = 요청 + 공감 건수. 알림은 없다 — 상태는 "내 요청"에서 본다.
  */
 @Service
 @RequiredArgsConstructor
@@ -47,16 +47,18 @@ public class ScoreSheetRequestService {
     public StoreDto.ScoreRequestsResponse view(Long memberId) {
         List<ScoreSheetGameRequest> games = gameRequestRepository.findAll();
         List<ScoreSheetRequestEntry> entries = entryRepository.findAll();
-        Map<Long, Set<Long>> people = people(entries);
+        // 요청 + 공감 건수 — 내가 요청한 게임에 공감해도 1 오르도록 (사람 수로 세면 그대로라 토글이 안 보임)
+        Map<Long, Long> counts = entries.stream().filter(e -> e.getMemberId() != null)
+            .collect(Collectors.groupingBy(ScoreSheetRequestEntry::getGameRequestId, Collectors.counting()));
         Set<Long> votedByMe = entries.stream()
             .filter(e -> e.getKind() == ScoreSheetRequestEntry.Kind.VOTE && memberId.equals(e.getMemberId()))
             .map(ScoreSheetRequestEntry::getGameRequestId).collect(Collectors.toSet());
         List<StoreDto.ScoreRequestItem> popular = games.stream()
             .filter(g -> g.getStatus() != ScoreSheetGameRequest.Status.ADDED)
-            .sorted(Comparator.comparingInt((ScoreSheetGameRequest g) -> people.getOrDefault(g.getId(), Set.of()).size()).reversed()
+            .sorted(Comparator.comparingLong((ScoreSheetGameRequest g) -> counts.getOrDefault(g.getId(), 0L)).reversed()
                 .thenComparing(ScoreSheetGameRequest::getLastRequestedAt, Comparator.reverseOrder()))
             .limit(POPULAR)
-            .map(g -> new StoreDto.ScoreRequestItem(g.getId(), g.getName(), people.getOrDefault(g.getId(), Set.of()).size(),
+            .map(g -> new StoreDto.ScoreRequestItem(g.getId(), g.getName(), counts.getOrDefault(g.getId(), 0L),
                 votedByMe.contains(g.getId())))
             .toList();
         Map<Long, ScoreSheetGameRequest> byId = games.stream().collect(Collectors.toMap(ScoreSheetGameRequest::getId, Function.identity()));
