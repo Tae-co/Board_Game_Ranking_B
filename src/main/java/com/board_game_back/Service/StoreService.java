@@ -190,7 +190,12 @@ public class StoreService {
     public StoreDto.EventsResponse events(Long storeId, Long memberId) {
         Store store = getStore(storeId);
         if (store.isClosed()) return new StoreDto.EventsResponse(List.of(), List.of());
-        return new StoreDto.EventsResponse(storeContestService.listCards(store, memberId), storeEventService.adminList(storeId));
+        return new StoreDto.EventsResponse(storeContestService.listCards(store, memberId), storeEventService.viewerList(store, memberId));
+    }
+
+    /** 1회용 쿠폰 사용 완료 (이벤트 자세히 보기) */
+    public StoreDto.EventCard useEvent(Long storeId, Long eventId, Long memberId) {
+        return storeEventService.use(storeId, eventId, memberId);
     }
 
     public StoreDto.HomeResponse home(Long storeId, Long memberId) {

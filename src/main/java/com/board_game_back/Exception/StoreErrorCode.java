@@ -61,7 +61,10 @@ public enum StoreErrorCode {
     CONTEST_PARTY(HttpStatus.CONFLICT, "대회 중에는 할 수 없어요."),
     INVALID_CONTEST(HttpStatus.BAD_REQUEST, "대회 내용을 확인해 주세요."),
     EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "이벤트를 찾을 수 없어요."),
-    INVALID_EVENT(HttpStatus.BAD_REQUEST, "이벤트 내용을 확인해 주세요.");
+    INVALID_EVENT(HttpStatus.BAD_REQUEST, "이벤트 내용을 확인해 주세요."),
+    EVENT_NOT_COUPON(HttpStatus.BAD_REQUEST, "1회용 쿠폰 이벤트가 아니에요."),
+    EVENT_NOT_ACTIVE(HttpStatus.CONFLICT, "지금은 쓸 수 있는 기간이 아니에요."),
+    COUPON_ALREADY_USED(HttpStatus.CONFLICT, "이미 사용한 쿠폰이에요.");
 
     private final HttpStatus status;
     private final String message;

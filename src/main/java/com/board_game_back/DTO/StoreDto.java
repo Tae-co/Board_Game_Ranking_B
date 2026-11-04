@@ -294,8 +294,9 @@ public class StoreDto {
                               int capacity, long applied, int rounds, String prizeText, String status,
                               boolean roomClosed, String myStatus, boolean arrived) {}
 
+    /** usedAt = 1회용 쿠폰을 내가 쓴 시각 (손님 이벤트 목록만, 어드민·TV는 null) */
     public record EventCard(Long id, String title, String benefitText, String howToUse, String imageUrl,
-                            String startsOn, String endsOn, boolean active) {}
+                            boolean oneTime, String startsOn, String endsOn, boolean active, String usedAt) {}
 
     /** status: APPLIED / PLAYING / EXCLUDED / LEFT */
     public record ContestEntryItem(Long memberId, String nickname, boolean arrived, String status, boolean me) {}
@@ -333,8 +334,8 @@ public class StoreDto {
                                    boolean roomClosed) {}
 
     /** 6j 매장 이벤트. 날짜 "yyyy-MM-dd" (매장 영업일) */
-    public record EventForm(String title, String benefitText, String howToUse, String imageUrl, String startsOn,
-                            String endsOn) {}
+    public record EventForm(String title, String benefitText, String howToUse, String imageUrl, Boolean oneTime,
+                            String startsOn, String endsOn) {}
 
     // ── 어드민 ──
 

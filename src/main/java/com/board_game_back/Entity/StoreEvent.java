@@ -39,6 +39,10 @@ public class StoreEvent {
     @Column(length = 500)
     private String imageUrl;
 
+    /** 1회용 쿠폰: 상세 화면에 사용 완료 버튼, 회원당 한 번 (store_event_use) */
+    @Column(nullable = false)
+    private boolean oneTime;
+
     @Column(nullable = false)
     private LocalDate startsOn;
 
@@ -53,12 +57,13 @@ public class StoreEvent {
         this.createdAt = now;
     }
 
-    public void update(String title, String benefitText, String howToUse, String imageUrl, LocalDate startsOn,
-                       LocalDate endsOn) {
+    public void update(String title, String benefitText, String howToUse, String imageUrl, boolean oneTime,
+                       LocalDate startsOn, LocalDate endsOn) {
         this.title = title;
         this.benefitText = benefitText;
         this.howToUse = howToUse;
         this.imageUrl = imageUrl;
+        this.oneTime = oneTime;
         this.startsOn = startsOn;
         this.endsOn = endsOn;
     }
