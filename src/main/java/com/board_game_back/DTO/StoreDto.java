@@ -294,8 +294,8 @@ public class StoreDto {
                               int capacity, long applied, int rounds, String prizeText, String status,
                               boolean roomClosed, String myStatus, boolean arrived) {}
 
-    public record EventCard(Long id, String title, String benefitText, String imageUrl, String startsOn,
-                            String endsOn, boolean active) {}
+    public record EventCard(Long id, String title, String benefitText, String howToUse, String imageUrl,
+                            String startsOn, String endsOn, boolean active) {}
 
     /** status: APPLIED / PLAYING / EXCLUDED / LEFT */
     public record ContestEntryItem(Long memberId, String nickname, boolean arrived, String status, boolean me) {}
@@ -333,7 +333,8 @@ public class StoreDto {
                                    boolean roomClosed) {}
 
     /** 6j 매장 이벤트. 날짜 "yyyy-MM-dd" (매장 영업일) */
-    public record EventForm(String title, String benefitText, String imageUrl, String startsOn, String endsOn) {}
+    public record EventForm(String title, String benefitText, String howToUse, String imageUrl, String startsOn,
+                            String endsOn) {}
 
     // ── 어드민 ──
 

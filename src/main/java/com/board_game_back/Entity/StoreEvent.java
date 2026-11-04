@@ -13,7 +13,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 매장 이벤트 (음료 1+1 등). 게임방·랭킹 없이 매장 홈 카드와 TV 4d에만 뜬다. 기간은 매장 영업일. */
+/** 매장 이벤트 (음료 1+1 등). 게임방·랭킹 없이 매장 홈 카드·상세와 TV 4d에만 뜬다. 기간은 매장 영업일. */
 @Entity
 @Table(name = "store_event")
 @Getter
@@ -34,6 +34,9 @@ public class StoreEvent {
     private String benefitText;
 
     @Column(length = 500)
+    private String howToUse;
+
+    @Column(length = 500)
     private String imageUrl;
 
     @Column(nullable = false)
@@ -50,9 +53,11 @@ public class StoreEvent {
         this.createdAt = now;
     }
 
-    public void update(String title, String benefitText, String imageUrl, LocalDate startsOn, LocalDate endsOn) {
+    public void update(String title, String benefitText, String howToUse, String imageUrl, LocalDate startsOn,
+                       LocalDate endsOn) {
         this.title = title;
         this.benefitText = benefitText;
+        this.howToUse = howToUse;
         this.imageUrl = imageUrl;
         this.startsOn = startsOn;
         this.endsOn = endsOn;

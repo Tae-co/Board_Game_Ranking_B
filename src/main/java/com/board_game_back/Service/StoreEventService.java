@@ -80,9 +80,10 @@ public class StoreEventService {
         if (form == null) throw new StoreException(StoreErrorCode.INVALID_EVENT);
         String title = form.title() == null ? "" : form.title().trim();
         String benefit = form.benefitText() == null || form.benefitText().isBlank() ? null : form.benefitText().trim();
+        String howToUse = form.howToUse() == null || form.howToUse().isBlank() ? null : form.howToUse().trim();
         String image = form.imageUrl() == null || form.imageUrl().isBlank() ? null : form.imageUrl().trim();
         if (title.isEmpty() || title.length() > 40 || (benefit != null && benefit.length() > 300)
-            || (image != null && image.length() > 500)) {
+            || (howToUse != null && howToUse.length() > 500) || (image != null && image.length() > 500)) {
             throw new StoreException(StoreErrorCode.INVALID_EVENT);
         }
         LocalDate start;
@@ -94,11 +95,11 @@ public class StoreEventService {
             throw new StoreException(StoreErrorCode.INVALID_EVENT);
         }
         if (end.isBefore(start)) throw new StoreException(StoreErrorCode.INVALID_EVENT);
-        event.update(title, benefit, image, start, end);
+        event.update(title, benefit, howToUse, image, start, end);
     }
 
     private static StoreDto.EventCard card(StoreEvent e, LocalDate today) {
-        return new StoreDto.EventCard(e.getId(), e.getTitle(), e.getBenefitText(), e.getImageUrl(),
+        return new StoreDto.EventCard(e.getId(), e.getTitle(), e.getBenefitText(), e.getHowToUse(), e.getImageUrl(),
             e.getStartsOn().toString(), e.getEndsOn().toString(), e.isActiveOn(today));
     }
 
