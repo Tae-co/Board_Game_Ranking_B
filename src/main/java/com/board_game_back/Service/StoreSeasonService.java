@@ -110,30 +110,32 @@ public class StoreSeasonService {
         Map<Long, List<StoreRating>> byGame = ratings.stream().collect(Collectors.groupingBy(StoreRating::getBoardGameId));
         Map<Long, Member> members = rankingService.members(ratings.stream().map(StoreRating::getMemberId).toList());
         List<StoreSeasonSnapshot> rows = new ArrayList<>();
-        List<StoreDto.GameRanking> leaders = new ArrayList<>();
-        Map<Long, String> names = gameNames(byGame.keySet());
         for (Map.Entry<Long, List<StoreRating>> e : byGame.entrySet()) {
-            List<StoreDto.RankItem> ranked = rankingService.rank(e.getValue(), members, null);
-            for (StoreDto.RankItem r : ranked) {
+            for (StoreDto.RankItem r : rankingService.rank(e.getValue(), members, null)) {
                 rows.add(new StoreSeasonSnapshot(season.getId(), StoreSeasonSnapshot.Kind.RANK, e.getKey(), r.memberId(),
                     r.nickname(), r.rank(), r.score(), r.games()));
             }
-            if (!ranked.isEmpty()) {
-                leaders.add(new StoreDto.GameRanking(null, e.getKey(), names.get(e.getKey()), ranked.size(), ranked.subList(0, 1)));
+        }
+        StoreDto.Mvp mvp = rankingService.mvpBetween(store.getId(), season.getStartDate(), season.getEndDate());
+        if (mvp != null) {
+            addMvp(rows, season, StoreSeasonSnapshot.Kind.MOST_VISITS, mvp.mostVisits());
+            addMvp(rows, season, StoreSeasonSnapshot.Kind.MOST_GAMES, mvp.mostGames());
+            addMvp(rows, season, StoreSeasonSnapshot.Kind.MOST_WINS, mvp.mostWins());
+            addMvp(rows, season, StoreSeasonSnapshot.Kind.BEST_STREAK, mvp.bestStreak());
+            StoreDto.MvpRate rate = mvp.bestWinRate();
+            if (rate != null) {
+                rows.add(new StoreSeasonSnapshot(season.getId(), StoreSeasonSnapshot.Kind.WIN_RATE, null,
+                    rate.memberId(), rate.nickname(), 1, rate.percent(), (int) rate.games()));
             }
-        }
-        StoreDto.Mvp mvp = rankingService.mvpBetween(store.getId(), season.getStartDate(), season.getEndDate(), leaders);
-        if (mvp != null && mvp.mostVisits() != null) {
-            rows.add(new StoreSeasonSnapshot(season.getId(), StoreSeasonSnapshot.Kind.MOST_VISITS, null,
-                mvp.mostVisits().memberId(), mvp.mostVisits().nickname(), 1, (int) mvp.mostVisits().count(), null));
-        }
-        if (mvp != null && mvp.mostGames() != null) {
-            rows.add(new StoreSeasonSnapshot(season.getId(), StoreSeasonSnapshot.Kind.MOST_GAMES, null,
-                mvp.mostGames().memberId(), mvp.mostGames().nickname(), 1, (int) mvp.mostGames().count(), null));
         }
         snapshotRepository.saveAll(rows);
         ratingRepository.deleteByStoreId(store.getId());
         season.finalizeAt(now);
+    }
+
+    private static void addMvp(List<StoreSeasonSnapshot> rows, StoreSeason season, StoreSeasonSnapshot.Kind kind, StoreDto.MvpItem item) {
+        if (item == null) return;
+        rows.add(new StoreSeasonSnapshot(season.getId(), kind, null, item.memberId(), item.nickname(), 1, (int) item.count(), null));
     }
 
     // ── 6 어드민 시즌 ──
@@ -332,8 +334,12 @@ public class StoreSeasonService {
             .filter(s -> s.getStartDate().isAfter(last.getEndDate())).findFirst()
             .map(s -> s.getStartDate().toString()).orElse(last.getEndDate().plusDays(1).toString());
         if (winners.isEmpty() && mvp.apply(StoreSeasonSnapshot.Kind.MOST_VISITS) == null) return null;
+        StoreDto.MvpRate rate = rows.stream().filter(r -> r.getKind() == StoreSeasonSnapshot.Kind.WIN_RATE).findFirst()
+            .map(r -> new StoreDto.MvpRate(r.getMemberId(), r.getNickname(), r.getValue(), r.getGames() == null ? 0 : r.getGames()))
+            .orElse(null);
         return new StoreDto.SeasonResult(last.getName(), winners, mvp.apply(StoreSeasonSnapshot.Kind.MOST_VISITS),
-            mvp.apply(StoreSeasonSnapshot.Kind.MOST_GAMES), nextStart);
+            mvp.apply(StoreSeasonSnapshot.Kind.MOST_GAMES), mvp.apply(StoreSeasonSnapshot.Kind.MOST_WINS),
+            mvp.apply(StoreSeasonSnapshot.Kind.BEST_STREAK), rate, nextStart);
     }
 
     // ── 공통 ──

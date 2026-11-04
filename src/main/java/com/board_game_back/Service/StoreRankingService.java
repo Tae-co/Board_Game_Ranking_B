@@ -34,6 +34,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -51,6 +52,7 @@ public class StoreRankingService {
     public static final int ROOM_TOP = 10;
     public static final int FULL_TOP = 20;
     public static final int RECENT_MATCHES = 25;
+    public static final int WIN_RATE_MIN_GAMES = 3;
 
     private final StoreRepository storeRepository;
     private final StoreRoomRepository storeRoomRepository;
@@ -96,14 +98,17 @@ public class StoreRankingService {
     }
 
     /** 이번 시즌 MVP. 시즌이 아직 없으면 전체 기간 */
-    public StoreDto.Mvp mvp(Long storeId, List<StoreDto.GameRanking> rankings) {
+    public StoreDto.Mvp mvp(Long storeId) {
         Store store = storeRepository.findById(storeId).orElseThrow(() -> new StoreException(StoreErrorCode.STORE_NOT_FOUND));
         LocalDate from = currentSeason(store, StorePartyService.now()).map(StoreSeason::getStartDate).orElse(EPOCH);
-        return mvpBetween(storeId, from, FAR_FUTURE, rankings);
+        return mvpBetween(storeId, from, FAR_FUTURE);
     }
 
-    /** 기간 안 최다 방문·최다 참여 + 게임별 1위(rankings 첫 줄) */
-    public StoreDto.Mvp mvpBetween(Long storeId, LocalDate from, LocalDate to, List<StoreDto.GameRanking> rankings) {
+    /**
+     * 기간 안 최다 방문·최다 참여·최다승·최대 연승·최고 승률. 승 = 1등(공동 1등 포함), 최고 승률은 {@link #WIN_RATE_MIN_GAMES}판 이상만.
+     * 게임별 1위는 아래 게임별 랭킹과 겹쳐서 넣지 않는다
+     */
+    public StoreDto.Mvp mvpBetween(Long storeId, LocalDate from, LocalDate to) {
         List<Object[]> rows = participantRepository.activityBetween(storeId, from, to);
         Map<Long, Member> members = members(rows.stream().map(r -> (Long) r[0]).toList());
         rows = rows.stream().filter(r -> isRankable(members.get((Long) r[0]))).toList();
@@ -116,14 +121,39 @@ public class StoreRankingService {
             .max(Comparator.<Object[]>comparingLong(r -> (Long) r[1]).thenComparing(recent))
             .map(r -> new StoreDto.MvpItem((Long) r[0], members.get((Long) r[0]).getNickname(), (Long) r[1]))
             .orElse(null);
-        List<StoreDto.GameLeader> leaders = rankings.stream()
-            .map(g -> {
-                StoreDto.RankItem top = g.top().get(0);
-                return new StoreDto.GameLeader(g.boardGameId(), g.name(), top.memberId(), top.nickname(), top.score());
-            })
-            .toList();
-        if (visits == null && leaders.isEmpty()) return null;
-        return new StoreDto.Mvp(visits, games, leaders);
+        if (visits == null) return null;
+        // 회원별 [승, 지금 연승, 최대 연승] — 끝난 순서대로 훑는다
+        Map<Long, int[]> wins = new HashMap<>();
+        for (Object[] p : participantRepository.placementsBetween(storeId, from, to)) {
+            int[] w = wins.computeIfAbsent((Long) p[0], k -> new int[3]);
+            if (Integer.valueOf(1).equals(p[1])) {
+                w[0]++;
+                w[1]++;
+                w[2] = Math.max(w[2], w[1]);
+            } else {
+                w[1] = 0;
+            }
+        }
+        int[] none = new int[3];
+        StoreDto.MvpItem mostWins = topBy(rows, members, r -> wins.getOrDefault((Long) r[0], none)[0], recent);
+        StoreDto.MvpItem bestStreak = topBy(rows, members, r -> wins.getOrDefault((Long) r[0], none)[2], recent);
+        StoreDto.MvpRate bestWinRate = rows.stream()
+            .filter(r -> (Long) r[1] >= WIN_RATE_MIN_GAMES && wins.getOrDefault((Long) r[0], none)[0] > 0)
+            .max(Comparator.<Object[]>comparingDouble(r -> (double) wins.get((Long) r[0])[0] / (Long) r[1]).thenComparing(recent))
+            .map(r -> new StoreDto.MvpRate((Long) r[0], members.get((Long) r[0]).getNickname(),
+                (int) Math.round(100.0 * wins.get((Long) r[0])[0] / (Long) r[1]), (Long) r[1]))
+            .orElse(null);
+        return new StoreDto.Mvp(visits, games, mostWins, bestStreak, bestWinRate);
+    }
+
+    /** 값이 0보다 큰 사람 중 가장 큰 사람. 동점이면 가장 최근에 플레이한 사람 */
+    private static StoreDto.MvpItem topBy(List<Object[]> rows, Map<Long, Member> members,
+                                          ToLongFunction<Object[]> value, Comparator<Object[]> recent) {
+        return rows.stream()
+            .filter(r -> value.applyAsLong(r) > 0)
+            .max(Comparator.comparingLong(value).thenComparing(recent))
+            .map(r -> new StoreDto.MvpItem((Long) r[0], members.get((Long) r[0]).getNickname(), value.applyAsLong(r)))
+            .orElse(null);
     }
 
     /** 2b 게임별 매장 랭킹 전체 (상위 20 + 내 순위) */

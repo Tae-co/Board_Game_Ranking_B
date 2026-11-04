@@ -214,7 +214,7 @@ public class StoreDeviceService {
         StoreTvSetting setting = setting(store.getId(), now);
         List<StoreDto.GameItem> games = storeRankingService.visibleGames(store.getId());
         return new StoreDto.DisplayResponse(brief, storeBrief, StoreDto.iso(now), qrInfo, settingDto(setting),
-            storeRankingService.mvp(store.getId(), storeRankingService.homeRankings(store.getId(), games, null)),
+            storeRankingService.mvp(store.getId()),
             top10(store.getId(), games, setting.hiddenGameIds()),
             setting.isShowJustFinished() ? justFinished(store.getId(), now) : List.of(),
             storeSeasonService.currentInfo(store.getId()), storeSeasonService.recentResult(store.getId(), now),
@@ -247,7 +247,7 @@ public class StoreDeviceService {
         return new StoreDto.TvSettingResponse(settingDto(setting),
             games.stream().map(g -> new StoreDto.TvGame(g.boardGameId(), g.name(), matchCounts.getOrDefault(g.storeRoomId(), 0L))).toList(),
             tvs.size(), StoreDto.iso(lastSeen),
-            storeRankingService.mvp(storeId, storeRankingService.homeRankings(storeId, games, null)),
+            storeRankingService.mvp(storeId),
             top10(storeId, games, List.of()), storeSeasonService.recentResult(storeId, now),
             storeEventService.activeCards(store), storeContestService.recruitingCards(store), storeContestService.board(store, now));
     }

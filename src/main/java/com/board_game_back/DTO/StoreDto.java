@@ -73,10 +73,13 @@ public class StoreDto {
 
     public record GameRanking(Long storeRoomId, Long boardGameId, String name, long playerCount, List<RankItem> top) {}
 
-    /** gameLeaders = 게임별 1위. 동점이면 가장 최근에 플레이한 사람 (plan-store §1 MVP) */
-    public record Mvp(MvpItem mostVisits, MvpItem mostGames, List<GameLeader> gameLeaders) {}
+    /** 동점이면 가장 최근에 플레이한 사람 (plan-store §1 MVP). 기록이 없는 칸은 null */
+    public record Mvp(MvpItem mostVisits, MvpItem mostGames, MvpItem mostWins, MvpItem bestStreak, MvpRate bestWinRate) {}
 
     public record MvpItem(Long memberId, String nickname, long count) {}
+
+    /** 최고 승률: percent = 승 / 판 (반올림), games = 판 */
+    public record MvpRate(Long memberId, String nickname, int percent, long games) {}
 
     public record GameLeader(Long boardGameId, String name, Long memberId, String nickname, int score) {}
 
@@ -208,7 +211,7 @@ public class StoreDto {
 
     /** 4b: 끝난 뒤 1주일. winners = 게임별 1위 */
     public record SeasonResult(String name, List<GameLeader> winners, MvpItem mostVisits, MvpItem mostGames,
-                               String nextStart) {}
+                               MvpItem mostWins, MvpItem bestStreak, MvpRate bestWinRate, String nextStart) {}
 
     // ── 신고 · 점수 초기화 (3g·6b·2 안내 카드) ──
 

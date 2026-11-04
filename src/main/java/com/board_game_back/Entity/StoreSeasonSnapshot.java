@@ -13,14 +13,14 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 끝난 시즌 결과 한 줄: 게임별 순위(RANK) / 최다 방문 / 최다 참여. 닉네임은 그때 값으로 남긴다 */
+/** 끝난 시즌 결과 한 줄: 게임별 순위(RANK) / 최다 방문 / 최다 참여 / 최다승 / 최대 연승 / 최고 승률(value=%, games=판). 닉네임은 그때 값으로 남긴다 */
 @Entity
 @Table(name = "store_season_snapshot")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class StoreSeasonSnapshot {
 
-    public enum Kind { RANK, MOST_VISITS, MOST_GAMES }
+    public enum Kind { RANK, MOST_VISITS, MOST_GAMES, MOST_WINS, BEST_STREAK, WIN_RATE }
 
     @Id
     @GeneratedValue(strategy = IDENTITY)

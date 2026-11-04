@@ -26,6 +26,16 @@ public interface StoreMatchParticipantRepository extends JpaRepository<StoreMatc
         """)
     List<Object[]> activityBetween(@Param("storeId") Long storeId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 
+    /** 매장 MVP 최다승·연승·승률: [memberId, placement] — 기간 안 기록된 판, 끝난 순서대로 */
+    @Query("""
+        SELECT p.memberId, p.placement
+        FROM StoreMatchParticipant p JOIN StoreMatch m ON m.id = p.storeMatchId
+        WHERE m.storeId = :storeId AND m.status = com.board_game_back.Entity.StoreMatch.Status.RECORDED
+          AND p.memberId IS NOT NULL AND m.businessDate BETWEEN :from AND :to
+        ORDER BY m.endedAt, m.id
+        """)
+    List<Object[]> placementsBetween(@Param("storeId") Long storeId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
     /** 내 매장 기록(프로필·2h): [storeMatchId, boardGameId, placement, businessDate] — 기간 안 기록된 판 */
     @Query("""
         SELECT m.id, m.boardGameId, p.placement, m.businessDate

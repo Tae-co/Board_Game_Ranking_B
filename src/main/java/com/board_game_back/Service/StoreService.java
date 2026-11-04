@@ -219,7 +219,7 @@ public class StoreService {
             storeMemberRepository.countByStoreId(storeId),
             gameItems,
             party,
-            storeRankingService.mvp(storeId, rankings),
+            storeRankingService.mvp(storeId),
             rankings,
             storeSeasonService.currentInfo(storeId),
             role == ViewerRole.MEMBER ? storeReportService.unseenNotice(storeId, memberId) : null,
