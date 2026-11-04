@@ -60,6 +60,7 @@ class RoomServiceDeleteMemberTest {
     @Mock private StoreStaffRepository storeStaffRepository;
     @Mock private com.board_game_back.Repository.StoreRatingRepository storeRatingRepository;
     @Mock private StorePartyService storePartyService;
+    @Mock private StoreContestService storeContestService;
 
     @InjectMocks private RoomService roomService;
 

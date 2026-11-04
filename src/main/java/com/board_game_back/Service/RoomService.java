@@ -55,6 +55,7 @@ public class RoomService {
     private final StoreStaffRepository storeStaffRepository;
     private final StoreRatingRepository storeRatingRepository;
     private final StorePartyService storePartyService;
+    private final StoreContestService storeContestService;
 
     @Transactional
     public Room createRoom(String roomName, Long memberId, Long boardGameId, Long communityId,
@@ -254,6 +255,7 @@ public class RoomService {
         communityMemberRepository.deleteByMemberId(memberId);
 
         // 매장 멤버·STAFF 지정도 지운다 (plan-store §1 회원 탈퇴)
+        storeContestService.onMemberDeleted(memberId);
         storePartyService.onMemberDeleted(memberId);
         storeRatingRepository.deleteByMemberId(memberId);
         storeMemberRepository.deleteByMemberId(memberId);

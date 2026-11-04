@@ -14,7 +14,10 @@ import com.board_game_back.Exception.StoreErrorCode;
 import com.board_game_back.Exception.StoreException;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.Repository.ScoreSheetRequestEntryRepository;
 import com.board_game_back.Repository.StoreMatchParticipantRepository;
+import com.board_game_back.Repository.StoreRatingResetRepository;
+import com.board_game_back.Repository.StoreReportRepository;
 import com.board_game_back.Repository.StoreMatchRepository;
 import com.board_game_back.Repository.StoreMemberRepository;
 import com.board_game_back.Repository.StorePartyMemberRepository;
@@ -44,7 +47,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class StorePartyService {
 
     static final Set<StoreMatch.Status> OPEN = EnumSet.of(
-        StoreMatch.Status.PLAYING, StoreMatch.Status.AWAITING_CONFIRM, StoreMatch.Status.DISPUTED);
+        StoreMatch.Status.PLAYING, StoreMatch.Status.AWAITING_CONFIRM, StoreMatch.Status.DISPUTED,
+        StoreMatch.Status.AWAITING_STAFF);
     private static final int NOTICE_MINUTES = 30;
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -54,6 +58,9 @@ public class StorePartyService {
     private final StorePartyMemberRepository storePartyMemberRepository;
     private final StoreMatchRepository storeMatchRepository;
     private final StoreMatchParticipantRepository storeMatchParticipantRepository;
+    private final StoreReportRepository storeReportRepository;
+    private final StoreRatingResetRepository storeRatingResetRepository;
+    private final ScoreSheetRequestEntryRepository scoreSheetRequestEntryRepository;
     private final BoardGameRepository boardGameRepository;
     private final MemberRepository memberRepository;
     private final StoreAccessService storeAccessService;
@@ -90,6 +97,7 @@ public class StorePartyService {
     StoreDto.PartyResponse join(Long storeId, Long memberId, String code, boolean move, LocalDateTime now) {
         requirePlayable(storeId, memberId, now);
         StoreParty target = storePartyRepository.findByStoreIdAndCodeAndDisbandedAtIsNull(storeId, code == null ? "" : code.trim())
+            .filter(p -> !p.isContest())
             .orElseThrow(() -> new StoreException(StoreErrorCode.PARTY_NOT_FOUND));
         StorePartyMember current = storePartyMemberRepository.findByMemberIdAndLeftAtIsNull(memberId).orElse(null);
         if (current != null && current.getPartyId().equals(target.getId())) return response(target, now);
@@ -119,6 +127,7 @@ public class StorePartyService {
         LocalDateTime now = now();
         StorePartyMember me = requireMembership(memberId);
         StoreParty party = lock(me.getPartyId());
+        requireNotContest(party);
         requireNoOpenMatch(party.getId());
         removeMember(party, me, LeftReason.LEAVE, now);
     }
@@ -128,6 +137,7 @@ public class StorePartyService {
         LocalDateTime now = now();
         StorePartyMember me = requireMembership(memberId);
         StoreParty party = lock(me.getPartyId());
+        requireNotContest(party);
         requireNoOpenMatch(party.getId());
         StorePartyMember target = activeMembers(party.getId()).stream()
             .filter(pm -> targetMemberId.equals(pm.getMemberId()))
@@ -142,6 +152,7 @@ public class StorePartyService {
         LocalDateTime now = now();
         StorePartyMember me = requireMembership(memberId);
         StoreParty party = lock(me.getPartyId());
+        requireNotContest(party);
         requireNoOpenMatch(party.getId());
         for (StorePartyMember pm : activeMembers(party.getId())) pm.leave(LeftReason.DISBAND, now);
         party.disband(now);
@@ -154,6 +165,7 @@ public class StorePartyService {
         LocalDateTime now = now();
         StorePartyMember me = requireMembership(memberId);
         StoreParty party = lock(me.getPartyId());
+        requireNotContest(party);
         if (!memberId.equals(party.getRecorderMemberId())) throw new StoreException(StoreErrorCode.NOT_RECORDER);
         requireNoOpenMatch(party.getId());
         boolean inParty = activeMembers(party.getId()).stream().anyMatch(pm -> targetMemberId.equals(pm.getMemberId()));
@@ -169,7 +181,8 @@ public class StorePartyService {
     @Transactional
     public int expireCheckins(Long partyId, LocalDateTime now) {
         StoreParty party = lock(partyId);
-        if (!party.isActive() || openMatch(partyId).isPresent()) return 0;
+        // 대회 그룹은 STAFF가 도착을 확인했으니 3시간으로 빼지 않는다
+        if (!party.isActive() || party.isContest() || openMatch(partyId).isPresent()) return 0;
         int removed = 0;
         for (StorePartyMember pm : activeMembers(partyId)) {
             boolean checkedIn = storeMemberRepository.findByStoreIdAndMemberId(party.getStoreId(), pm.getMemberId())
@@ -189,7 +202,8 @@ public class StorePartyService {
         StorePartyMember pm = storePartyMemberRepository.findByMemberIdAndLeftAtIsNull(memberId).orElse(null);
         if (pm == null) return;
         StoreParty party = lock(pm.getPartyId());
-        if (!party.getStoreId().equals(storeId)) return;
+        // 대회 그룹은 StoreContestService.onLeaveStore가 먼저 처리한다
+        if (!party.getStoreId().equals(storeId) || party.isContest()) return;
         requireNoOpenMatch(party.getId());
         removeMember(party, pm, LeftReason.LEAVE, now());
     }
@@ -203,6 +217,62 @@ public class StorePartyService {
         });
         storeMatchParticipantRepository.anonymizeMember(memberId);
         storeMatchRepository.anonymizeRecorder(memberId);
+        // 신고·초기화·점수판 요청은 기록으로 남기고 사람만 지운다
+        storeReportRepository.anonymizeReporter(memberId);
+        storeReportRepository.anonymizeTarget(memberId);
+        storeRatingResetRepository.anonymizeMember(memberId);
+        scoreSheetRequestEntryRepository.anonymizeMember(memberId);
+    }
+
+    // ── 대회 그룹 (StoreContestService가 쓴다) ──
+
+    /** 대회 시작: 지금 그룹에서 잠시 빠진다. 기록자였으면 가장 먼저 합류한 사람에게. 있던 그룹 id (없으면 null) */
+    Long leaveForContest(Long memberId, LocalDateTime now) {
+        StorePartyMember current = storePartyMemberRepository.findByMemberIdAndLeftAtIsNull(memberId).orElse(null);
+        if (current == null) return null;
+        StoreParty party = lock(current.getPartyId());
+        removeMember(party, current, LeftReason.CONTEST, now);
+        storePartyMemberRepository.flush();
+        return party.getId();
+    }
+
+    /** 참가자는 코드 없이 한 테이블로 (plan-store §1 대회 시작) */
+    StoreParty createContestParty(Long storeId, Long contestId, Long recorderMemberId, List<Long> memberIds,
+                                  java.time.LocalDate businessDate, LocalDateTime now) {
+        StoreParty party = storePartyRepository.save(
+            new StoreParty(storeId, newCode(storeId), recorderMemberId, businessDate, now, contestId));
+        for (Long memberId : memberIds) storePartyMemberRepository.save(new StorePartyMember(party.getId(), memberId, now));
+        return party;
+    }
+
+    /** 대회 중 매장 나가기·탈퇴로 대회 그룹에서 빠진다 */
+    void leaveContestParty(Long partyId, Long memberId, LeftReason reason, LocalDateTime now) {
+        StoreParty party = lock(partyId);
+        activeMembers(partyId).stream()
+            .filter(pm -> memberId.equals(pm.getMemberId()))
+            .findFirst()
+            .ifPresent(pm -> removeMember(party, pm, reason, now));
+    }
+
+    /**
+     * 대회가 끝나면 대회 그룹을 해산하고 원래 그룹으로 돌려보낸다.
+     * 그 사이 원래 그룹이 없어졌거나 다른 그룹에 들어가 있으면 돌아갈 그룹 없음 (plan-store §1 대회 시작)
+     */
+    void endContestParty(Long partyId, Map<Long, Long> originByMember, LocalDateTime now) {
+        StoreParty party = lock(partyId);
+        for (StorePartyMember pm : activeMembers(partyId)) pm.leave(LeftReason.CONTEST_END, now);
+        party.disband(now);
+        storePartyMemberRepository.flush();
+        notifier.changed(partyId);
+        for (Map.Entry<Long, Long> e : originByMember.entrySet()) {
+            if (e.getKey() == null || e.getValue() == null) continue;
+            if (storePartyMemberRepository.findByMemberIdAndLeftAtIsNull(e.getKey()).isPresent()) continue;
+            if (storeMemberRepository.findByStoreIdAndMemberId(party.getStoreId(), e.getKey()).isEmpty()) continue;
+            StoreParty origin = lock(e.getValue());
+            if (!origin.isActive()) continue;
+            storePartyMemberRepository.save(new StorePartyMember(origin.getId(), e.getKey(), now));
+            notifier.changed(origin.getId());
+        }
     }
 
     // ── 공통 (StoreMatchService도 쓴다) ──
@@ -266,6 +336,7 @@ public class StorePartyService {
         StorePartyMember current = storePartyMemberRepository.findByMemberIdAndLeftAtIsNull(memberId).orElse(null);
         if (current == null || current.getPartyId().equals(targetPartyId)) return;
         StoreParty old = lock(current.getPartyId());
+        requireNotContest(old);
         requireNoOpenMatch(old.getId());
         removeMember(old, current, LeftReason.MOVE, now);
         storePartyMemberRepository.flush();
@@ -284,6 +355,10 @@ public class StorePartyService {
     private StorePartyMember requireMembership(Long memberId) {
         return storePartyMemberRepository.findByMemberIdAndLeftAtIsNull(memberId)
             .orElseThrow(() -> new StoreException(StoreErrorCode.NOT_IN_PARTY));
+    }
+
+    private static void requireNotContest(StoreParty party) {
+        if (party.isContest()) throw new StoreException(StoreErrorCode.CONTEST_PARTY);
     }
 
     private void requireNoOpenMatch(Long partyId) {
@@ -311,7 +386,7 @@ public class StorePartyService {
         return new StoreDto.PartyResponse(party.getId(),
             new StoreDto.StoreBrief(store.getId(), store.getName(), store.getBranch()),
             party.getCode(), party.getRecorderMemberId(), items, expiredNicknames(party.getId(), now),
-            matchBrief(open), matchBrief(last));
+            matchBrief(open), matchBrief(last), party.getContestId());
     }
 
     StoreDto.MatchBrief matchBrief(StoreMatch match) {

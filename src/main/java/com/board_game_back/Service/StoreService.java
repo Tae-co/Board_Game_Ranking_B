@@ -44,6 +44,11 @@ public class StoreService {
     private final StoreScanTicketService storeScanTicketService;
     private final StorePartyService storePartyService;
     private final StoreRankingService storeRankingService;
+    private final StoreSeasonService storeSeasonService;
+    private final StoreReportService storeReportService;
+    private final StoreInsightService storeInsightService;
+    private final StoreContestService storeContestService;
+    private final StoreEventService storeEventService;
 
     private static LocalDateTime now() {
         return LocalDateTime.now(ZoneOffset.UTC);
@@ -108,7 +113,8 @@ public class StoreService {
         }
         StoreMember member = storeMemberRepository.findByStoreIdAndMemberId(storeId, memberId)
             .orElseThrow(() -> new StoreException(StoreErrorCode.NOT_MEMBER));
-        // 판이 열려 있으면 막고(MATCH_OPEN), 그룹에서도 빠진다 (1c)
+        // 판이 열려 있으면 막고(MATCH_OPEN), 그룹·대회에서도 빠진다 (1c)
+        storeContestService.onLeaveStore(storeId, memberId);
         storePartyService.leaveStore(storeId, memberId);
         storeRatingRepository.deleteByStoreIdAndMemberId(storeId, memberId);
         storeMatchParticipantRepository.anonymizeMemberInStore(storeId, memberId);
@@ -180,6 +186,18 @@ public class StoreService {
 
     // ── 매장 홈 ──
 
+    /** 2 이벤트 더보기: 대회(지난 끝난 대회까지) + 매장 이벤트(진행 중·예정). 운영 끝난 매장은 홈처럼 비움 */
+    public StoreDto.EventsResponse events(Long storeId, Long memberId) {
+        Store store = getStore(storeId);
+        if (store.isClosed()) return new StoreDto.EventsResponse(List.of(), List.of());
+        return new StoreDto.EventsResponse(storeContestService.listCards(store, memberId), storeEventService.viewerList(store, memberId));
+    }
+
+    /** 1회용 쿠폰 사용 완료 (이벤트 자세히 보기) */
+    public StoreDto.EventCard useEvent(Long storeId, Long eventId, Long memberId) {
+        return storeEventService.use(storeId, eventId, memberId);
+    }
+
     public StoreDto.HomeResponse home(Long storeId, Long memberId) {
         LocalDateTime now = now();
         Store store = getStore(storeId);
@@ -196,7 +214,7 @@ public class StoreService {
 
         StoreDto.PartyBrief party = storePartyService.membership(memberId)
             .flatMap(pm -> storePartyService.findParty(pm.getPartyId()))
-            .filter(p -> p.isActive() && p.getStoreId().equals(storeId))
+            .filter(p -> p.isActive() && !p.isContest() && p.getStoreId().equals(storeId))
             .map(storePartyService::brief)
             .orElse(null);
 
@@ -206,15 +224,21 @@ public class StoreService {
             storeMemberRepository.countByStoreId(storeId),
             gameItems,
             party,
-            storeRankingService.mvp(storeId, rankings),
-            rankings);
+            storeRankingService.mvp(storeId),
+            rankings,
+            storeSeasonService.currentInfo(storeId),
+            role == ViewerRole.MEMBER ? storeReportService.unseenNotice(storeId, memberId) : null,
+            role == ViewerRole.MEMBER && store.isClosed() ? storeInsightService.closedRecord(store, memberId) : null,
+            store.isClosed() ? List.of() : storeContestService.cards(store, memberId),
+            store.isClosed() ? List.of() : storeEventService.activeCards(store));
     }
 
     // ── 공통 ──
 
     static StoreDto.StoreInfo info(Store s) {
         return new StoreDto.StoreInfo(s.getId(), s.getName(), s.getBranch(), s.getAddress(), s.getRegion(),
-            s.getPhone(), s.getImageUrl(), StoreDto.hhmm(s.getOpenTime()), StoreDto.hhmm(s.getCloseTime()), s.isClosed());
+            s.getPhone(), s.getImageUrl(), StoreDto.hhmm(s.getOpenTime()), StoreDto.hhmm(s.getCloseTime()), s.isClosed(),
+            StoreDto.iso(s.getClosedAt()));
     }
 
     private Store getStore(Long storeId) {

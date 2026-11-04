@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
@@ -15,15 +16,36 @@ public interface StoreMatchParticipantRepository extends JpaRepository<StoreMatc
 
     List<StoreMatchParticipant> findByStoreMatchIdIn(Collection<Long> storeMatchIds);
 
-    /** 매장 MVP: [memberId, 참여 판 수, 방문 일수(영업일)] — 기록된 판만 */
+    /** 매장 MVP·리포트: [memberId, 참여 판 수, 방문 일수(영업일), 마지막 기록] — 기간 안 기록된 판만 */
     @Query("""
         SELECT p.memberId, COUNT(p), COUNT(DISTINCT m.businessDate), MAX(m.endedAt)
         FROM StoreMatchParticipant p JOIN StoreMatch m ON m.id = p.storeMatchId
         WHERE m.storeId = :storeId AND m.status = com.board_game_back.Entity.StoreMatch.Status.RECORDED
-          AND p.memberId IS NOT NULL
+          AND p.memberId IS NOT NULL AND m.businessDate BETWEEN :from AND :to
         GROUP BY p.memberId
         """)
-    List<Object[]> activityByStore(@Param("storeId") Long storeId);
+    List<Object[]> activityBetween(@Param("storeId") Long storeId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /** 매장 MVP 최다승·연승·승률: [memberId, placement] — 기간 안 기록된 판, 끝난 순서대로 */
+    @Query("""
+        SELECT p.memberId, p.placement
+        FROM StoreMatchParticipant p JOIN StoreMatch m ON m.id = p.storeMatchId
+        WHERE m.storeId = :storeId AND m.status = com.board_game_back.Entity.StoreMatch.Status.RECORDED
+          AND p.memberId IS NOT NULL AND m.businessDate BETWEEN :from AND :to
+        ORDER BY m.endedAt, m.id
+        """)
+    List<Object[]> placementsBetween(@Param("storeId") Long storeId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /** 내 매장 기록(프로필·2h): [storeMatchId, boardGameId, placement, businessDate] — 기간 안 기록된 판 */
+    @Query("""
+        SELECT m.id, m.boardGameId, p.placement, m.businessDate
+        FROM StoreMatchParticipant p JOIN StoreMatch m ON m.id = p.storeMatchId
+        WHERE m.storeId = :storeId AND p.memberId = :memberId
+          AND m.status = com.board_game_back.Entity.StoreMatch.Status.RECORDED
+          AND m.businessDate BETWEEN :from AND :to
+        """)
+    List<Object[]> myMatchesBetween(@Param("storeId") Long storeId, @Param("memberId") Long memberId,
+                                    @Param("from") LocalDate from, @Param("to") LocalDate to);
 
     /** 게임방별 참여 인원 수: [storeRoomId, 사람 수] */
     @Query("""

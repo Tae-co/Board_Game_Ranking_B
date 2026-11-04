@@ -45,6 +45,16 @@ public final class StoreClock {
         return toUtc(date.atTime(store.getCloseTime()).atZone(zone(store)));
     }
 
+    /** 그 영업일이 시작하는 시각 (UTC) */
+    public static LocalDateTime openingAt(Store store, LocalDate businessDate) {
+        return toUtc(businessDate.atTime(store.getOpenTime()).atZone(zone(store)));
+    }
+
+    /** UTC 시각을 매장 지역 시간으로 */
+    public static ZonedDateTime toLocal(Store store, LocalDateTime utc) {
+        return local(store, utc);
+    }
+
     /** 지금이 속한 정각 칸의 시작 (매장 지역 시간의 정각) */
     public static LocalDateTime hourSlotStart(Store store, LocalDateTime utcNow) {
         return toUtc(local(store, utcNow).truncatedTo(ChronoUnit.HOURS));

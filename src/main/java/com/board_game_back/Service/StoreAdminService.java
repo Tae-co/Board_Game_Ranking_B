@@ -46,6 +46,8 @@ public class StoreAdminService {
     private final StoreAccessService storeAccessService;
     private final StoreMatchRepository storeMatchRepository;
     private final StoreDeviceRepository storeDeviceRepository;
+    private final StoreContestService storeContestService;
+    private final StoreEventService storeEventService;
 
     public List<StoreDto.AdminStoreItem> list() {
         List<Store> stores = storeRepository.findAll();
@@ -91,6 +93,8 @@ public class StoreAdminService {
         Store store = getStore(storeId);
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         store.close(now);
+        storeContestService.onStoreClosed(storeId);
+        storeEventService.onStoreClosed(store);
         storeDeviceRepository.findByStoreIdAndRevokedAtIsNullOrderByIdAsc(storeId).forEach(d -> d.revoke(now));
         return item(store);
     }
@@ -162,7 +166,8 @@ public class StoreAdminService {
             .map(r -> {
                 BoardGame g = games.get(r.getBoardGameId());
                 return new StoreDto.AdminRoomItem(r.getId(), g.getId(), g.getName(), g.getImageUrl(),
-                    g.getMinMinutes(), g.getMaxMinutes(), r.isClosed(), matchCounts.getOrDefault(r.getId(), 0L));
+                    g.getMinMinutes(), g.getMaxMinutes(), r.isClosed(), matchCounts.getOrDefault(r.getId(), 0L),
+                    storeContestService.upcomingCount(r.getId()), g.getMinPlayers(), g.getMaxPlayers());
             })
             .toList();
     }

@@ -65,6 +65,10 @@ public class Store {
     /** 운영 끝낸 시각. null = 운영 중 */
     private LocalDateTime closedAt;
 
+    /** 다음 시즌을 정하는 방식 (4단계): MONTHLY / QUARTERLY / CUSTOM */
+    @Column(nullable = false, length = 10)
+    private String seasonCycle = "MONTHLY";
+
     @Builder
     public Store(String name, String branch, String address, String region, String phone, String imageUrl,
                  LocalTime openTime, LocalTime closeTime, String qrSecret) {
@@ -98,6 +102,10 @@ public class Store {
     /** 6g QR 비밀키 새로 만들기. 지금 QR이 모두 무효가 되고 기기 토큰은 그대로 */
     public void rotateQrSecret(String newSecret) {
         this.qrSecret = newSecret;
+    }
+
+    public void setSeasonCycle(String seasonCycle) {
+        this.seasonCycle = seasonCycle;
     }
 
     public void close(LocalDateTime now) {

@@ -4,6 +4,7 @@ import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Service.RoomService;
+import com.board_game_back.Service.ScoreSheetRequestService;
 import com.board_game_back.Service.StoreAdminService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
@@ -37,6 +38,7 @@ public class AdminController {
     private final MemberRepository memberRepository;
     private final RoomService roomService;
     private final StoreAdminService storeAdminService;
+    private final ScoreSheetRequestService scoreSheetRequestService;
 
     @Value("${supabase.url}")
     private String supabaseUrl;
@@ -93,6 +95,8 @@ public class AdminController {
         game.updateRecordMinutes(minMinutes, maxMinutes);
         BoardGame saved = boardGameRepository.save(game);
         storeAdminService.createRoomsForGame(saved);
+        // 같은 이름 점수판 요청은 추가됨으로 (6c·6d)
+        scoreSheetRequestService.markAdded(saved.getName());
         return ResponseEntity.ok(saved);
     }
 

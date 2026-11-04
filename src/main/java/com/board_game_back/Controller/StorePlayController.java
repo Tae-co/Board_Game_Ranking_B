@@ -5,6 +5,7 @@ import com.board_game_back.Service.StoreMatchService;
 import com.board_game_back.Service.StorePartyService;
 import com.board_game_back.Service.StoreRankingService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 /** 매장 2단계: 오늘의 그룹 · 매장 게임방 · 판 (plan-store §2 2i·3·3b~3n). */
+@Slf4j
 @RestController
 @RequestMapping("/api/stores")
 @RequiredArgsConstructor
@@ -115,6 +117,13 @@ public class StorePlayController {
     public ResponseEntity<StoreDto.MatchResponse> getMatch(
             @PathVariable Long matchId,
             @AuthenticationPrincipal Long memberId) {
+        // 마감이 지난 판은 스케줄러(30초)를 기다리지 않고 보는 순간 닫는다 — 60분이 되면 바로 3m으로.
+        // 닫다가 실패해도 조회는 돌려준다 (실패하면 화면이 판이 없는 줄 알고 나가 버린다). 스케줄러가 다시 닫는다
+        try {
+            matchService.closeIfDue(matchId);
+        } catch (Exception e) {
+            log.error("매장 판 조회 중 자동 종료 실패 match={}", matchId, e);
+        }
         return ResponseEntity.ok(matchService.view(matchId, memberId));
     }
 

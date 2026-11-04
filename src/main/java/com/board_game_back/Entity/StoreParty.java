@@ -44,7 +44,16 @@ public class StoreParty {
 
     private LocalDateTime disbandedAt;
 
+    /** 대회 그룹이면 대회 id. 코드로 합류할 수 없고 대회가 끝나면 해산된다 */
+    private Long contestId;
+
     public StoreParty(Long storeId, String code, Long recorderMemberId, LocalDate businessDate, LocalDateTime now) {
+        this(storeId, code, recorderMemberId, businessDate, now, null);
+    }
+
+    public StoreParty(Long storeId, String code, Long recorderMemberId, LocalDate businessDate, LocalDateTime now,
+                      Long contestId) {
+        this.contestId = contestId;
         this.storeId = storeId;
         this.code = code;
         this.recorderMemberId = recorderMemberId;
@@ -54,6 +63,10 @@ public class StoreParty {
 
     public boolean isActive() {
         return disbandedAt == null;
+    }
+
+    public boolean isContest() {
+        return contestId != null;
     }
 
     public void changeRecorder(Long memberId) {

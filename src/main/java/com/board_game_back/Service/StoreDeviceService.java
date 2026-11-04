@@ -4,6 +4,7 @@ import com.board_game_back.DTO.StoreDto;
 import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.Store;
+import com.board_game_back.Entity.StoreContest;
 import com.board_game_back.Entity.StoreDevice;
 import com.board_game_back.Entity.StoreMatch;
 import com.board_game_back.Entity.StoreMatchParticipant;
@@ -14,6 +15,7 @@ import com.board_game_back.Exception.StoreErrorCode;
 import com.board_game_back.Exception.StoreException;
 import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.Repository.StoreContestRepository;
 import com.board_game_back.Repository.StoreDeviceRepository;
 import com.board_game_back.Repository.StoreMatchParticipantRepository;
 import com.board_game_back.Repository.StoreMatchRepository;
@@ -84,6 +86,10 @@ public class StoreDeviceService {
     private final StoreQrService storeQrService;
     private final StoreRankingService storeRankingService;
     private final StorePartyService storePartyService;
+    private final StoreSeasonService storeSeasonService;
+    private final StoreContestService storeContestService;
+    private final StoreEventService storeEventService;
+    private final StoreContestRepository storeContestRepository;
 
     static LocalDateTime now() {
         return LocalDateTime.now(ZoneOffset.UTC);
@@ -202,14 +208,18 @@ public class StoreDeviceService {
         StoreDto.StoreBrief storeBrief = new StoreDto.StoreBrief(store.getId(), store.getName(), store.getBranch());
         StoreDto.QrInfo qrInfo = new StoreDto.QrInfo(qr.url(), StoreDto.iso(qr.expiresAt()));
         if (device.getKind() == StoreDevice.Kind.TABLE) {
-            return new StoreDto.DisplayResponse(brief, storeBrief, StoreDto.iso(now), qrInfo, null, null, null, null);
+            return new StoreDto.DisplayResponse(brief, storeBrief, StoreDto.iso(now), qrInfo, null, null, null, null, null, null,
+                null, null, null);
         }
         StoreTvSetting setting = setting(store.getId(), now);
         List<StoreDto.GameItem> games = storeRankingService.visibleGames(store.getId());
         return new StoreDto.DisplayResponse(brief, storeBrief, StoreDto.iso(now), qrInfo, settingDto(setting),
-            storeRankingService.mvp(store.getId(), storeRankingService.homeRankings(store.getId(), games, null)),
+            storeRankingService.mvp(store.getId()),
             top10(store.getId(), games, setting.hiddenGameIds()),
-            setting.isShowJustFinished() ? justFinished(store.getId(), now) : List.of());
+            setting.isShowJustFinished() ? justFinished(store.getId(), now) : List.of(),
+            storeSeasonService.currentInfo(store.getId()), storeSeasonService.recentResult(store.getId(), now),
+            storeEventService.activeCards(store), storeContestService.recruitingCards(store),
+            storeContestService.board(store, now));
     }
 
     StoreDevice authenticate(String rawToken) {
@@ -225,7 +235,7 @@ public class StoreDeviceService {
 
     public StoreDto.TvSettingResponse tvSetting(Long storeId) {
         LocalDateTime now = now();
-        getStore(storeId);
+        Store store = getStore(storeId);
         StoreTvSetting setting = setting(storeId, now);
         List<StoreDto.GameItem> games = storeRankingService.visibleGames(storeId);
         Map<Long, Long> matchCounts = new HashMap<>();
@@ -237,8 +247,9 @@ public class StoreDeviceService {
         return new StoreDto.TvSettingResponse(settingDto(setting),
             games.stream().map(g -> new StoreDto.TvGame(g.boardGameId(), g.name(), matchCounts.getOrDefault(g.storeRoomId(), 0L))).toList(),
             tvs.size(), StoreDto.iso(lastSeen),
-            storeRankingService.mvp(storeId, storeRankingService.homeRankings(storeId, games, null)),
-            top10(storeId, games, List.of()));
+            storeRankingService.mvp(storeId),
+            top10(storeId, games, List.of()), storeSeasonService.recentResult(storeId, now),
+            storeEventService.activeCards(store), storeContestService.recruitingCards(store), storeContestService.board(store, now));
     }
 
     @Transactional
@@ -319,6 +330,9 @@ public class StoreDeviceService {
             .map(StoreMatchParticipant::getMemberId).filter(Objects::nonNull).toList());
         Map<Long, String> gameNames = boardGameRepository.findByIdIn(matches.stream().map(StoreMatch::getBoardGameId).toList())
             .stream().collect(Collectors.toMap(BoardGame::getId, BoardGame::getName));
+        Map<Long, String> contestTitles = storeContestRepository.findAllById(
+                matches.stream().map(StoreMatch::getContestId).filter(Objects::nonNull).distinct().toList())
+            .stream().collect(Collectors.toMap(StoreContest::getId, StoreContest::getTitle));
         return matches.stream()
             .map(m -> new StoreDto.JustFinished(m.getId(), gameNames.get(m.getBoardGameId()),
                 StoreDto.iso(m.getStartedAt()), StoreDto.iso(m.getEndedAt()),
@@ -326,7 +340,8 @@ public class StoreDeviceService {
                     .sorted(Comparator.comparing(StoreMatchParticipant::getPlacement, Comparator.nullsLast(Comparator.naturalOrder())))
                     .map(p -> StoreMatchService.participantItem(p, names, true))
                     .map(p -> new StoreDto.JustFinishedPlayer(p.placement(), p.nickname(), p.gameScore(), p.ratingChange()))
-                    .toList()))
+                    .toList(),
+                m.isContest() ? contestTitles.get(m.getContestId()) : null, m.getContestRound()))
             .toList();
     }
 

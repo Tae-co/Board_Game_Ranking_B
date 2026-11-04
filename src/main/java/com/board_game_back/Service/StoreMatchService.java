@@ -3,6 +3,7 @@ package com.board_game_back.Service;
 import com.board_game_back.DTO.StoreDto;
 import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Store;
+import com.board_game_back.Entity.StoreContest;
 import com.board_game_back.Entity.StoreMatch;
 import com.board_game_back.Entity.StoreMatch.EndReason;
 import com.board_game_back.Entity.StoreMatchParticipant;
@@ -14,6 +15,7 @@ import com.board_game_back.Entity.StoreRoom;
 import com.board_game_back.Exception.StoreErrorCode;
 import com.board_game_back.Exception.StoreException;
 import com.board_game_back.Repository.BoardGameRepository;
+import com.board_game_back.Repository.StoreContestRepository;
 import com.board_game_back.Repository.StoreMatchParticipantRepository;
 import com.board_game_back.Repository.StoreMatchRepository;
 import com.board_game_back.Repository.StoreMemberRepository;
@@ -41,6 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>시작: 기록자만. 저장 마감 = min(시작 + 최대 시간, 영업 마감)을 시작 때 저장
  *   <li>처음 저장: 시작 + 최소 시간 ≤ 지금 ≤ 저장 마감. 다시 저장(점수가 달라요·점수 고치기 뒤)은 영업 마감 전이면 된다
  *   <li>저장하면 5분 확인. 전원 확인 또는 5분이 지나면 기록 → 매장 Elo
+ *   <li>대회 판: 시간 제한·게임 취소 없음. 전원 확인 또는 5분 뒤 STAFF 확인(5c)을 기다린다 → {@link StoreContestService}
  * </ul>
  */
 @Service
@@ -61,6 +64,7 @@ public class StoreMatchService {
     private final StorePartyService partyService;
     private final StoreEloCalculator eloCalculator;
     private final StorePartyNotifier notifier;
+    private final StoreContestRepository contestRepository;
 
     // ── 시작 ──
 
@@ -71,6 +75,7 @@ public class StoreMatchService {
         StorePartyMember me = partyService.membership(memberId).orElse(null);
         StoreParty party = me == null ? null : storeParty(me.getPartyId());
         if (party == null || !party.isActive() || !party.getStoreId().equals(store.getId())) return "NO_PARTY";
+        if (party.isContest()) return "PARTY_PLAYING";
         if (!memberId.equals(party.getRecorderMemberId())) return "NOT_RECORDER";
         if (room.isClosed()) return "ROOM_CLOSED";
         if (!game.hasRecordMinutes()) return "GAME_TIME_NOT_SET";
@@ -156,7 +161,7 @@ public class StoreMatchService {
             if (memberId.equals(p.getMemberId())) p.confirm(now);
         }
         match.submit(now, now.plus(CONFIRM_WINDOW));
-        if (allConfirmed(participants)) recordMatch(match, participants, EndReason.CONFIRMED, now);
+        if (allConfirmed(participants)) confirmed(match, participants, EndReason.CONFIRMED, now);
         notifier.changed(match.getPartyId());
         return view(matchId, memberId);
     }
@@ -168,7 +173,7 @@ public class StoreMatchService {
         if (match.getStatus() != StoreMatch.Status.AWAITING_CONFIRM) throw new StoreException(StoreErrorCode.MATCH_STATE);
         List<StoreMatchParticipant> participants = participantRepository.findByStoreMatchIdOrderByIdAsc(matchId);
         participant(participants, memberId).confirm(now);
-        if (allConfirmed(participants)) recordMatch(match, participants, EndReason.CONFIRMED, now);
+        if (allConfirmed(participants)) confirmed(match, participants, EndReason.CONFIRMED, now);
         notifier.changed(match.getPartyId());
         return view(matchId, memberId);
     }
@@ -203,13 +208,20 @@ public class StoreMatchService {
     public StoreDto.MatchResponse cancel(Long matchId, Long memberId) {
         StoreMatch match = lockMatch(matchId);
         requireRecorder(match, memberId);
-        if (!match.isEditable()) throw new StoreException(StoreErrorCode.MATCH_STATE);
+        // 대회 판엔 게임 취소가 없다 (40차)
+        if (!match.isEditable() || match.isContest()) throw new StoreException(StoreErrorCode.MATCH_STATE);
         match.cancel(StorePartyService.now());
         notifier.changed(match.getPartyId());
         return view(matchId, memberId);
     }
 
     // ── 자동 종료 (스케줄러) ──
+
+    /** 판 조회 때 — 스케줄러를 기다리지 않고 지금 시각으로 닫는다 */
+    @Transactional
+    public boolean closeIfDue(Long matchId) {
+        return closeIfDue(matchId, StorePartyService.now());
+    }
 
     /** 저장 마감·영업 마감·5분 확인이 지난 판을 닫는다. 바뀌었으면 true */
     @Transactional
@@ -218,7 +230,10 @@ public class StoreMatchService {
         if (!match.isOpen()) return false;
         if (match.getStatus() == StoreMatch.Status.AWAITING_CONFIRM) {
             if (match.getConfirmDeadline() == null || now.isBefore(match.getConfirmDeadline())) return false;
-            recordMatch(match, participantRepository.findByStoreMatchIdOrderByIdAsc(matchId), EndReason.TIMEOUT, now);
+            confirmed(match, participantRepository.findByStoreMatchIdOrderByIdAsc(matchId), EndReason.TIMEOUT, now);
+        } else if (match.isContest()) {
+            // 대회 판엔 기록 시간·영업 마감 제한이 없다 (STAFF가 본다)
+            return false;
         } else if (match.getFirstSavedAt() == null) {
             if (!now.isAfter(match.getSaveDeadline())) return false;
             boolean byClosing = !match.getSaveDeadline().isBefore(match.getClosesAt());
@@ -236,6 +251,15 @@ public class StoreMatchService {
     }
 
     // ── 기록 ──
+
+    /** 같이 한 사람 확인이 끝났다. 일반 판은 기록, 대회 판은 STAFF 확인으로 */
+    private void confirmed(StoreMatch match, List<StoreMatchParticipant> participants, EndReason reason, LocalDateTime now) {
+        if (match.isContest()) {
+            match.awaitStaff();
+            return;
+        }
+        recordMatch(match, participants, reason, now);
+    }
 
     private void recordMatch(StoreMatch match, List<StoreMatchParticipant> participants, EndReason reason, LocalDateTime now) {
         List<StoreMatchParticipant> rated = participants.stream()
@@ -301,7 +325,9 @@ public class StoreMatchService {
         List<StoreMatchParticipant> participants = participantRepository.findByStoreMatchIdOrderByIdAsc(matchId);
         boolean inMatch = participants.stream().anyMatch(p -> memberId.equals(p.getMemberId()));
         boolean inParty = partyService.membership(memberId).map(pm -> pm.getPartyId().equals(match.getPartyId())).orElse(false);
-        if (!inMatch && !inParty) throw new StoreException(StoreErrorCode.NOT_PARTICIPANT);
+        // 대회 판은 이 매장 STAFF도 본다 (5c)
+        boolean staff = match.isContest() && storeAccessService.viewerRole(match.getStoreId(), memberId) == StoreAccessService.ViewerRole.STAFF;
+        if (!inMatch && !inParty && !staff) throw new StoreException(StoreErrorCode.NOT_PARTICIPANT);
 
         Store store = storeRepository.findById(match.getStoreId()).orElseThrow();
         String gameName = boardGameRepository.findById(match.getBoardGameId()).map(BoardGame::getName).orElse(null);
@@ -333,10 +359,21 @@ public class StoreMatchService {
             StoreDto.iso(match.getFirstSavedAt()), StoreDto.iso(match.getConfirmDeadline()),
             StoreDto.iso(match.getEndedAt()), StoreDto.iso(StorePartyService.now()),
             match.getDisputedByMemberId(), nameOf(names, match.getDisputedByMemberId()), match.getDraftJson(), match.getDraftVersion(), items,
-            rankBefore, rankAfter);
+            rankBefore, rankAfter, contestInfo(match, participants));
     }
 
-    private static String nameOf(Map<Long, String> names, Long memberId) {
+    private StoreDto.ContestMatchInfo contestInfo(StoreMatch match, List<StoreMatchParticipant> participants) {
+        if (!match.isContest()) return null;
+        StoreContest contest = contestRepository.findById(match.getContestId()).orElse(null);
+        if (contest == null) return null;
+        // 돌려보낸 사람이 참가자가 아니면 STAFF (3k "STAFF가 결과를 돌려보냈어요")
+        boolean staffReturned = match.getStatus() == StoreMatch.Status.DISPUTED && match.getDisputedByMemberId() != null
+            && participants.stream().noneMatch(p -> match.getDisputedByMemberId().equals(p.getMemberId()));
+        return new StoreDto.ContestMatchInfo(contest.getId(), contest.getTitle(), match.getContestRound(),
+            contest.getRounds(), staffReturned);
+    }
+
+    static String nameOf(Map<Long, String> names, Long memberId) {
         return memberId == null ? null : names.get(memberId);
     }
 
@@ -384,7 +421,7 @@ public class StoreMatchService {
     }
 
     /** 그룹 행을 먼저 잠그고 판을 읽는다 — 판 엔티티를 잠금 전에 올리면 옛 상태를 본다 */
-    private StoreMatch lockMatch(Long matchId) {
+    StoreMatch lockMatch(Long matchId) {
         Long partyId = storeMatchRepository.findPartyIdById(matchId)
             .orElseThrow(() -> new StoreException(StoreErrorCode.MATCH_NOT_FOUND));
         partyService.lock(partyId);

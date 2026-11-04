@@ -74,7 +74,7 @@ class StoreMatchServiceTest {
     void setUp() {
         service = new StoreMatchService(storeRepository, storeRoomRepository, storeMemberRepository, storeMatchRepository,
             participantRepository, storeRatingRepository, boardGameRepository, storeAccessService, partyService,
-            new StoreEloCalculator(), notifier);
+            new StoreEloCalculator(), notifier, null);
         useStore(LocalTime.of(12, 0), LocalTime.of(22, 0));
 
         BoardGame catan = BoardGame.builder().name("카탄").minPlayers(3).maxPlayers(4).build();

@@ -20,6 +20,12 @@ public interface StoreRatingRepository extends JpaRepository<StoreRating, Long> 
 
     List<StoreRating> findByStoreIdAndMemberId(Long storeId, Long memberId);
 
+    List<StoreRating> findByStoreId(Long storeId);
+
+    @Modifying
+    @Query("DELETE FROM StoreRating r WHERE r.storeId = :storeId")
+    void deleteByStoreId(@Param("storeId") Long storeId);
+
     @Modifying
     @Query("DELETE FROM StoreRating r WHERE r.memberId = :memberId")
     void deleteByMemberId(@Param("memberId") Long memberId);

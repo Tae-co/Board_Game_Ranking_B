@@ -44,6 +44,22 @@ public class StoreController {
         return ResponseEntity.ok(storeService.home(storeId, memberId));
     }
 
+    @GetMapping("/{storeId}/events")
+    public ResponseEntity<StoreDto.EventsResponse> getEvents(
+            @PathVariable Long storeId,
+            @AuthenticationPrincipal Long memberId) {
+        return ResponseEntity.ok(storeService.events(storeId, memberId));
+    }
+
+    /** 1회용 쿠폰 사용 완료 (이벤트 자세히 보기) */
+    @PostMapping("/{storeId}/events/{eventId}/use")
+    public ResponseEntity<StoreDto.EventCard> useEvent(
+            @PathVariable Long storeId,
+            @PathVariable Long eventId,
+            @AuthenticationPrincipal Long memberId) {
+        return ResponseEntity.ok(storeService.useEvent(storeId, eventId, memberId));
+    }
+
     @PostMapping("/{storeId}/join")
     public ResponseEntity<StoreDto.CheckinResponse> join(
             @PathVariable Long storeId,

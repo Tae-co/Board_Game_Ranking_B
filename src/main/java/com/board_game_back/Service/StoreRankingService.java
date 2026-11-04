@@ -9,6 +9,7 @@ import com.board_game_back.Entity.StoreMatchParticipant;
 import com.board_game_back.Entity.StoreParty;
 import com.board_game_back.Entity.StoreRating;
 import com.board_game_back.Entity.StoreRoom;
+import com.board_game_back.Entity.StoreSeason;
 import com.board_game_back.Exception.StoreErrorCode;
 import com.board_game_back.Exception.StoreException;
 import com.board_game_back.Repository.BoardGameRepository;
@@ -18,7 +19,9 @@ import com.board_game_back.Repository.StoreMatchRepository;
 import com.board_game_back.Repository.StoreRatingRepository;
 import com.board_game_back.Repository.StoreRepository;
 import com.board_game_back.Repository.StoreRoomRepository;
+import com.board_game_back.Repository.StoreSeasonRepository;
 import com.board_game_back.Utils.StoreClock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,8 +31,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -47,6 +52,7 @@ public class StoreRankingService {
     public static final int ROOM_TOP = 10;
     public static final int FULL_TOP = 20;
     public static final int RECENT_MATCHES = 25;
+    public static final int WIN_RATE_MIN_GAMES = 3;
 
     private final StoreRepository storeRepository;
     private final StoreRoomRepository storeRoomRepository;
@@ -57,6 +63,10 @@ public class StoreRankingService {
     private final MemberRepository memberRepository;
     private final StorePartyService partyService;
     private final StoreMatchService matchService;
+    private final StoreSeasonRepository seasonRepository;
+
+    public static final LocalDate EPOCH = LocalDate.of(2000, 1, 1);
+    public static final LocalDate FAR_FUTURE = LocalDate.of(9999, 12, 31);
 
     /** 손님 화면에 보이는 게임방 = 열려 있고 기록 시간이 정해진 게임 (값이 없는 게임은 잠시 닫힘으로 시작, impl §7-5) */
     public List<StoreDto.GameItem> visibleGames(Long storeId) {
@@ -87,8 +97,19 @@ public class StoreRankingService {
         return result;
     }
 
-    public StoreDto.Mvp mvp(Long storeId, List<StoreDto.GameRanking> rankings) {
-        List<Object[]> rows = participantRepository.activityByStore(storeId);
+    /** 이번 시즌 MVP. 시즌이 아직 없으면 전체 기간 */
+    public StoreDto.Mvp mvp(Long storeId) {
+        Store store = storeRepository.findById(storeId).orElseThrow(() -> new StoreException(StoreErrorCode.STORE_NOT_FOUND));
+        LocalDate from = currentSeason(store, StorePartyService.now()).map(StoreSeason::getStartDate).orElse(EPOCH);
+        return mvpBetween(storeId, from, FAR_FUTURE);
+    }
+
+    /**
+     * 기간 안 최다 방문·최다 참여·최다승·최대 연승·최고 승률. 승 = 1등(공동 1등 포함), 최고 승률은 {@link #WIN_RATE_MIN_GAMES}판 이상만.
+     * 게임별 1위는 아래 게임별 랭킹과 겹쳐서 넣지 않는다
+     */
+    public StoreDto.Mvp mvpBetween(Long storeId, LocalDate from, LocalDate to) {
+        List<Object[]> rows = participantRepository.activityBetween(storeId, from, to);
         Map<Long, Member> members = members(rows.stream().map(r -> (Long) r[0]).toList());
         rows = rows.stream().filter(r -> isRankable(members.get((Long) r[0]))).toList();
         Comparator<Object[]> recent = Comparator.comparing(r -> (LocalDateTime) r[3], Comparator.nullsFirst(Comparator.naturalOrder()));
@@ -100,14 +121,39 @@ public class StoreRankingService {
             .max(Comparator.<Object[]>comparingLong(r -> (Long) r[1]).thenComparing(recent))
             .map(r -> new StoreDto.MvpItem((Long) r[0], members.get((Long) r[0]).getNickname(), (Long) r[1]))
             .orElse(null);
-        List<StoreDto.GameLeader> leaders = rankings.stream()
-            .map(g -> {
-                StoreDto.RankItem top = g.top().get(0);
-                return new StoreDto.GameLeader(g.boardGameId(), g.name(), top.memberId(), top.nickname(), top.score());
-            })
-            .toList();
-        if (visits == null && leaders.isEmpty()) return null;
-        return new StoreDto.Mvp(visits, games, leaders);
+        if (visits == null) return null;
+        // 회원별 [승, 지금 연승, 최대 연승] — 끝난 순서대로 훑는다
+        Map<Long, int[]> wins = new HashMap<>();
+        for (Object[] p : participantRepository.placementsBetween(storeId, from, to)) {
+            int[] w = wins.computeIfAbsent((Long) p[0], k -> new int[3]);
+            if (Integer.valueOf(1).equals(p[1])) {
+                w[0]++;
+                w[1]++;
+                w[2] = Math.max(w[2], w[1]);
+            } else {
+                w[1] = 0;
+            }
+        }
+        int[] none = new int[3];
+        StoreDto.MvpItem mostWins = topBy(rows, members, r -> wins.getOrDefault((Long) r[0], none)[0], recent);
+        StoreDto.MvpItem bestStreak = topBy(rows, members, r -> wins.getOrDefault((Long) r[0], none)[2], recent);
+        StoreDto.MvpRate bestWinRate = rows.stream()
+            .filter(r -> (Long) r[1] >= WIN_RATE_MIN_GAMES && wins.getOrDefault((Long) r[0], none)[0] > 0)
+            .max(Comparator.<Object[]>comparingDouble(r -> (double) wins.get((Long) r[0])[0] / (Long) r[1]).thenComparing(recent))
+            .map(r -> new StoreDto.MvpRate((Long) r[0], members.get((Long) r[0]).getNickname(),
+                (int) Math.round(100.0 * wins.get((Long) r[0])[0] / (Long) r[1]), (Long) r[1]))
+            .orElse(null);
+        return new StoreDto.Mvp(visits, games, mostWins, bestStreak, bestWinRate);
+    }
+
+    /** 값이 0보다 큰 사람 중 가장 큰 사람. 동점이면 가장 최근에 플레이한 사람 */
+    private static StoreDto.MvpItem topBy(List<Object[]> rows, Map<Long, Member> members,
+                                          ToLongFunction<Object[]> value, Comparator<Object[]> recent) {
+        return rows.stream()
+            .filter(r -> value.applyAsLong(r) > 0)
+            .max(Comparator.comparingLong(value).thenComparing(recent))
+            .map(r -> new StoreDto.MvpItem((Long) r[0], members.get((Long) r[0]).getNickname(), value.applyAsLong(r)))
+            .orElse(null);
     }
 
     /** 2b 게임별 매장 랭킹 전체 (상위 20 + 내 순위) */
@@ -117,8 +163,12 @@ public class StoreRankingService {
         List<StoreRating> ratings = storeRatingRepository.findByStoreIdAndBoardGameId(storeId, game.getId());
         List<StoreDto.RankItem> ranked = rank(ratings, members(ratings.stream().map(StoreRating::getMemberId).toList()), memberId);
         StoreDto.RankItem me = ranked.stream().filter(StoreDto.RankItem::me).findFirst().orElse(null);
+        Store store = storeRepository.findById(storeId).orElseThrow();
+        LocalDateTime now = StorePartyService.now();
+        StoreDto.SeasonInfo season = currentSeason(store, now)
+            .map(s -> StoreSeasonService.info(s, StoreClock.businessDate(store, now))).orElse(null);
         return new StoreDto.RankingResponse(room.getId(), game.getId(), game.getName(), ranked.size(),
-            ranked.subList(0, Math.min(FULL_TOP, ranked.size())), me);
+            ranked.subList(0, Math.min(FULL_TOP, ranked.size())), me, season);
     }
 
     /** 3 매장 게임방 */
@@ -153,10 +203,10 @@ public class StoreRankingService {
             new StoreDto.StartState(block, party, busyGame, closesAt, expired));
     }
 
-    /** 3 매치기록 탭: 최근 25경기 */
+    /** 3 매치기록 탭: 최근 25경기 (대회 판은 매장 점수가 없어 뺀다) */
     public List<StoreDto.MatchSummary> recentMatches(Long storeId, Long storeRoomId) {
         room(storeId, storeRoomId);
-        List<StoreMatch> matches = storeMatchRepository.findByStoreRoomIdAndStatusOrderByEndedAtDesc(
+        List<StoreMatch> matches = storeMatchRepository.findByStoreRoomIdAndStatusAndContestIdIsNullOrderByEndedAtDesc(
             storeRoomId, StoreMatch.Status.RECORDED, PageRequest.of(0, RECENT_MATCHES));
         Map<Long, List<StoreMatchParticipant>> byMatch = matches.isEmpty() ? Map.of()
             : participantRepository.findByStoreMatchIdIn(matches.stream().map(StoreMatch::getId).toList()).stream()
@@ -164,12 +214,22 @@ public class StoreRankingService {
         Map<Long, String> names = partyService.nicknames(byMatch.values().stream().flatMap(List::stream)
             .map(StoreMatchParticipant::getMemberId).filter(Objects::nonNull).toList());
         return matches.stream()
-            .map(m -> new StoreDto.MatchSummary(m.getId(), StoreDto.iso(m.getEndedAt()),
+            .map(m -> new StoreDto.MatchSummary(m.getId(), StoreDto.iso(m.getStartedAt()), StoreDto.iso(m.getEndedAt()),
                 byMatch.getOrDefault(m.getId(), List.of()).stream()
                     .sorted(Comparator.comparing(StoreMatchParticipant::getPlacement, Comparator.nullsLast(Comparator.naturalOrder())))
                     .map(p -> StoreMatchService.participantItem(p, names, true))
                     .toList()))
             .toList();
+    }
+
+    /**
+     * 지금 시즌: 아직 끝나지 않았고 이미 시작한 것 중 가장 늦게 시작한 것. 시즌 경계 처리 전 잠깐은 지난 시즌이 나올 수 있다
+     */
+    public Optional<StoreSeason> currentSeason(Store store, LocalDateTime now) {
+        LocalDate today = StoreClock.businessDate(store, now);
+        return seasonRepository.findByStoreIdOrderByStartDateAsc(store.getId()).stream()
+            .filter(s -> s.getFinalizedAt() == null && !s.getStartDate().isAfter(today))
+            .reduce((a, b) -> b);
     }
 
     // ── 공통 ──
@@ -193,7 +253,7 @@ public class StoreRankingService {
         return m != null && !StoreAccessService.STAFF_ROLE.equals(m.getRole());
     }
 
-    private Map<Long, Member> members(Collection<Long> ids) {
+    Map<Long, Member> members(Collection<Long> ids) {
         Set<Long> unique = new HashSet<>(ids);
         return memberRepository.findAllById(unique).stream().collect(Collectors.toMap(Member::getId, Function.identity()));
     }

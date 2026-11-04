@@ -54,6 +54,9 @@ class StorePartyServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private StoreAccessService storeAccessService;
     @Mock private StorePartyNotifier notifier;
+    @Mock private com.board_game_back.Repository.StoreReportRepository storeReportRepository;
+    @Mock private com.board_game_back.Repository.StoreRatingResetRepository storeRatingResetRepository;
+    @Mock private com.board_game_back.Repository.ScoreSheetRequestEntryRepository scoreSheetRequestEntryRepository;
 
     private StorePartyService service;
     private StoreParty party;
@@ -62,7 +65,8 @@ class StorePartyServiceTest {
     @BeforeEach
     void setUp() {
         service = new StorePartyService(storeRepository, storeMemberRepository, storePartyRepository,
-            storePartyMemberRepository, storeMatchRepository, storeMatchParticipantRepository, boardGameRepository,
+            storePartyMemberRepository, storeMatchRepository, storeMatchParticipantRepository,
+            storeReportRepository, storeRatingResetRepository, scoreSheetRequestEntryRepository, boardGameRepository,
             memberRepository, storeAccessService, notifier);
         party = new StoreParty(STORE_ID, "1234", 1L, LocalDate.of(2026, 11, 2), T0);
         ReflectionTestUtils.setField(party, "id", PARTY_ID);
