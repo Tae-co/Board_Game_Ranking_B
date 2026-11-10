@@ -49,6 +49,7 @@ class CommunityLeaveAnonymizeIT {
     @Autowired MatchRecordRepository matchRecordRepository;
 
     @Autowired RoomService roomService;
+    @Autowired SeasonService seasonService;
 
     private Member owner, a, leaver;
     private Community community;
@@ -92,7 +93,7 @@ class CommunityLeaveAnonymizeIT {
         assertThat(after.ids).doesNotContain(leaver.getId());
         assertThat(after.leftIds).hasSize(1);
         Member ghost = memberRepository.findById(after.leftIds.get(0)).orElseThrow();
-        assertThat(ghost.getNickname()).startsWith("나간 멤버 #");
+        assertThat(ghost.getNickname()).isEqualTo("나간 멤버 #" + ghost.getId());
         assertThat(ghost.isLeftPlaceholder()).isTrue();
 
         assertThat(ratingRepository.findByMember_IdAndRoom_Id(leaver.getId(), room.getId())).isEmpty();
@@ -116,6 +117,19 @@ class CommunityLeaveAnonymizeIT {
         seed();
         roomService.leaveRoom(room.getId(), leaver.getId(), leaver.getId());
         assertAnonymizedAndScoresKept();
+    }
+
+    @Test
+    void 나간_멤버는_명예의_전당_상을_받지_않는다() {
+        seed();  // 나갈 사람이 3판 중 2판 1등 → 나가기 전에는 최다 승리
+        assertThat(seasonService.getStatus(community.getId()).awards())
+            .anyMatch(aw -> aw.type().equals("MOST_WINS") && aw.memberId().equals(leaver.getId()));
+
+        communityService.leaveCommunity(community.getId(), leaver.getId());
+
+        assertThat(seasonService.getStatus(community.getId()).awards())
+            .allMatch(aw -> memberRepository.findById(aw.memberId()).map(m -> !m.isLeftPlaceholder()).orElse(true))
+            .noneMatch(aw -> aw.memberId().equals(leaver.getId()));
     }
 
     @Test

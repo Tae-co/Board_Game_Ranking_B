@@ -213,15 +213,13 @@ public class RoomService {
 
     /**
      * 나간 사람의 기록을 대신 들고 있을 '나간 멤버' 계정. 어느 방의 멤버도 아니라 재계산이 끝나면 점수가 지워지고
-     * 랭킹에 안 나온다. 닉네임은 UNIQUE라 번호를 붙인다 — '#'은 일반 닉네임에 못 쓰므로 실제 회원과 겹치지 않는다.
+     * 랭킹에 안 나온다. 닉네임은 UNIQUE라 계정 id를 붙인다 — 무작위 번호는 쌓이면 고갈된다.
+     * '#'은 일반 닉네임에 못 쓰므로 실제 회원과 겹치지 않는다. NULL 닉네임은 UNIQUE 인덱스에서 빠지므로 먼저 저장해 id를 받는다.
      */
     public Member createLeftPlaceholder() {
-        java.util.Random random = new java.util.Random();
-        String nickname;
-        do {
-            nickname = "나간 멤버 #" + (1000 + random.nextInt(9000));
-        } while (memberRepository.existsByNickname(nickname));
-        return memberRepository.save(Member.builder().nickname(nickname).role(Member.ROLE_LEFT).build());
+        Member ghost = memberRepository.save(Member.builder().role(Member.ROLE_LEFT).build());
+        ghost.updateNickname("나간 멤버 #" + ghost.getId());
+        return ghost;
     }
 
     @Transactional
