@@ -274,6 +274,25 @@ public class CommunityService {
         if (community.getCreatedBy().equals(memberId)) {
             throw new SecurityException("커뮤니티 소유자는 내보낼 수 없습니다.");
         }
+        detachMember(communityId, memberId);
+    }
+
+    /** 본인이 커뮤니티에서 나간다. 강퇴와 같은 정리(어드민 권한 해제·방 나가기)를 한다 */
+    @Transactional
+    public void leaveCommunity(Long communityId, Long memberId) {
+        Community community = communityRepository.findById(communityId)
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
+        // 소유자가 나가면 주인 없는 커뮤니티가 된다 — 설정에서 소유권을 넘기거나 삭제해야 한다
+        if (community.getCreatedBy().equals(memberId)) {
+            throw new IllegalStateException("커뮤니티를 만든 사람은 나갈 수 없어요. 관리에서 소유권을 넘기거나 커뮤니티를 삭제해 주세요.");
+        }
+        if (!communityMemberRepository.existsByCommunityIdAndMemberId(communityId, memberId)) {
+            throw new IllegalArgumentException("이 커뮤니티의 멤버가 아닙니다.");
+        }
+        detachMember(communityId, memberId);
+    }
+
+    private void detachMember(Long communityId, Long memberId) {
         communityMemberRepository.findByCommunityIdAndMemberId(communityId, memberId)
             .ifPresent(communityMemberRepository::delete);
         // 어드민을 내보내면 어드민 권한도 함께 뺀다 (멤버가 아닌 어드민이 남지 않게)
