@@ -4,7 +4,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 닉네임 규칙: 2~20자, 글자(한글·영문 등)·숫자·이모지만 허용. 공백·%·_ 같은 특수문자는 금지.
+ * 닉네임 규칙: 2~20자, 글자(한글·영문 등)·숫자·이모지·띄어쓰기만 허용. %·_ 같은 특수문자는 금지.
+ * 띄어쓰기는 단어 사이 한 칸만 (앞뒤·연속 공백 불가).
  * 프론트 src/utils/nickname.js 와 같은 규칙을 유지할 것.
  */
 public final class NicknameRules {
@@ -18,8 +19,8 @@ public final class NicknameRules {
     private static final String TOKEN =
         "(?:\\p{IsExtended_Pictographic}\\x{FE0F}"
         + "|[\\p{L}\\p{M}\\p{Nd}\\p{IsEmoji_Presentation}\\x{200D}\\x{E0020}-\\x{E007F}])";
-    private static final Pattern VALID = Pattern.compile("^" + TOKEN + "+$");
-    private static final Pattern ALLOWED = Pattern.compile(TOKEN);
+    private static final Pattern VALID = Pattern.compile("^" + TOKEN + "+(?: " + TOKEN + "+)*$");
+    private static final Pattern ALLOWED = Pattern.compile(TOKEN + "| ");
 
     private NicknameRules() {}
 
@@ -30,17 +31,17 @@ public final class NicknameRules {
             && VALID.matcher(nickname).matches();
     }
 
-    /** 소셜 가입용: 허용 안 되는 문자를 지우고 20자로 자른다. 2자 미만이 되면 fallback. */
+    /** 소셜 가입용: 허용 안 되는 문자를 지우고(공백은 한 칸으로) 20자로 자른다. 2자 미만이 되면 fallback. */
     public static String sanitize(String raw, String fallback) {
         if (raw == null) return fallback;
         StringBuilder sb = new StringBuilder();
         Matcher m = ALLOWED.matcher(raw);
         while (m.find()) sb.append(m.group());
-        String cleaned = sb.toString();
+        String cleaned = sb.toString().replaceAll(" {2,}", " ").trim();
         if (cleaned.length() > MAX_LENGTH) {
             int end = MAX_LENGTH;
             if (Character.isHighSurrogate(cleaned.charAt(end - 1))) end--;
-            cleaned = cleaned.substring(0, end);
+            cleaned = cleaned.substring(0, end).trim();
         }
         return cleaned.length() < MIN_LENGTH ? fallback : cleaned;
     }

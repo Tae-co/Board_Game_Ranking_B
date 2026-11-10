@@ -15,13 +15,16 @@ class NicknameRulesTest {
         assertThat(NicknameRules.isValid("👍🏽굿")).isTrue();
         assertThat(NicknameRules.isValid("👨‍👩‍👧")).isTrue();
         assertThat(NicknameRules.isValid("🇰🇷한국")).isTrue();
+        assertThat(NicknameRules.isValid("보드 게임 왕")).isTrue();
     }
 
     @Test
-    void 특수문자_공백은_금지() {
+    void 특수문자와_앞뒤_연속_공백은_금지() {
         assertThat(NicknameRules.isValid("a%b")).isFalse();
         assertThat(NicknameRules.isValid("a_b")).isFalse();
-        assertThat(NicknameRules.isValid("a b")).isFalse();
+        assertThat(NicknameRules.isValid("a  b")).isFalse();
+        assertThat(NicknameRules.isValid(" ab")).isFalse();
+        assertThat(NicknameRules.isValid("ab ")).isFalse();
         assertThat(NicknameRules.isValid("#1등")).isFalse();
         assertThat(NicknameRules.isValid("★별★")).isFalse();
         assertThat(NicknameRules.isValid("©저작")).isFalse();
@@ -38,8 +41,9 @@ class NicknameRulesTest {
 
     @Test
     void 소셜_이름은_특수문자를_지우고_비면_기본값() {
-        assertThat(NicknameRules.sanitize("John Smith", "플레이어")).isEqualTo("JohnSmith");
+        assertThat(NicknameRules.sanitize("John Smith", "플레이어")).isEqualTo("John Smith");
         assertThat(NicknameRules.sanitize("★별★🎲", "플레이어")).isEqualTo("별🎲");
+        assertThat(NicknameRules.sanitize("  김 % 철수 ", "플레이어")).isEqualTo("김 철수");
         assertThat(NicknameRules.sanitize("%%%", "플레이어")).isEqualTo("플레이어");
         assertThat(NicknameRules.sanitize(null, "플레이어")).isEqualTo("플레이어");
         assertThat(NicknameRules.sanitize("가".repeat(25), "플레이어")).hasSize(20);
