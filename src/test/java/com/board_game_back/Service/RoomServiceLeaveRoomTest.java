@@ -16,6 +16,7 @@ import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
+import com.board_game_back.Repository.SeasonRankSnapshotRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,7 @@ class RoomServiceLeaveRoomTest {
     @Mock private CommunityAdminRepository communityAdminRepository;
     @Mock private CommunityMemberRepository communityMemberRepository;
     @Mock private CommunityRepository communityRepository;
+    @Mock private SeasonRankSnapshotRepository seasonRankSnapshotRepository;
 
     @InjectMocks private RoomService roomService;
 

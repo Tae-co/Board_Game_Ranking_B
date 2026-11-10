@@ -4,10 +4,39 @@ import com.board_game_back.Entity.SeasonRankSnapshot;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface SeasonRankSnapshotRepository extends JpaRepository<SeasonRankSnapshot, Long> {
+
+    /** 커뮤니티 나가기: 이 커뮤니티 방들의 지난 시즌 순위표에 내가 있는지 */
+    @Query("""
+        SELECT COUNT(s) > 0 FROM SeasonRankSnapshot s
+        WHERE s.memberId = :memberId AND s.roomId IN (SELECT r.id FROM Room r WHERE r.communityId = :communityId)
+        """)
+    boolean existsByMemberInCommunity(@Param("memberId") Long memberId, @Param("communityId") Long communityId);
+
+    /** 커뮤니티 나가기: 지난 시즌 순위표의 내 줄도 '나간 멤버' 계정으로 옮긴다 */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE SeasonRankSnapshot s SET s.memberId = :ghostId
+        WHERE s.memberId = :memberId AND s.roomId IN (SELECT r.id FROM Room r WHERE r.communityId = :communityId)
+        """)
+    int reassignMemberInCommunity(@Param("memberId") Long memberId, @Param("ghostId") Long ghostId,
+                                  @Param("communityId") Long communityId);
+
+    /** 회원 탈퇴: 이 멤버가 지난 시즌 순위표에 남아 있는 방들 */
+    @Query("SELECT DISTINCT s.roomId FROM SeasonRankSnapshot s WHERE s.memberId = :memberId")
+    List<Long> findRoomIdsByMemberId(@Param("memberId") Long memberId);
+
+    /** 방 나가기: 이 방의 지난 시즌 순위표에 내가 있는지 */
+    boolean existsByMemberIdAndRoomId(Long memberId, Long roomId);
+
+    /** 방 나가기: 이 방 지난 시즌 순위표의 내 줄을 '나간 멤버' 계정으로 옮긴다 */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE SeasonRankSnapshot s SET s.memberId = :ghostId WHERE s.memberId = :memberId AND s.roomId = :roomId")
+    int reassignMemberInRoom(@Param("memberId") Long memberId, @Param("ghostId") Long ghostId, @Param("roomId") Long roomId);
 
     /** 롤오버 멱등성 판단: 이 시즌의 스냅샷이 이미 있으면 다시 찍지 않는다. */
     boolean existsByRoomSeasonId(Long roomSeasonId);

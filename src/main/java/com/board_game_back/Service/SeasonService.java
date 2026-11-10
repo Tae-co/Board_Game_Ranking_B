@@ -78,7 +78,8 @@ public class SeasonService {
         for (MatchRecord match : matches) {
             for (MatchParticipant p : match.getParticipants()) {
                 Member member = p.getMember();
-                if (member == null) continue;
+                // 나간 사람의 기록은 '나간 멤버'로 남지만 상은 주지 않는다
+                if (member == null || member.isLeftPlaceholder()) continue;
                 tallies.computeIfAbsent(member.getId(), id -> new PlayerTally(member))
                     .record(p.getPlacement(), p.getRatingChange());
             }
@@ -144,7 +145,7 @@ public class SeasonService {
         // 마지막 경기 승자 — 공동 1등이면 모두
         MatchRecord last = matches.get(matches.size() - 1);
         for (MatchParticipant p : last.getParticipants()) {
-            if (p.getPlacement() != 1 || p.getMember() == null) continue;
+            if (p.getPlacement() != 1 || p.getMember() == null || p.getMember().isLeftPlaceholder()) continue;
             Member m = p.getMember();
             awards.add(new SeasonDto.Award(
                 "LAST_WINNER", m.getId(), m.getNickname(), m.getProfileImage(), 0, last.getBoardGame().getName()));
