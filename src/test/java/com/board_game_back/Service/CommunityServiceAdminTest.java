@@ -14,10 +14,12 @@ import com.board_game_back.Entity.Member;
 import com.board_game_back.Repository.CommunityAdminRepository;
 import com.board_game_back.Repository.CommunityMemberRepository;
 import com.board_game_back.Repository.CommunityRepository;
+import com.board_game_back.Repository.MatchParticipantRepository;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
+import com.board_game_back.Repository.SeasonRankSnapshotRepository;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Entity.RoomMember;
 import java.time.LocalDateTime;
@@ -52,6 +54,8 @@ class CommunityServiceAdminTest {
     @Mock private RoomMemberRepository roomMemberRepository;
     @Mock private PlayerGameRatingRepository playerGameRatingRepository;
     @Mock private RoomService roomService;
+    @Mock private MatchParticipantRepository matchParticipantRepository;
+    @Mock private SeasonRankSnapshotRepository seasonRankSnapshotRepository;
 
     @InjectMocks private CommunityService communityService;
 

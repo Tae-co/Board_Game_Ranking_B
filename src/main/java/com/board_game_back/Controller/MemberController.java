@@ -51,6 +51,7 @@ public class MemberController {
         List<Member> source = memberRepository.findByNicknameContainingIgnoreCase(nickname);
         List<Map<String, Object>> results = source.stream()
             .filter(m -> excludeId == null || !m.getId().equals(excludeId))
+            .filter(m -> !m.isLeftPlaceholder())
             .limit(100)
             .map(m -> Map.<String, Object>of("memberId", m.getId(), "nickname", m.getNickname()))
             .collect(Collectors.toList());
