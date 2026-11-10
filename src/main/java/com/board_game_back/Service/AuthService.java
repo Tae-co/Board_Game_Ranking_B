@@ -8,6 +8,7 @@ import java.util.Random;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.board_game_back.Utils.NicknameRules;
 
 @Service
 @RequiredArgsConstructor
@@ -49,10 +50,7 @@ public class AuthService {
     @Transactional
     public Member findOrCreateOAuthMember(String socialId, String nickname) {
         return memberRepository.findBySocialId(socialId).orElseGet(() -> {
-            String uniqueNickname = nickname;
-            if (memberRepository.existsByNickname(uniqueNickname)) {
-                uniqueNickname = nickname + "_" + (System.currentTimeMillis() % 10000);
-            }
+            String uniqueNickname = resolveUniqueNickname(NicknameRules.sanitize(nickname, "플레이어"));
             return memberRepository.save(
                 Member.builder()
                     .socialId(socialId)
@@ -78,7 +76,11 @@ public class AuthService {
         if (!memberRepository.existsByNickname(base)) return base;
         String candidate;
         do {
-            candidate = base + "_" + (1000 + new Random().nextInt(9000));
+            // 특수문자 금지라 '_' 없이 숫자만 붙인다. 20자 넘지 않게 base를 자름
+            String head = base.length() > NicknameRules.MAX_LENGTH - 4
+                ? base.substring(0, NicknameRules.MAX_LENGTH - 4) : base;
+            if (Character.isHighSurrogate(head.charAt(head.length() - 1))) head = head.substring(0, head.length() - 1);
+            candidate = head + (1000 + new Random().nextInt(9000));
         } while (memberRepository.existsByNickname(candidate));
         return candidate;
     }

@@ -66,6 +66,15 @@ public class CommunityController {
         return ResponseEntity.noContent().build();
     }
 
+    /** 본인이 커뮤니티에서 나가기 */
+    @PostMapping("/{communityId}/leave")
+    public ResponseEntity<Void> leaveCommunity(
+            @PathVariable Long communityId,
+            @AuthenticationPrincipal Long requesterId) {
+        communityService.leaveCommunity(communityId, requesterId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{communityId}/rooms")
     public ResponseEntity<List<CommunityDto.RoomResponse>> getCommunityRooms(
             @PathVariable Long communityId,

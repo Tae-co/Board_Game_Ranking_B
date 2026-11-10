@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.board_game_back.Utils.NicknameRules;
 
 @RestController
 @RequestMapping("/api/members")
@@ -50,6 +51,7 @@ public class MemberController {
         List<Member> source = memberRepository.findByNicknameContainingIgnoreCase(nickname);
         List<Map<String, Object>> results = source.stream()
             .filter(m -> excludeId == null || !m.getId().equals(excludeId))
+            .filter(m -> !m.isLeftPlaceholder())
             .limit(100)
             .map(m -> Map.<String, Object>of("memberId", m.getId(), "nickname", m.getNickname()))
             .collect(Collectors.toList());
@@ -143,13 +145,13 @@ public class MemberController {
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal Long requesterId) {
         if (!id.equals(requesterId)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        String nickname = body.get("nickname");
-        if (nickname == null || nickname.isBlank() || nickname.length() < 2 || nickname.length() > 20) {
+        String nickname = body.get("nickname") == null ? null : body.get("nickname").trim();
+        if (!NicknameRules.isValid(nickname)) {
             return ResponseEntity.badRequest().build();
         }
         Member member = memberRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
-        member.updateNickname(nickname.trim());
+        member.updateNickname(nickname);
         return ResponseEntity.ok().build();
     }
 }

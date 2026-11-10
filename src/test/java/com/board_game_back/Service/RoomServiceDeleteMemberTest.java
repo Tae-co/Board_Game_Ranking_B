@@ -22,6 +22,7 @@ import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
 import com.board_game_back.Repository.StoreMemberRepository;
 import com.board_game_back.Repository.StoreStaffRepository;
+import com.board_game_back.Repository.SeasonRankSnapshotRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -61,6 +62,7 @@ class RoomServiceDeleteMemberTest {
     @Mock private com.board_game_back.Repository.StoreRatingRepository storeRatingRepository;
     @Mock private StorePartyService storePartyService;
     @Mock private StoreContestService storeContestService;
+    @Mock private SeasonRankSnapshotRepository seasonRankSnapshotRepository;
 
     @InjectMocks private RoomService roomService;
 

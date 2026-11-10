@@ -11,10 +11,12 @@ import com.board_game_back.Repository.BoardGameRepository;
 import com.board_game_back.Repository.CommunityAdminRepository;
 import com.board_game_back.Repository.CommunityMemberRepository;
 import com.board_game_back.Repository.CommunityRepository;
+import com.board_game_back.Repository.MatchParticipantRepository;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
+import com.board_game_back.Repository.SeasonRankSnapshotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +47,8 @@ public class CommunityService {
     private final BoardGameRepository boardGameRepository;
     private final PlayerGameRatingRepository playerGameRatingRepository;
     private final RoomService roomService;
+    private final MatchParticipantRepository matchParticipantRepository;
+    private final SeasonRankSnapshotRepository seasonRankSnapshotRepository;
 
     private static final int MAX_ADMINS = 5;  // 소유자 포함
 
@@ -274,6 +278,25 @@ public class CommunityService {
         if (community.getCreatedBy().equals(memberId)) {
             throw new SecurityException("커뮤니티 소유자는 내보낼 수 없습니다.");
         }
+        detachMember(communityId, memberId);
+    }
+
+    /** 본인이 커뮤니티에서 나간다. 강퇴와 같은 정리(어드민 권한 해제·방 나가기)를 한다 */
+    @Transactional
+    public void leaveCommunity(Long communityId, Long memberId) {
+        Community community = communityRepository.findById(communityId)
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
+        // 소유자가 나가면 주인 없는 커뮤니티가 된다 — 설정에서 소유권을 넘기거나 삭제해야 한다
+        if (community.getCreatedBy().equals(memberId)) {
+            throw new IllegalStateException("커뮤니티를 만든 사람은 나갈 수 없어요. 관리에서 소유권을 넘기거나 커뮤니티를 삭제해 주세요.");
+        }
+        if (!communityMemberRepository.existsByCommunityIdAndMemberId(communityId, memberId)) {
+            throw new IllegalArgumentException("이 커뮤니티의 멤버가 아닙니다.");
+        }
+        detachMember(communityId, memberId);
+    }
+
+    private void detachMember(Long communityId, Long memberId) {
         communityMemberRepository.findByCommunityIdAndMemberId(communityId, memberId)
             .ifPresent(communityMemberRepository::delete);
         // 어드민을 내보내면 어드민 권한도 함께 뺀다 (멤버가 아닌 어드민이 남지 않게)
@@ -289,6 +312,24 @@ public class CommunityService {
                 playerGameRatingRepository.deleteByMember_IdAndRoom_Id(memberId, room.getId());
             }
         }
+        anonymizeRecords(communityId, memberId);
+    }
+
+    /**
+     * 나간 사람의 이 커뮤니티 경기 기록·지난 시즌 순위를 그 사람 몫의 '나간 멤버' 계정으로 옮긴다.
+     * 참가 중이던 방은 방 나가기({@link RoomService#leaveRoom})가 방마다 이미 옮겼고, 여기서는 예전에 나간 방에 남은 줄을 정리한다.
+     * 기록을 지우면 재계산 때 다른 멤버 점수가 바뀌므로, 같은 한 사람으로 남겨 리플레이 결과를 그대로 둔다.
+     * '나간 멤버'는 어느 방의 멤버도 아니라 재계산이 끝나면 점수가 지워지고 랭킹에 안 나온다.
+     * 다시 들어와도 옛 기록은 돌아오지 않는다(새로 시작).
+     */
+    private void anonymizeRecords(Long communityId, Long memberId) {
+        boolean hasMatches = matchParticipantRepository.existsByMemberInCommunity(memberId, communityId);
+        boolean hasSnapshots = seasonRankSnapshotRepository.existsByMemberInCommunity(memberId, communityId);
+        if (!hasMatches && !hasSnapshots) return;
+
+        Member ghost = roomService.createLeftPlaceholder();
+        if (hasMatches) matchParticipantRepository.reassignMemberInCommunity(memberId, ghost, communityId);
+        if (hasSnapshots) seasonRankSnapshotRepository.reassignMemberInCommunity(memberId, ghost.getId(), communityId);
     }
 
     @Transactional(readOnly = true)
