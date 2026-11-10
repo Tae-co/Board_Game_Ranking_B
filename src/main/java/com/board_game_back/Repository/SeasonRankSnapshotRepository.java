@@ -26,6 +26,10 @@ public interface SeasonRankSnapshotRepository extends JpaRepository<SeasonRankSn
     int reassignMemberInCommunity(@Param("memberId") Long memberId, @Param("ghostId") Long ghostId,
                                   @Param("communityId") Long communityId);
 
+    /** 회원 탈퇴: 이 멤버가 지난 시즌 순위표에 남아 있는 방들 */
+    @Query("SELECT DISTINCT s.roomId FROM SeasonRankSnapshot s WHERE s.memberId = :memberId")
+    List<Long> findRoomIdsByMemberId(@Param("memberId") Long memberId);
+
     /** 방 나가기: 이 방의 지난 시즌 순위표에 내가 있는지 */
     boolean existsByMemberIdAndRoomId(Long memberId, Long roomId);
 

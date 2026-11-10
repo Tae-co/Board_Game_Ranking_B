@@ -133,6 +133,28 @@ class CommunityLeaveAnonymizeIT {
     }
 
     @Test
+    void 회원_탈퇴하면_회원은_지워지고_경기는_나간_멤버로_남아_점수는_그대로() {
+        seed();
+        roomService.deleteMember(leaver.getId());
+
+        assertThat(memberRepository.findById(leaver.getId())).isEmpty();
+        assertAnonymizedAndScoresKept();
+    }
+
+    @Test
+    void 예전에_실명으로_남은_기록도_탈퇴하면_나간_멤버로_옮긴다() {
+        seed();
+        // 익명화 도입 전에 방을 나간 경우: 방 멤버만 빠지고 경기 줄은 실명으로 남아 있다
+        roomMemberRepository.deleteByRoomIdAndMemberId(room.getId(), leaver.getId());
+        ratingRepository.deleteByMember_IdAndRoom_Id(leaver.getId(), room.getId());
+
+        roomService.deleteMember(leaver.getId());
+
+        assertThat(memberRepository.findById(leaver.getId())).isEmpty();
+        assertAnonymizedAndScoresKept();
+    }
+
+    @Test
     void 방을_나갔다_다시_들어오면_옛_경기는_돌아오지_않고_새로_시작() {
         seed();
         roomService.leaveRoom(room.getId(), leaver.getId(), leaver.getId());

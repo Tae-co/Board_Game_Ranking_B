@@ -154,15 +154,8 @@ public class RoomService {
     }
 
     @Transactional
+    /** 나가면 이 방의 내 경기 기록·지난 시즌 순위는 '나간 멤버'로 남는다 (다른 멤버 점수 유지, 다시 들어오면 새로 시작). */
     public void leaveRoom(Long roomId, Long memberId, Long requesterId) {
-        leaveRoom(roomId, memberId, requesterId, true);
-    }
-
-    /**
-     * @param anonymize true면 이 방의 내 경기 기록·지난 시즌 순위를 '나간 멤버'로 옮긴다 (다른 멤버 점수 유지, 다시 들어오면 새로 시작).
-     *                  회원 탈퇴는 기존대로 기록을 지우므로 false로 부른다.
-     */
-    private void leaveRoom(Long roomId, Long memberId, Long requesterId, boolean anonymize) {
         if (!requesterId.equals(memberId)) {
             RoomMember requester = roomMemberRepository.findByRoomIdAndMemberId(roomId, requesterId)
                 .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
@@ -199,7 +192,7 @@ public class RoomService {
 
         playerGameRatingRepository.deleteByMember_IdAndRoom_Id(memberId, roomId);
         roomMemberRepository.deleteByRoomIdAndMemberId(roomId, memberId);
-        if (anonymize) anonymizeRecordsInRoom(roomId, memberId);
+        anonymizeRecordsInRoom(roomId, memberId);
     }
 
     private void anonymizeRecordsInRoom(Long roomId, Long memberId) {
@@ -252,9 +245,14 @@ public class RoomService {
     public void deleteMember(Long memberId) {
         List<RoomMember> myRooms = new java.util.ArrayList<>(roomMemberRepository.findByMemberId(memberId));
         for (RoomMember rm : myRooms) {
-            leaveRoom(rm.getRoom().getId(), memberId, memberId, false);
+            leaveRoom(rm.getRoom().getId(), memberId, memberId);
         }
+        // 이미 나간 방에 실명으로 남은 기록도 '나간 멤버'로 옮긴다. 지우면 재계산 때 다른 멤버 점수가 바뀐다
+        java.util.Set<Long> leftoverRoomIds = new java.util.LinkedHashSet<>(matchParticipantRepository.findRoomIdsByMemberId(memberId));
+        leftoverRoomIds.addAll(seasonRankSnapshotRepository.findRoomIdsByMemberId(memberId));
+        for (Long roomId : leftoverRoomIds) anonymizeRecordsInRoom(roomId, memberId);
 
+        // 방 없는 옛 경기 줄만 남는다
         matchParticipantRepository.deleteByMemberId(memberId);
         playerGameRatingRepository.deleteByMember_Id(memberId);
         roomMemberRepository.deleteByMember_Id(memberId);

@@ -34,6 +34,10 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
     int reassignMemberInCommunity(@Param("memberId") Long memberId, @Param("ghost") com.board_game_back.Entity.Member ghost,
                                   @Param("communityId") Long communityId);
 
+    /** 회원 탈퇴: 이 멤버의 경기 줄이 남아 있는 방들 */
+    @Query("SELECT DISTINCT mp.matchRecord.room.id FROM MatchParticipant mp WHERE mp.member.id = :memberId AND mp.matchRecord.room IS NOT NULL")
+    List<Long> findRoomIdsByMemberId(@Param("memberId") Long memberId);
+
     /** 방 나가기: 이 방에서 이 멤버가 한 경기가 있는지 */
     @Query("""
         SELECT COUNT(mp) > 0 FROM MatchParticipant mp
