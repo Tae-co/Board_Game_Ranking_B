@@ -48,26 +48,33 @@ class CommunityLeaveAnonymizeIT {
     @Autowired PlayerGameRatingRepository ratingRepository;
     @Autowired MatchRecordRepository matchRecordRepository;
 
-    @Test
-    void 나간_사람_경기는_나간_멤버로_남고_재계산해도_남은_멤버_점수는_그대로() {
-        String tag = UUID.randomUUID().toString().substring(0, 6);
-        Member owner = memberRepository.save(Member.builder().nickname("주인" + tag).build());
-        Member a = memberRepository.save(Member.builder().nickname("가" + tag).build());
-        Member leaver = memberRepository.save(Member.builder().nickname("나" + tag).build());
+    @Autowired RoomService roomService;
 
-        Community community = communityRepository.save(new Community("테스트" + tag, "South Korea", null, owner.getId()));
+    private Member owner, a, leaver;
+    private Community community;
+    private BoardGame game;
+    private Room room;
+    private double ownerBefore, aBefore;
+
+    /** 주인·가·나(나갈 사람) 셋이 한 방에서 3판. 나갈 사람이 1등을 많이 해 남은 사람 점수에 영향을 줬다 */
+    private void seed() {
+        String tag = UUID.randomUUID().toString().substring(0, 6);
+        owner = memberRepository.save(Member.builder().nickname("주인" + tag).build());
+        a = memberRepository.save(Member.builder().nickname("가" + tag).build());
+        leaver = memberRepository.save(Member.builder().nickname("나" + tag).build());
+
+        community = communityRepository.save(new Community("테스트" + tag, "South Korea", null, owner.getId()));
         for (Member m : List.of(owner, a, leaver)) communityMemberRepository.save(new CommunityMember(community, m));
 
-        BoardGame game = boardGameRepository.save(BoardGame.builder()
+        game = boardGameRepository.save(BoardGame.builder()
             .name("테스트게임" + tag).minPlayers(2).maxPlayers(4).ratingType(RatingType.ELO).build());
-        Room room = new Room("방" + tag, tag, game.getId());
-        room.assignCommunity(community.getId());
-        room = roomRepository.save(room);
+        Room r = new Room("방" + tag, tag, game.getId());
+        r.assignCommunity(community.getId());
+        room = roomRepository.save(r);
         roomMemberRepository.save(new RoomMember(room, owner, MemberRole.HOST));
         roomMemberRepository.save(new RoomMember(room, a, MemberRole.MEMBER));
         roomMemberRepository.save(new RoomMember(room, leaver, MemberRole.MEMBER));
 
-        // 나갈 사람이 1등을 많이 해 남은 사람 점수에 영향을 줬다
         int[][] placements = { {3, 2, 1}, {2, 3, 1}, {1, 3, 2} };
         for (int[] p : placements) {
             matchService.recordMatchResult(new MatchDto.ResultRequest(game.getId(), room.getId(), List.of(
@@ -75,12 +82,12 @@ class CommunityLeaveAnonymizeIT {
                 new MatchDto.ParticipantRequest(a.getId(), p[1], null, null, null),
                 new MatchDto.ParticipantRequest(leaver.getId(), p[2], null, null, null))), owner.getId());
         }
-        double ownerBefore = score(owner, game, room);
-        double aBefore = score(a, game, room);
+        ownerBefore = score(owner, game, room);
+        aBefore = score(a, game, room);
+    }
 
-        communityService.leaveCommunity(community.getId(), leaver.getId());
-
-        // 경기 기록: 나간 사람 줄이 '나간 멤버' 한 명으로 옮겨졌다
+    /** 나간 사람 줄이 '나간 멤버' 한 명으로 옮겨졌고, 재계산해도 남은 사람 점수가 그대로 */
+    private void assertAnonymizedAndScoresKept() {
         Participants after = participants(room.getId(), game.getId());
         assertThat(after.ids).doesNotContain(leaver.getId());
         assertThat(after.leftIds).hasSize(1);
@@ -88,15 +95,41 @@ class CommunityLeaveAnonymizeIT {
         assertThat(ghost.getNickname()).startsWith("나간 멤버 #");
         assertThat(ghost.isLeftPlaceholder()).isTrue();
 
-        // 나간 사람·나간 멤버 모두 랭킹에 없다
         assertThat(ratingRepository.findByMember_IdAndRoom_Id(leaver.getId(), room.getId())).isEmpty();
         assertThat(ratingRepository.findByMember_IdAndRoom_Id(ghost.getId(), room.getId())).isEmpty();
 
-        // 재계산해도 남은 사람 점수가 그대로
         matchService.recalculateAllRatings();
         assertThat(score(owner, game, room)).isEqualTo(ownerBefore);
         assertThat(score(a, game, room)).isEqualTo(aBefore);
         assertThat(ratingRepository.findByMember_IdAndRoom_Id(ghost.getId(), room.getId())).isEmpty();
+    }
+
+    @Test
+    void 커뮤니티를_나가면_경기는_나간_멤버로_남고_재계산해도_남은_멤버_점수는_그대로() {
+        seed();
+        communityService.leaveCommunity(community.getId(), leaver.getId());
+        assertAnonymizedAndScoresKept();
+    }
+
+    @Test
+    void 방을_나가면_경기는_나간_멤버로_남고_재계산해도_남은_멤버_점수는_그대로() {
+        seed();
+        roomService.leaveRoom(room.getId(), leaver.getId(), leaver.getId());
+        assertAnonymizedAndScoresKept();
+    }
+
+    @Test
+    void 방을_나갔다_다시_들어오면_옛_경기는_돌아오지_않고_새로_시작() {
+        seed();
+        roomService.leaveRoom(room.getId(), leaver.getId(), leaver.getId());
+        roomMemberRepository.save(new RoomMember(roomRepository.findById(room.getId()).orElseThrow(),
+            memberRepository.findById(leaver.getId()).orElseThrow(), MemberRole.MEMBER));
+
+        matchService.recalculateAllRatings();
+
+        assertThat(ratingRepository.findByMember_IdAndRoom_Id(leaver.getId(), room.getId())).isEmpty();
+        assertThat(score(owner, game, room)).isEqualTo(ownerBefore);
+        assertThat(score(a, game, room)).isEqualTo(aBefore);
     }
 
     private double score(Member m, BoardGame game, Room room) {

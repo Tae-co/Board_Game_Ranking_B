@@ -317,6 +317,7 @@ public class CommunityService {
 
     /**
      * 나간 사람의 이 커뮤니티 경기 기록·지난 시즌 순위를 그 사람 몫의 '나간 멤버' 계정으로 옮긴다.
+     * 참가 중이던 방은 방 나가기({@link RoomService#leaveRoom})가 방마다 이미 옮겼고, 여기서는 예전에 나간 방에 남은 줄을 정리한다.
      * 기록을 지우면 재계산 때 다른 멤버 점수가 바뀌므로, 같은 한 사람으로 남겨 리플레이 결과를 그대로 둔다.
      * '나간 멤버'는 어느 방의 멤버도 아니라 재계산이 끝나면 점수가 지워지고 랭킹에 안 나온다.
      * 다시 들어와도 옛 기록은 돌아오지 않는다(새로 시작).
@@ -326,22 +327,9 @@ public class CommunityService {
         boolean hasSnapshots = seasonRankSnapshotRepository.existsByMemberInCommunity(memberId, communityId);
         if (!hasMatches && !hasSnapshots) return;
 
-        Member ghost = memberRepository.save(Member.builder()
-            .nickname(uniqueLeftNickname())
-            .role(Member.ROLE_LEFT)
-            .build());
+        Member ghost = roomService.createLeftPlaceholder();
         if (hasMatches) matchParticipantRepository.reassignMemberInCommunity(memberId, ghost, communityId);
         if (hasSnapshots) seasonRankSnapshotRepository.reassignMemberInCommunity(memberId, ghost.getId(), communityId);
-    }
-
-    /** 닉네임은 UNIQUE라 번호를 붙인다. '#'은 일반 닉네임에 못 쓰므로 실제 회원과 겹치지 않는다 */
-    private String uniqueLeftNickname() {
-        java.util.Random random = new java.util.Random();
-        String candidate;
-        do {
-            candidate = "나간 멤버 #" + (1000 + random.nextInt(9000));
-        } while (memberRepository.existsByNickname(candidate));
-        return candidate;
     }
 
     @Transactional(readOnly = true)

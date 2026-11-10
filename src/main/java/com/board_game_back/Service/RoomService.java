@@ -19,6 +19,7 @@ import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
+import com.board_game_back.Repository.SeasonRankSnapshotRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
@@ -48,6 +49,7 @@ public class RoomService {
     private final CommunityMemberRepository communityMemberRepository;
     private final CommunityRepository communityRepository;
     private final RoomSeasonService roomSeasonService;
+    private final SeasonRankSnapshotRepository seasonRankSnapshotRepository;
 
     @Transactional
     public Room createRoom(String roomName, Long memberId, Long boardGameId, Long communityId,
@@ -153,6 +155,14 @@ public class RoomService {
 
     @Transactional
     public void leaveRoom(Long roomId, Long memberId, Long requesterId) {
+        leaveRoom(roomId, memberId, requesterId, true);
+    }
+
+    /**
+     * @param anonymize true면 이 방의 내 경기 기록·지난 시즌 순위를 '나간 멤버'로 옮긴다 (다른 멤버 점수 유지, 다시 들어오면 새로 시작).
+     *                  회원 탈퇴는 기존대로 기록을 지우므로 false로 부른다.
+     */
+    private void leaveRoom(Long roomId, Long memberId, Long requesterId, boolean anonymize) {
         if (!requesterId.equals(memberId)) {
             RoomMember requester = roomMemberRepository.findByRoomIdAndMemberId(roomId, requesterId)
                 .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
@@ -189,6 +199,29 @@ public class RoomService {
 
         playerGameRatingRepository.deleteByMember_IdAndRoom_Id(memberId, roomId);
         roomMemberRepository.deleteByRoomIdAndMemberId(roomId, memberId);
+        if (anonymize) anonymizeRecordsInRoom(roomId, memberId);
+    }
+
+    private void anonymizeRecordsInRoom(Long roomId, Long memberId) {
+        boolean hasMatches = matchParticipantRepository.existsByMemberInRoom(memberId, roomId);
+        boolean hasSnapshots = seasonRankSnapshotRepository.existsByMemberIdAndRoomId(memberId, roomId);
+        if (!hasMatches && !hasSnapshots) return;
+        Member ghost = createLeftPlaceholder();
+        if (hasMatches) matchParticipantRepository.reassignMemberInRoom(memberId, ghost, roomId);
+        if (hasSnapshots) seasonRankSnapshotRepository.reassignMemberInRoom(memberId, ghost.getId(), roomId);
+    }
+
+    /**
+     * 나간 사람의 기록을 대신 들고 있을 '나간 멤버' 계정. 어느 방의 멤버도 아니라 재계산이 끝나면 점수가 지워지고
+     * 랭킹에 안 나온다. 닉네임은 UNIQUE라 번호를 붙인다 — '#'은 일반 닉네임에 못 쓰므로 실제 회원과 겹치지 않는다.
+     */
+    public Member createLeftPlaceholder() {
+        java.util.Random random = new java.util.Random();
+        String nickname;
+        do {
+            nickname = "나간 멤버 #" + (1000 + random.nextInt(9000));
+        } while (memberRepository.existsByNickname(nickname));
+        return memberRepository.save(Member.builder().nickname(nickname).role(Member.ROLE_LEFT).build());
     }
 
     @Transactional
@@ -221,7 +254,7 @@ public class RoomService {
     public void deleteMember(Long memberId) {
         List<RoomMember> myRooms = new java.util.ArrayList<>(roomMemberRepository.findByMemberId(memberId));
         for (RoomMember rm : myRooms) {
-            leaveRoom(rm.getRoom().getId(), memberId, memberId);
+            leaveRoom(rm.getRoom().getId(), memberId, memberId, false);
         }
 
         matchParticipantRepository.deleteByMemberId(memberId);

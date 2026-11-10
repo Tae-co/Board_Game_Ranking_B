@@ -26,6 +26,14 @@ public interface SeasonRankSnapshotRepository extends JpaRepository<SeasonRankSn
     int reassignMemberInCommunity(@Param("memberId") Long memberId, @Param("ghostId") Long ghostId,
                                   @Param("communityId") Long communityId);
 
+    /** 방 나가기: 이 방의 지난 시즌 순위표에 내가 있는지 */
+    boolean existsByMemberIdAndRoomId(Long memberId, Long roomId);
+
+    /** 방 나가기: 이 방 지난 시즌 순위표의 내 줄을 '나간 멤버' 계정으로 옮긴다 */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE SeasonRankSnapshot s SET s.memberId = :ghostId WHERE s.memberId = :memberId AND s.roomId = :roomId")
+    int reassignMemberInRoom(@Param("memberId") Long memberId, @Param("ghostId") Long ghostId, @Param("roomId") Long roomId);
+
     /** 롤오버 멱등성 판단: 이 시즌의 스냅샷이 이미 있으면 다시 찍지 않는다. */
     boolean existsByRoomSeasonId(Long roomSeasonId);
 

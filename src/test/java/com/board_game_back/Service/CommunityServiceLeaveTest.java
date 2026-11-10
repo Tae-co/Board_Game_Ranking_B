@@ -78,7 +78,7 @@ class CommunityServiceLeaveTest {
 
         communityService.leaveCommunity(COMMUNITY_ID, MEMBER_ID);
 
-        verify(memberRepository, never()).save(any());
+        verify(roomService, never()).createLeftPlaceholder();
     }
 
     @Test

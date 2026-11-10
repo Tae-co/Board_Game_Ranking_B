@@ -34,6 +34,23 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
     int reassignMemberInCommunity(@Param("memberId") Long memberId, @Param("ghost") com.board_game_back.Entity.Member ghost,
                                   @Param("communityId") Long communityId);
 
+    /** 방 나가기: 이 방에서 이 멤버가 한 경기가 있는지 */
+    @Query("""
+        SELECT COUNT(mp) > 0 FROM MatchParticipant mp
+        WHERE mp.member.id = :memberId AND mp.matchRecord.room.id = :roomId
+        """)
+    boolean existsByMemberInRoom(@Param("memberId") Long memberId, @Param("roomId") Long roomId);
+
+    /** 방 나가기: 이 방의 내 경기 줄을 '나간 멤버' 계정으로 옮긴다 */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE MatchParticipant mp SET mp.member = :ghost
+        WHERE mp.member.id = :memberId
+          AND mp.matchRecord.id IN (SELECT r.id FROM MatchRecord r WHERE r.room.id = :roomId)
+        """)
+    int reassignMemberInRoom(@Param("memberId") Long memberId, @Param("ghost") com.board_game_back.Entity.Member ghost,
+                             @Param("roomId") Long roomId);
+
     /** 커뮤니티 방들에서 멤버별 경기 수. 소유자가 탈퇴할 때 다음 소유자를 고른다. */
     @Query("""
         SELECT mp.member.id, COUNT(mp) FROM MatchParticipant mp
