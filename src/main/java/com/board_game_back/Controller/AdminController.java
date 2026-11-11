@@ -1,23 +1,17 @@
 package com.board_game_back.Controller;
 
-import com.board_game_back.Entity.BoardGame;
-import com.board_game_back.Repository.BoardGameRepository;
-import com.board_game_back.Repository.MemberRepository;
+import com.board_game_back.DTO.BoardGameDto;
+import com.board_game_back.DTO.MemberDto;
+import com.board_game_back.Service.BoardGameService;
+import com.board_game_back.Service.MemberService;
 import com.board_game_back.Service.RoomService;
-import com.board_game_back.Service.ScoreSheetRequestService;
-import com.board_game_back.Service.StoreAdminService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,18 +28,11 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class AdminController {
 
-    private final BoardGameRepository boardGameRepository;
-    private final MemberRepository memberRepository;
+    private final BoardGameService boardGameService;
+    private final MemberService memberService;
     private final RoomService roomService;
-    private final StoreAdminService storeAdminService;
-    private final ScoreSheetRequestService scoreSheetRequestService;
 
-    @Value("${supabase.url}")
-    private String supabaseUrl;
-
-    @Value("${supabase.service-role-key}")
-    private String serviceRoleKey;
-
+    // SecurityConfig도 /api/admin/**에 ROLE_ADMIN을 요구한다. 설정이 바뀌어도 열리지 않게 한 번 더 막는다
     private void checkAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))) {
@@ -55,101 +42,40 @@ public class AdminController {
 
     /** 보드게임 목록 조회 */
     @GetMapping("/games")
-    public ResponseEntity<List<BoardGame>> getGames() {
+    public ResponseEntity<List<BoardGameDto.Response>> getGames() {
         checkAdmin();
-        return ResponseEntity.ok(boardGameRepository.findAll());
-    }
-
-    private void validateSchemaJson(String schemaJson) {
-        if (schemaJson == null || schemaJson.isBlank()) return;
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            Map<?, ?> parsed = mapper.readValue(schemaJson, Map.class);
-            String type = (String) parsed.get("type");
-            if (!List.of("flat", "sectioned", "conditional", "simple").contains(type)) {
-                throw new IllegalArgumentException("유효하지 않은 schema type: " + type);
-            }
-        } catch (IllegalArgumentException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalArgumentException("schema_json 파싱 오류: " + e.getMessage());
-        }
+        return ResponseEntity.ok(boardGameService.getAllGamesForAdmin());
     }
 
     /** 보드게임 추가 */
     @PostMapping("/games")
-    public ResponseEntity<BoardGame> addGame(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<BoardGameDto.Response> addGame(@RequestBody BoardGameDto.AdminRequest req) {
         checkAdmin();
-        String schemaJson = (String) body.get("schemaJson");
-        validateSchemaJson(schemaJson);
-        BoardGame game = BoardGame.builder()
-                .name((String) body.get("name"))
-                .imageUrl((String) body.getOrDefault("imageUrl", ""))
-                .minPlayers(((Number) body.getOrDefault("minPlayers", 2)).intValue())
-                .maxPlayers(((Number) body.getOrDefault("maxPlayers", 6)).intValue())
-                .schemaJson(schemaJson)
-                .build();
-        Integer minMinutes = intOrNull(body.get("minMinutes"));
-        Integer maxMinutes = intOrNull(body.get("maxMinutes"));
-        StoreAdminService.validateRecordMinutes(minMinutes, maxMinutes);
-        game.updateRecordMinutes(minMinutes, maxMinutes);
-        BoardGame saved = boardGameRepository.save(game);
-        storeAdminService.createRoomsForGame(saved);
-        // 같은 이름 점수판 요청은 추가됨으로 (6c·6d)
-        scoreSheetRequestService.markAdded(saved.getName());
-        return ResponseEntity.ok(saved);
+        return ResponseEntity.ok(boardGameService.createOfficialGame(req));
     }
 
     /** 보드게임 수정 */
     @PutMapping("/games/{id}")
-    @Transactional
-    public ResponseEntity<BoardGame> updateGame(
+    public ResponseEntity<BoardGameDto.Response> updateGame(
             @PathVariable Long id,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody BoardGameDto.AdminRequest req) {
         checkAdmin();
-        String schemaJson = (String) body.get("schemaJson");
-        validateSchemaJson(schemaJson);
-        BoardGame game = boardGameRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임입니다."));
-        game.update(
-                (String) body.get("name"),
-                (String) body.getOrDefault("imageUrl", ""),
-                ((Number) body.getOrDefault("minPlayers", 2)).intValue(),
-                ((Number) body.getOrDefault("maxPlayers", 6)).intValue(),
-                schemaJson
-        );
-        // 매장 기록 시간: 보낸 경우만 바꾼다 (게임 탭 수정 폼은 안 보낸다)
-        if (body.containsKey("minMinutes") || body.containsKey("maxMinutes")) {
-            Integer minMinutes = intOrNull(body.get("minMinutes"));
-            Integer maxMinutes = intOrNull(body.get("maxMinutes"));
-            StoreAdminService.validateRecordMinutes(minMinutes, maxMinutes);
-            game.updateRecordMinutes(minMinutes, maxMinutes);
-        }
-        return ResponseEntity.ok(game);
+        return ResponseEntity.ok(boardGameService.updateGameByAdmin(id, req));
     }
 
     /** 보드게임 삭제 */
     @DeleteMapping("/games/{id}")
     public ResponseEntity<String> deleteGame(@PathVariable Long id) {
         checkAdmin();
-        storeAdminService.deleteRoomsForGame(id);
-        boardGameRepository.deleteById(id);
+        boardGameService.deleteGameByAdmin(id);
         return ResponseEntity.ok("삭제되었습니다.");
     }
 
     /** 전체 멤버 목록 */
     @GetMapping("/members")
-    public ResponseEntity<List<Map<String, Object>>> getMembers() {
+    public ResponseEntity<List<MemberDto.AdminSummary>> getMembers() {
         checkAdmin();
-        List<Map<String, Object>> result = memberRepository.findAll().stream()
-            .map(m -> Map.<String, Object>of(
-                "memberId", m.getId(),
-                "nickname", m.getNickname() != null ? m.getNickname() : "",
-                "role", m.getRole() != null ? m.getRole() : "",
-                "phoneNumber", m.getPhoneNumber() != null ? m.getPhoneNumber() : ""
-            ))
-            .collect(java.util.stream.Collectors.toList());
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(memberService.getMembersForAdmin());
     }
 
     /** 멤버 삭제 */
@@ -165,29 +91,9 @@ public class AdminController {
     public ResponseEntity<Map<String, String>> uploadImage(@RequestParam MultipartFile file) {
         checkAdmin();
         try {
-            String filename = UUID.randomUUID() + ".jpg";
-            String uploadUrl = supabaseUrl + "/storage/v1/object/game-images/" + filename;
-
-            RestTemplate restTemplate = new RestTemplate();
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + serviceRoleKey);
-            headers.setContentType(MediaType.IMAGE_JPEG);
-
-            restTemplate.exchange(
-                uploadUrl,
-                HttpMethod.PUT,
-                new HttpEntity<>(file.getBytes(), headers),
-                String.class
-            );
-
-            String publicUrl = supabaseUrl + "/storage/v1/object/public/game-images/" + filename;
-            return ResponseEntity.ok(Map.of("url", publicUrl));
+            return ResponseEntity.ok(Map.of("url", boardGameService.uploadOfficialGameImage(file)));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
-    }
-
-    private static Integer intOrNull(Object value) {
-        return value instanceof Number n ? n.intValue() : null;
     }
 }

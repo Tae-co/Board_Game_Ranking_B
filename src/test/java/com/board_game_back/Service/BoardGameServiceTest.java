@@ -41,6 +41,8 @@ class BoardGameServiceTest {
     @Mock private CommunityAdminRepository communityAdminRepository;
     @Mock private RoomRepository roomRepository;
     @Mock private MatchRecordRepository matchRecordRepository;
+    @Mock private StoreAdminService storeAdminService;
+    @Mock private ScoreSheetRequestService scoreSheetRequestService;
 
     @InjectMocks private BoardGameService boardGameService;
 
@@ -135,6 +137,66 @@ class BoardGameServiceTest {
         assertStatus(() -> boardGameService.deleteCustomGame(ADMIN_ID, GAME_ID),
             HttpStatus.CONFLICT, "플레이 기록이 남아 있어 삭제할 수 없어요.");
         verify(boardGameRepository, never()).delete(any());
+    }
+
+    @Test
+    void 관리자_공식_게임은_인원수를_안_주면_2에서_6명_스키마가_없어도_만든다() {
+        when(boardGameRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        BoardGameDto.Response res = boardGameService.createOfficialGame(
+            BoardGameDto.AdminRequest.of("공식", null, null, null, null, null, null));
+
+        assertThat(res.minPlayers()).isEqualTo(2);
+        assertThat(res.maxPlayers()).isEqualTo(6);
+        assertThat(res.imageUrl()).isEmpty();
+        assertThat(res.communityId()).isNull();
+    }
+
+    @Test
+    void 관리자도_내장_형식이_아닌_스키마는_막는다() {
+        assertThatThrownBy(() -> boardGameService.createOfficialGame(
+                BoardGameDto.AdminRequest.of("x", "", 2, 4, "{\"type\":\"chip\"}", null, null)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("유효하지 않은 schema type: chip");
+        verify(boardGameRepository, never()).save(any());
+    }
+
+    @Test
+    void 관리자가_없는_게임을_고치면_400용_예외() {
+        when(boardGameRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> boardGameService.updateGameByAdmin(999L,
+                BoardGameDto.AdminRequest.of("x", "", 2, 4, "{\"type\":\"simple\"}", null, null)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("존재하지 않는 게임입니다.");
+    }
+
+    @Test
+    void 매장_기록_시간은_안_보내면_그대로_null로_보내면_지운다() {
+        BoardGame game = BoardGame.builder().name("공식").minPlayers(2).maxPlayers(4).build();
+        game.updateRecordMinutes(30, 90);
+        when(boardGameRepository.findById(5L)).thenReturn(Optional.of(game));
+
+        boardGameService.updateGameByAdmin(5L,
+            BoardGameDto.AdminRequest.of("공식", "", 2, 4, null, null, null));
+        assertThat(game.getMinMinutes()).isEqualTo(30);
+        assertThat(game.getMaxMinutes()).isEqualTo(90);
+
+        boardGameService.updateGameByAdmin(5L,
+            BoardGameDto.AdminRequest.of("공식", "", 2, 4, null, Optional.empty(), Optional.empty()));
+        assertThat(game.getMinMinutes()).isNull();
+        assertThat(game.getMaxMinutes()).isNull();
+    }
+
+    @Test
+    void 공식_게임을_만들면_매장_게임방과_점수판_요청을_처리한다() {
+        when(boardGameRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        boardGameService.createOfficialGame(
+            BoardGameDto.AdminRequest.of("새 게임", "", 2, 4, null, Optional.of(30), Optional.of(90)));
+
+        verify(storeAdminService).createRoomsForGame(any());
+        verify(scoreSheetRequestService).markAdded("새 게임");
     }
 
     @Test

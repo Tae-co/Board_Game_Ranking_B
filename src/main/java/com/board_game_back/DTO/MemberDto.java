@@ -37,4 +37,21 @@ public class MemberDto {
         List<GameStatItem> games
     ) {}
 
+    // 📤 [Response] 관리자 회원 목록 한 줄. 값이 없으면 빈 문자열 (Map으로 내보내던 때와 같음)
+    public record AdminSummary(
+        Long memberId,
+        String nickname,
+        String role,
+        String phoneNumber
+    ) {
+        public static AdminSummary from(com.board_game_back.Entity.Member m) {
+            return new AdminSummary(
+                m.getId(),
+                m.getNickname() != null ? m.getNickname() : "",
+                m.getRole() != null ? m.getRole() : "",
+                m.getPhoneNumber() != null ? m.getPhoneNumber() : ""
+            );
+        }
+    }
+
 }
