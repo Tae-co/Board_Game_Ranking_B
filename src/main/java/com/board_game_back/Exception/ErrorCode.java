@@ -62,6 +62,7 @@ public enum ErrorCode {
     MATCH_WITHOUT_ROOM(HttpStatus.BAD_REQUEST, "방 정보가 없는 매치는 삭제할 수 없습니다."),
     ROOM_MEMBER_ONLY_RECORD(HttpStatus.FORBIDDEN, "방 멤버만 매치를 등록할 수 있습니다."),
     PARTICIPANT_NOT_ROOM_MEMBER(HttpStatus.FORBIDDEN, "방 멤버가 아닌 참가자는 등록할 수 없습니다."),
+    MATCH_GAME_NOT_ROOM_GAME(HttpStatus.BAD_REQUEST, "이 방의 게임이 아닌 경기는 기록할 수 없습니다."),
     ROOM_OWNER_ONLY_EDIT_MATCH(HttpStatus.FORBIDDEN, "방장만 매치를 수정할 수 있습니다."),
     ROOM_OWNER_ONLY_DELETE_MATCH(HttpStatus.FORBIDDEN, "방장만 삭제할 수 있습니다."),
     CHIP_DELTA_REQUIRED(HttpStatus.BAD_REQUEST, "칩 손익을 입력해주세요."),
