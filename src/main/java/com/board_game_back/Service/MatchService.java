@@ -56,6 +56,13 @@ public class MatchService {
         Room room = roomRepository.findById(request.roomId())
             .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
 
+        // 점수는 (멤버, 게임, 방)마다 한 줄이다. 방의 게임이 아닌 경기를 받으면 같은 방에 멤버 점수 줄이
+        // 하나 더 생겨, 방 랭킹에는 안 보이는 점수가 쌓이고 LP 수정 같은 (멤버, 방) 조회가 깨진다.
+        // 게임이 비어 있는 방은 한 방 한 게임(2026-03) 이전에 만든 방이라 막지 않는다.
+        if (room.getBoardGameId() != null && !room.getBoardGameId().equals(game.getId())) {
+            throw new AppException(ErrorCode.MATCH_GAME_NOT_ROOM_GAME);
+        }
+
         // 정각 스케줄러를 기다리면 시즌 종료 후 최대 1시간 동안의 경기가 지난 시즌 점수에 섞인다 (§22).
         seasonRolloverService.rolloverIfDue(room.getId());
 

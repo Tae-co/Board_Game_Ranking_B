@@ -128,4 +128,20 @@ class MatchServiceChipTest {
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("code", ErrorCode.BUY_INS_INVALID);
     }
+
+    @Test
+    void 방의_게임이_아닌_경기는_거절하고_시즌도_넘기지_않는다() {
+        BoardGame 카탄 = BoardGame.builder().name("카탄").build();
+        ReflectionTestUtils.setField(카탄, "id", 31L);
+        when(boardGameRepository.findById(31L)).thenReturn(Optional.of(카탄));
+
+        assertThatThrownBy(() -> matchService.recordMatchResult(new MatchDto.ResultRequest(31L, ROOM_ID, List.of(
+            new MatchDto.ParticipantRequest(1L, 1, null, null, null),
+            new MatchDto.ParticipantRequest(2L, 2, null, null, null))), 1L))
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.MATCH_GAME_NOT_ROOM_GAME);
+        verify(seasonRolloverService, never()).rolloverIfDue(any());
+        verify(ratingRepository, never()).save(any());
+        verify(matchRecordRepository, never()).save(any());
+    }
 }
