@@ -6,6 +6,7 @@ import com.board_game_back.DTO.RoomDto;
 import com.board_game_back.DTO.RoomDto.Response;
 import com.board_game_back.DTO.SeasonDto;
 import com.board_game_back.Entity.Room;
+import com.board_game_back.Service.AccessGuard;
 import com.board_game_back.Service.MatchService;
 import com.board_game_back.Service.RankingService;
 import com.board_game_back.Service.RoomSeasonService;
@@ -38,6 +39,7 @@ public class RoomController {
     private final MatchService matchService;
     private final SeasonArchiveService seasonArchiveService;
     private final RoomSeasonService roomSeasonService;
+    private final AccessGuard accessGuard;
 
     @PostMapping
     public ResponseEntity<RoomDto.Response> createRoom(
@@ -67,7 +69,10 @@ public class RoomController {
     }
 
     @GetMapping("/my/{memberId}")
-    public ResponseEntity<List<Response>> getMyRooms(@PathVariable Long memberId) {
+    public ResponseEntity<List<Response>> getMyRooms(
+            @PathVariable Long memberId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireSelf(memberId, requesterId);
         List<RoomDto.Response> responses = roomService.getMyRooms(memberId).stream()
             .map(r -> new RoomDto.Response(r.getId(), r.getName(), r.getInviteCode(), r.getBoardGameId()))
             .collect(Collectors.toList());
@@ -75,12 +80,18 @@ public class RoomController {
     }
 
     @GetMapping("/{roomId}/members")
-    public ResponseEntity<List<RoomDto.RoomMemberResponse>> getRoomMembers(@PathVariable Long roomId) {
+    public ResponseEntity<List<RoomDto.RoomMemberResponse>> getRoomMembers(
+            @PathVariable Long roomId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireRoomReader(roomId, requesterId);
         return ResponseEntity.ok(roomService.getRoomMembers(roomId));
     }
 
     @GetMapping("/{roomId}")
-    public ResponseEntity<RoomDto.Response> getRoomDetail(@PathVariable Long roomId) {
+    public ResponseEntity<RoomDto.Response> getRoomDetail(
+            @PathVariable Long roomId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireRoomReader(roomId, requesterId);
         Room room = roomService.getRoomById(roomId);
         return ResponseEntity.ok(
             new RoomDto.Response(room.getId(), room.getName(), room.getInviteCode(), room.getBoardGameId()));
@@ -95,7 +106,9 @@ public class RoomController {
             @PathVariable Long roomId,
             @RequestParam(required = false) Long boardGameId,
             @RequestParam(required = false) String seasonId,
-            @RequestParam(required = false) String season) {
+            @RequestParam(required = false) String season,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireRoomReader(roomId, requesterId);
         // season(yyyy-MM)은 구버전 앱(1.10.x)이 보낸다. 새 앱은 seasonId를 쓴다.
         String seasonRef = seasonId != null ? seasonId : season;
         if (seasonRef != null) {
@@ -110,7 +123,10 @@ public class RoomController {
 
     /** 진행 중 시즌. 종료 시각이 지났으면 넘긴 뒤의 시즌을 준다. */
     @GetMapping("/{roomId}/seasons/current")
-    public ResponseEntity<SeasonDto.RoomSeasonResponse> getCurrentSeason(@PathVariable Long roomId) {
+    public ResponseEntity<SeasonDto.RoomSeasonResponse> getCurrentSeason(
+            @PathVariable Long roomId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireRoomReader(roomId, requesterId);
         return ResponseEntity.ok(roomSeasonService.getCurrentSeasonResponse(roomId));
     }
 
@@ -128,7 +144,9 @@ public class RoomController {
     @GetMapping("/{roomId}/seasons")
     public ResponseEntity<List<SeasonDto.RoomSeasonResponse>> getRoomSeasons(
             @PathVariable Long roomId,
-            @RequestParam(required = false) Long boardGameId) {
+            @RequestParam(required = false) Long boardGameId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireRoomReader(roomId, requesterId);
         return ResponseEntity.ok(seasonArchiveService.getRoomSeasons(roomId, boardGameId));
     }
 
@@ -138,7 +156,9 @@ public class RoomController {
     public ResponseEntity<List<SeasonDto.PodiumEntry>> getSeasonPodium(
             @PathVariable Long roomId,
             @PathVariable String seasonRef,
-            @RequestParam(required = false) Long boardGameId) {
+            @RequestParam(required = false) Long boardGameId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireRoomReader(roomId, requesterId);
         return ResponseEntity.ok(seasonArchiveService.getPodium(roomId, boardGameId, seasonRef));
     }
 
@@ -160,7 +180,10 @@ public class RoomController {
     }
 
     @GetMapping("/{roomId}/matches")
-    public ResponseEntity<List<MatchDto.MatchHistoryResponse>> getMatchHistory(@PathVariable Long roomId) {
+    public ResponseEntity<List<MatchDto.MatchHistoryResponse>> getMatchHistory(
+            @PathVariable Long roomId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireRoomReader(roomId, requesterId);
         return ResponseEntity.ok(matchService.getMatchHistory(roomId));
     }
 

@@ -14,6 +14,10 @@ public enum ErrorCode {
     // ── 공통 ──
     LOGIN_REQUIRED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
     ADMIN_REQUIRED(HttpStatus.FORBIDDEN, "관리자 권한이 필요합니다."),
+    SELF_ONLY(HttpStatus.FORBIDDEN, "본인 정보만 볼 수 있습니다."),
+    ROOM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 게임방을 볼 권한이 없습니다."),
+    COMMUNITY_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 커뮤니티를 볼 권한이 없습니다."),
+    COMMUNITY_MEMBER_ONLY_JOIN_ROOM(HttpStatus.FORBIDDEN, "커뮤니티 멤버만 이 게임방에 참가할 수 있습니다."),
 
     // ── 회원 ──
     USER_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 유저입니다."),

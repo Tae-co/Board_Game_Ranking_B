@@ -2,6 +2,7 @@ package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.MemberDto;
 import com.board_game_back.DTO.SeasonDto;
+import com.board_game_back.Service.AccessGuard;
 import com.board_game_back.Service.MemberService;
 import com.board_game_back.Service.SeasonArchiveService;
 import com.board_game_back.Utils.NicknameRules;
@@ -26,6 +27,7 @@ public class MemberController {
 
     private final MemberService memberService;
     private final SeasonArchiveService seasonArchiveService;
+    private final AccessGuard accessGuard;
 
     @GetMapping("/search")
     public ResponseEntity<List<MemberDto.SearchItem>> searchMembers(
@@ -49,7 +51,9 @@ public class MemberController {
     public ResponseEntity<List<SeasonDto.SeasonHistoryItem>> getSeasonHistory(
             @PathVariable Long memberId,
             @RequestParam Long roomId,
-            @RequestParam(required = false) Long boardGameId) {
+            @RequestParam(required = false) Long boardGameId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireRoomReader(roomId, requesterId);
         return ResponseEntity.ok(
             seasonArchiveService.getMemberSeasonHistory(memberId, roomId, boardGameId));
     }
