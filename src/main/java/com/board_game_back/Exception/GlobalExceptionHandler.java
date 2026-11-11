@@ -27,6 +27,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
     }
 
+    @ExceptionHandler(AppException.class)
+    public ResponseEntity<Map<String, String>> handleApp(AppException e) {
+        return ResponseEntity.status(e.code().status())
+            .body(Map.of("message", e.getMessage(), "code", e.code().name()));
+    }
+
     // ResponseStatusException은 RuntimeException을 상속하므로 RuntimeException 핸들러보다 먼저 선언
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, String>> handleResponseStatus(ResponseStatusException e) {

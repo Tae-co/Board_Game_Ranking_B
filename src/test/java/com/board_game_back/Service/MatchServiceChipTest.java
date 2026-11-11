@@ -9,6 +9,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.DTO.MatchDto;
 import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Member;
@@ -118,10 +120,12 @@ class MatchServiceChipTest {
         assertThatThrownBy(() -> matchService.recordMatchResult(new MatchDto.ResultRequest(GAME_ID, ROOM_ID, List.of(
             new MatchDto.ParticipantRequest(1L, 1, null, null, 1),
             new MatchDto.ParticipantRequest(2L, 2, null, 0, 1))), 1L))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.CHIP_DELTA_REQUIRED);
         assertThatThrownBy(() -> matchService.recordMatchResult(new MatchDto.ResultRequest(GAME_ID, ROOM_ID, List.of(
             new MatchDto.ParticipantRequest(1L, 1, null, 100, 0),
             new MatchDto.ParticipantRequest(2L, 2, null, -100, 1))), 1L))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.BUY_INS_INVALID);
     }
 }
