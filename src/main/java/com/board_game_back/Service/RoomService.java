@@ -324,8 +324,14 @@ public class RoomService {
             throw new AppException(ErrorCode.ROOM_OWNER_ONLY_EDIT_SCORE);
         }
 
-        com.board_game_back.Entity.PlayerGameRating pgr = playerGameRatingRepository
-            .findByMember_IdAndRoom_Id(memberId, roomId)
+        // 점수 줄은 (멤버, 게임, 방)마다 하나라, 한 방에 게임 여러 개를 기록하던 시절의 방에는
+        // 같은 멤버 줄이 게임별로 남아 있다. 방의 게임으로 좁혀야 한 줄이 된다.
+        Room room = roomRepository.findById(roomId)
+            .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
+        Optional<com.board_game_back.Entity.PlayerGameRating> found = room.getBoardGameId() != null
+            ? playerGameRatingRepository.findByMember_IdAndBoardGame_IdAndRoom_Id(memberId, room.getBoardGameId(), roomId)
+            : playerGameRatingRepository.findByMember_IdAndRoom_Id(memberId, roomId);
+        com.board_game_back.Entity.PlayerGameRating pgr = found
             .orElseThrow(() -> new AppException(ErrorCode.RATING_NOT_FOUND));
 
         if (pgr.getPlayCount() > 0) {
