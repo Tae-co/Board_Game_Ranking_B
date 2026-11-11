@@ -163,6 +163,81 @@ public class BoardGameService {
         }
     }
 
+    // ── 관리자: 공식 게임 관리 (/api/admin/games) ──
+
+    private static final int ADMIN_DEFAULT_MIN_PLAYERS = 2;
+    private static final int ADMIN_DEFAULT_MAX_PLAYERS = 6;
+    private static final List<String> ADMIN_SCHEMA_TYPES = List.of("flat", "sectioned", "conditional", "simple");
+
+    /** 모든 게임 (공식 + 커뮤니티 커스텀) */
+    public List<BoardGameDto.Response> getAllGamesForAdmin() {
+        return boardGameRepository.findAll().stream().map(BoardGameDto.Response::from).toList();
+    }
+
+    @Transactional
+    public BoardGameDto.Response createOfficialGame(BoardGameDto.AdminRequest req) {
+        validateAdminSchema(req.schemaJson());
+        BoardGame game = BoardGame.builder()
+            .name(req.name())
+            .imageUrl(req.imageUrl() != null ? req.imageUrl() : "")
+            .minPlayers(req.minPlayers() != null ? req.minPlayers() : ADMIN_DEFAULT_MIN_PLAYERS)
+            .maxPlayers(req.maxPlayers() != null ? req.maxPlayers() : ADMIN_DEFAULT_MAX_PLAYERS)
+            .schemaJson(req.schemaJson())
+            .build();
+        return BoardGameDto.Response.from(boardGameRepository.save(game));
+    }
+
+    @Transactional
+    public BoardGameDto.Response updateGameByAdmin(Long id, BoardGameDto.AdminRequest req) {
+        validateAdminSchema(req.schemaJson());
+        BoardGame game = boardGameRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임입니다."));
+        game.update(
+            req.name(),
+            req.imageUrl() != null ? req.imageUrl() : "",
+            req.minPlayers() != null ? req.minPlayers() : ADMIN_DEFAULT_MIN_PLAYERS,
+            req.maxPlayers() != null ? req.maxPlayers() : ADMIN_DEFAULT_MAX_PLAYERS,
+            req.schemaJson()
+        );
+        return BoardGameDto.Response.from(game);
+    }
+
+    @Transactional
+    public void deleteGameByAdmin(Long id) {
+        boardGameRepository.deleteById(id);
+    }
+
+    /** 공식 게임 썸네일 업로드. 실패하면 원인 예외를 그대로 던진다 (컨트롤러가 {"error": 메시지}로 응답) */
+    public String uploadOfficialGameImage(MultipartFile file) throws Exception {
+        String filename = UUID.randomUUID() + ".jpg";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + serviceRoleKey);
+        headers.setContentType(MediaType.IMAGE_JPEG);
+
+        new RestTemplate().exchange(
+            supabaseUrl + "/storage/v1/object/game-images/" + filename,
+            HttpMethod.PUT,
+            new HttpEntity<>(file.getBytes(), headers),
+            String.class
+        );
+        return supabaseUrl + "/storage/v1/object/public/game-images/" + filename;
+    }
+
+    /** 관리자는 커스텀 점수판(simple)뿐 아니라 sectioned·conditional 같은 내장 형식도 쓴다. 비어 있으면 통과 */
+    private void validateAdminSchema(String schemaJson) {
+        if (schemaJson == null || schemaJson.isBlank()) return;
+        Map<?, ?> parsed;
+        try {
+            parsed = OBJECT_MAPPER.readValue(schemaJson, Map.class);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("schema_json 파싱 오류: " + e.getMessage());
+        }
+        Object type = parsed.get("type");
+        if (!ADMIN_SCHEMA_TYPES.contains(type)) {
+            throw new IllegalArgumentException("유효하지 않은 schema type: " + type);
+        }
+    }
+
     private BoardGame findGame(Long id) {
         return boardGameRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 게임입니다."));
