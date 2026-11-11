@@ -1,5 +1,7 @@
 package com.board_game_back.Entity;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import static jakarta.persistence.GenerationType.IDENTITY;
 
 import jakarta.persistence.Column;
@@ -127,7 +129,7 @@ public class RoomSeason {
         if (name == null || name.isBlank()) return null;
         String trimmed = name.trim();
         if (trimmed.length() > MAX_NAME_LENGTH) {
-            throw new IllegalArgumentException("시즌 이름은 " + MAX_NAME_LENGTH + "자 이하로 입력해주세요.");
+            throw new AppException(ErrorCode.SEASON_NAME_TOO_LONG, MAX_NAME_LENGTH);
         }
         return trimmed;
     }

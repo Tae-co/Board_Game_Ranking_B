@@ -1,5 +1,7 @@
 package com.board_game_back.Controller;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.DTO.BoardGameDto;
 import com.board_game_back.DTO.MemberDto;
 import com.board_game_back.DTO.UploadDto;
@@ -36,7 +38,7 @@ public class AdminController {
     private void checkAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))) {
-            throw new SecurityException("관리자 권한이 필요합니다.");
+            throw new AppException(ErrorCode.ADMIN_REQUIRED);
         }
     }
 

@@ -1,5 +1,7 @@
 package com.board_game_back.Service;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.DTO.SeasonDto;
 import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.MatchParticipant;
@@ -63,7 +65,7 @@ public class SeasonService {
 
     public SeasonDto.StatusResponse getStatus(Long communityId) {
         Community community = communityRepository.findById(communityId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.COMMUNITY_NOT_FOUND));
 
         ZoneId zone = RegionTimeZones.of(community.getRegion());
         LocalDate today = LocalDate.now(zone);

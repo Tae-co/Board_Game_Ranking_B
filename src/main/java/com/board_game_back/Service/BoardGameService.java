@@ -1,5 +1,7 @@
 package com.board_game_back.Service;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.DTO.BoardGameDto;
 import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.RatingType;
@@ -18,13 +20,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 /** 게임(점수판) 조회와 커뮤니티 커스텀 점수판 생성·삭제·썸네일 업로드 */
 @Service
@@ -70,23 +70,23 @@ public class BoardGameService {
     @Transactional
     public BoardGameDto.Response createCustomGame(Long memberId, BoardGameDto.CreateRequest req) {
         if (req.name() == null || req.name().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "게임 이름을 입력해주세요.");
+            throw new AppException(ErrorCode.GAME_NAME_REQUIRED);
         }
         if (req.communityId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "커뮤니티 정보가 필요합니다.");
+            throw new AppException(ErrorCode.COMMUNITY_ID_REQUIRED);
         }
-        requireCommunityAdmin(req.communityId(), memberId, "커뮤니티 어드민만 점수판을 만들 수 있습니다.");
+        requireCommunityAdmin(req.communityId(), memberId, ErrorCode.COMMUNITY_ADMIN_ONLY_CREATE_GAME);
 
         String name = req.name().trim();
         if (boardGameRepository.existsByCommunityIdAndName(req.communityId(), name)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 같은 이름의 게임이 있습니다.");
+            throw new AppException(ErrorCode.DUPLICATE_GAME_NAME);
         }
         String schemaType = validateUserSchema(req.schemaJson());
 
         int minPlayers = req.minPlayers() != null ? req.minPlayers() : DEFAULT_MIN_PLAYERS;
         int maxPlayers = req.maxPlayers() != null ? req.maxPlayers() : DEFAULT_MAX_PLAYERS;
         if (minPlayers < 1 || maxPlayers < minPlayers) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "인원수 설정이 올바르지 않습니다.");
+            throw new AppException(ErrorCode.INVALID_PLAYER_COUNT);
         }
 
         BoardGame game = BoardGame.builder()
@@ -110,17 +110,17 @@ public class BoardGameService {
     public void deleteCustomGame(Long memberId, Long id) {
         BoardGame game = findGame(id);
         if (game.getCommunityId() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기본 제공 게임은 삭제할 수 없습니다.");
+            throw new AppException(ErrorCode.OFFICIAL_GAME_UNDELETABLE);
         }
-        requireCommunityAdmin(game.getCommunityId(), memberId, "커뮤니티 어드민만 삭제할 수 있습니다.");
+        requireCommunityAdmin(game.getCommunityId(), memberId, ErrorCode.COMMUNITY_ADMIN_ONLY_DELETE_GAME);
 
         // 어떤 그룹이 쓰고 있는지 이름까지 알려준다. "삭제할 수 없다"만 알려주면 사용자가 무엇을 해야 하는지 알 수 없다.
         List<Room> roomsUsingGame = roomRepository.findByBoardGameId(id);
         if (!roomsUsingGame.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, buildRoomsInUseMessage(roomsUsingGame));
+            throw new AppException(ErrorCode.GAME_IN_USE_BY_ROOMS, roomNamesForMessage(roomsUsingGame));
         }
         if (matchRecordRepository.existsByBoardGameId(id)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "플레이 기록이 남아 있어 삭제할 수 없어요.");
+            throw new AppException(ErrorCode.GAME_HAS_MATCHES);
         }
         boardGameRepository.delete(game);
     }
@@ -132,12 +132,12 @@ public class BoardGameService {
      * @return 공개 URL
      */
     public String uploadGameImage(Long memberId, Long communityId, MultipartFile file) {
-        requireCommunityAdmin(communityId, memberId, "커뮤니티 어드민만 이미지를 올릴 수 있습니다.");
+        requireCommunityAdmin(communityId, memberId, ErrorCode.COMMUNITY_ADMIN_ONLY_UPLOAD);
 
         // 공개 버킷이므로 실제 이미지인지 확인한다
         String contentType = file.getContentType();
         if (file.isEmpty() || contentType == null || !contentType.startsWith("image/")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 파일만 올릴 수 있습니다.");
+            throw new AppException(ErrorCode.IMAGE_FILE_ONLY);
         }
 
         try {
@@ -161,7 +161,7 @@ public class BoardGameService {
             );
             return supabaseUrl + "/storage/v1/object/public/game-images/" + filename;
         } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다.");
+            throw new AppException(ErrorCode.IMAGE_UPLOAD_FAILED);
         }
     }
 
@@ -201,7 +201,7 @@ public class BoardGameService {
     public BoardGameDto.Response updateGameByAdmin(Long id, BoardGameDto.AdminRequest req) {
         validateAdminSchema(req.schemaJson());
         BoardGame game = boardGameRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.UNKNOWN_GAME));
         game.update(
             req.name(),
             req.imageUrl() != null ? req.imageUrl() : "",
@@ -248,27 +248,27 @@ public class BoardGameService {
         try {
             parsed = OBJECT_MAPPER.readValue(schemaJson, Map.class);
         } catch (Exception e) {
-            throw new IllegalArgumentException("schema_json 파싱 오류: " + e.getMessage());
+            throw new AppException(ErrorCode.ADMIN_SCHEMA_PARSE_ERROR, e.getMessage());
         }
         Object type = parsed.get("type");
         if (!ADMIN_SCHEMA_TYPES.contains(type)) {
-            throw new IllegalArgumentException("유효하지 않은 schema type: " + type);
+            throw new AppException(ErrorCode.ADMIN_SCHEMA_INVALID_TYPE, type);
         }
     }
 
     private BoardGame findGame(Long id) {
         return boardGameRepository.findById(id)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 게임입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.GAME_NOT_FOUND));
     }
 
-    private void requireCommunityAdmin(Long communityId, Long memberId, String message) {
+    private void requireCommunityAdmin(Long communityId, Long memberId, ErrorCode denied) {
         if (!communityAdminRepository.existsByCommunityIdAndMemberId(communityId, memberId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, message);
+            throw new AppException(denied);
         }
     }
 
-    /** "삭제할 수 없다"로 끝내지 않고, 어떤 그룹을 지워야 하는지까지 알려준다. */
-    private String buildRoomsInUseMessage(List<Room> rooms) {
+    /** "삭제할 수 없다"로 끝내지 않고, 어떤 그룹을 지워야 하는지까지 알려준다 (예: 'A', 'B', 'C' 외 2개) */
+    private String roomNamesForMessage(List<Room> rooms) {
         int shown = Math.min(rooms.size(), MAX_ROOM_NAMES_IN_MESSAGE);
         String names = rooms.stream()
             .limit(shown)
@@ -277,7 +277,7 @@ public class BoardGameService {
         String rest = rooms.size() > shown
             ? " 외 " + (rooms.size() - shown) + "개"
             : "";
-        return names + rest + " 그룹에서 사용 중이에요.\n그룹을 먼저 삭제한 뒤 점수판을 삭제해주세요.";
+        return names + rest;
     }
 
     /**
@@ -287,32 +287,32 @@ public class BoardGameService {
      */
     private String validateUserSchema(String schemaJson) {
         if (schemaJson == null || schemaJson.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "점수판 정보가 없습니다.");
+            throw new AppException(ErrorCode.SCHEMA_REQUIRED);
         }
 
         Map<?, ?> parsed;
         try {
             parsed = OBJECT_MAPPER.readValue(schemaJson, Map.class);
         } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "점수판 형식이 올바르지 않습니다.");
+            throw new AppException(ErrorCode.SCHEMA_INVALID_FORMAT);
         }
 
         String type = parsed.get("type") instanceof String s ? s : null;
         if (!"simple".equals(type) && !"flat".equals(type) && !"outcome".equals(type) && !"chip".equals(type)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "지원하지 않는 점수판 형식입니다.");
+            throw new AppException(ErrorCode.SCHEMA_UNSUPPORTED_TYPE);
         }
         if (!"flat".equals(type)) {
             return type;
         }
 
         if (!(parsed.get("categories") instanceof List<?> categories) || categories.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "점수 항목을 1개 이상 추가해주세요.");
+            throw new AppException(ErrorCode.SCHEMA_CATEGORY_REQUIRED);
         }
         for (Object category : categories) {
             if (!(category instanceof Map<?, ?> c)
                 || !(c.get("label") instanceof String label)
                 || label.isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "항목 이름을 모두 입력해주세요.");
+                throw new AppException(ErrorCode.SCHEMA_CATEGORY_LABEL_REQUIRED);
             }
         }
         return type;

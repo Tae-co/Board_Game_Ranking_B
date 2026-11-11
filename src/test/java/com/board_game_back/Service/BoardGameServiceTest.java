@@ -7,6 +7,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.DTO.BoardGameDto;
 import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.RatingType;
@@ -26,7 +28,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 /** 커스텀 점수판 생성·삭제 규칙 — BoardGameController에서 서비스로 옮기며 동작을 고정한다 */
 @ExtendWith(MockitoExtension.class)
@@ -59,11 +60,11 @@ class BoardGameServiceTest {
 
     private static void assertStatus(Runnable call, HttpStatus status, String message) {
         assertThatThrownBy(call::run)
-            .isInstanceOf(ResponseStatusException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(e -> {
-                ResponseStatusException ex = (ResponseStatusException) e;
-                assertThat(ex.getStatusCode()).isEqualTo(status);
-                assertThat(ex.getReason()).isEqualTo(message);
+                AppException ex = (AppException) e;
+                assertThat(ex.code().status()).isEqualTo(status);
+                assertThat(ex.getMessage()).isEqualTo(message);
             });
     }
 
@@ -156,7 +157,8 @@ class BoardGameServiceTest {
     void 관리자도_내장_형식이_아닌_스키마는_막는다() {
         assertThatThrownBy(() -> boardGameService.createOfficialGame(
                 BoardGameDto.AdminRequest.of("x", "", 2, 4, "{\"type\":\"chip\"}", null, null)))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.ADMIN_SCHEMA_INVALID_TYPE)
             .hasMessage("유효하지 않은 schema type: chip");
         verify(boardGameRepository, never()).save(any());
     }
@@ -167,7 +169,8 @@ class BoardGameServiceTest {
 
         assertThatThrownBy(() -> boardGameService.updateGameByAdmin(999L,
                 BoardGameDto.AdminRequest.of("x", "", 2, 4, "{\"type\":\"simple\"}", null, null)))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.UNKNOWN_GAME)
             .hasMessage("존재하지 않는 게임입니다.");
     }
 

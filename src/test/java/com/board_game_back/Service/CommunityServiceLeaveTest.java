@@ -6,6 +6,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.CommunityMember;
 import com.board_game_back.Repository.CommunityAdminRepository;
@@ -84,7 +86,8 @@ class CommunityServiceLeaveTest {
     @Test
     void 소유자는_나갈_수_없다() {
         assertThatThrownBy(() -> communityService.leaveCommunity(COMMUNITY_ID, OWNER_ID))
-            .isInstanceOf(IllegalStateException.class);
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.COMMUNITY_OWNER_CANNOT_LEAVE);
         verify(communityMemberRepository, never()).delete(any());
     }
 
@@ -93,7 +96,8 @@ class CommunityServiceLeaveTest {
         when(communityMemberRepository.existsByCommunityIdAndMemberId(COMMUNITY_ID, MEMBER_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> communityService.leaveCommunity(COMMUNITY_ID, MEMBER_ID))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.NOT_COMMUNITY_MEMBER);
         verify(communityMemberRepository, never()).delete(any());
     }
 }

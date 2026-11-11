@@ -1,5 +1,7 @@
 package com.board_game_back.Service;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.DTO.RoomDto;
 import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.CommunityAdmin;
@@ -23,8 +25,6 @@ import com.board_game_back.Repository.StoreMemberRepository;
 import com.board_game_back.Repository.StoreRatingRepository;
 import com.board_game_back.Repository.StoreStaffRepository;
 import com.board_game_back.Repository.SeasonRankSnapshotRepository;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -63,10 +63,10 @@ public class RoomService {
     public Room createRoom(String roomName, Long memberId, Long boardGameId, Long communityId,
                            String seasonName, LocalDate seasonEndDate) {
         Member member = memberRepository.findById(memberId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         if (communityId != null && !communityAdminRepository.existsByCommunityIdAndMemberId(communityId, memberId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "커뮤니티 어드민만 그룹을 만들 수 있습니다.");
+            throw new AppException(ErrorCode.COMMUNITY_ADMIN_ONLY_CREATE_ROOM);
         }
 
         String inviteCode = InviteCodeUtil.generateUnique(roomRepository::existsByInviteCode);
@@ -95,10 +95,10 @@ public class RoomService {
     @Transactional
     public Room joinRoom(String inviteCode, Long memberId) {
         Room room = roomRepository.findByInviteCode(inviteCode)
-            .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 초대 코드입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.INVALID_INVITE_CODE));
 
         Member member = memberRepository.findById(memberId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         boolean isAlreadyMember = roomMemberRepository.findByRoomIdAndMemberId(room.getId(), memberId).isPresent();
         if (isAlreadyMember) return room;
@@ -142,23 +142,23 @@ public class RoomService {
     @Transactional
     public void updateRoomName(Long roomId, Long requesterId, String newName) {
         RoomMember rm = roomMemberRepository.findByRoomIdAndMemberId(roomId, requesterId)
-            .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_ROOM_MEMBER));
         if (rm.getRole() != MemberRole.HOST) {
-            throw new IllegalStateException("방장만 수정할 수 있습니다.");
+            throw new AppException(ErrorCode.ROOM_OWNER_ONLY_EDIT);
         }
         Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
         room.rename(newName);
     }
 
     public Room getRoomById(Long roomId) {
         return roomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
     }
 
     public Room getRoomByInviteCode(String inviteCode) {
         return roomRepository.findByInviteCode(inviteCode)
-            .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 초대 코드입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.INVALID_INVITE_CODE));
     }
 
     @Transactional
@@ -166,14 +166,14 @@ public class RoomService {
     public void leaveRoom(Long roomId, Long memberId, Long requesterId) {
         if (!requesterId.equals(memberId)) {
             RoomMember requester = roomMemberRepository.findByRoomIdAndMemberId(roomId, requesterId)
-                .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_ROOM_MEMBER));
             if (requester.getRole() != MemberRole.HOST) {
-                throw new SecurityException("방장만 멤버를 강퇴할 수 있습니다.");
+                throw new AppException(ErrorCode.ROOM_OWNER_ONLY_KICK);
             }
         }
 
         RoomMember rm = roomMemberRepository.findByRoomIdAndMemberId(roomId, memberId)
-            .orElseThrow(() -> new IllegalArgumentException("해당 방의 멤버가 아닙니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.TARGET_NOT_ROOM_MEMBER));
 
         if (rm.getRole() == MemberRole.HOST) {
             List<RoomMember> others = roomMemberRepository.findByRoomId(roomId).stream()
@@ -226,9 +226,9 @@ public class RoomService {
     @Transactional
     public void deleteRoom(Long roomId, Long requesterId) {
         RoomMember rm = roomMemberRepository.findByRoomIdAndMemberId(roomId, requesterId)
-            .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_ROOM_MEMBER));
         if (rm.getRole() != MemberRole.HOST) {
-            throw new SecurityException("방장만 방을 삭제할 수 있습니다.");
+            throw new AppException(ErrorCode.ROOM_OWNER_ONLY_DELETE);
         }
         deleteRoomInternal(roomId);
     }
@@ -243,7 +243,7 @@ public class RoomService {
 
     private void deleteRoomInternal(Long roomId) {
         Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
         matchRecordRepository.deleteByRoomId(roomId);
         playerGameRatingRepository.deleteByRoomId(roomId);
         roomRepository.delete(room);
@@ -319,17 +319,17 @@ public class RoomService {
     @Transactional
     public void updateMemberRating(Long roomId, Long memberId, Long requesterId, double rating) {
         RoomMember requesterMember = roomMemberRepository.findByRoomIdAndMemberId(roomId, requesterId)
-            .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_ROOM_MEMBER));
         if (requesterMember.getRole() != MemberRole.HOST) {
-            throw new IllegalStateException("방장만 점수를 수정할 수 있습니다.");
+            throw new AppException(ErrorCode.ROOM_OWNER_ONLY_EDIT_SCORE);
         }
 
         com.board_game_back.Entity.PlayerGameRating pgr = playerGameRatingRepository
             .findByMember_IdAndRoom_Id(memberId, roomId)
-            .orElseThrow(() -> new IllegalArgumentException("해당 멤버의 점수 정보가 없습니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.RATING_NOT_FOUND));
 
         if (pgr.getPlayCount() > 0) {
-            throw new IllegalStateException("매치 기록이 있는 멤버의 점수는 수정할 수 없습니다.");
+            throw new AppException(ErrorCode.SCORE_LOCKED_BY_MATCHES);
         }
 
         pgr.updateInitialRating(rating);
