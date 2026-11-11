@@ -15,6 +15,15 @@ public class BoardGameDto {
         Integer maxPlayers
     ) {}
 
+    /** 관리자 공식 게임 추가·수정. 인원수를 안 보내면 2~6명 */
+    public record AdminRequest(
+        String name,
+        String imageUrl,
+        Integer minPlayers,
+        Integer maxPlayers,
+        String schemaJson
+    ) {}
+
     /** 엔티티를 그대로 내보내던 때와 같은 필드 (chipGame은 isChipGame() 게터가 만들던 값) */
     public record Response(
         Long id,

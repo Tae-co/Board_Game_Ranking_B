@@ -138,6 +138,38 @@ class BoardGameServiceTest {
     }
 
     @Test
+    void 관리자_공식_게임은_인원수를_안_주면_2에서_6명_스키마가_없어도_만든다() {
+        when(boardGameRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        BoardGameDto.Response res = boardGameService.createOfficialGame(
+            new BoardGameDto.AdminRequest("공식", null, null, null, null));
+
+        assertThat(res.minPlayers()).isEqualTo(2);
+        assertThat(res.maxPlayers()).isEqualTo(6);
+        assertThat(res.imageUrl()).isEmpty();
+        assertThat(res.communityId()).isNull();
+    }
+
+    @Test
+    void 관리자도_내장_형식이_아닌_스키마는_막는다() {
+        assertThatThrownBy(() -> boardGameService.createOfficialGame(
+                new BoardGameDto.AdminRequest("x", "", 2, 4, "{\"type\":\"chip\"}")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("유효하지 않은 schema type: chip");
+        verify(boardGameRepository, never()).save(any());
+    }
+
+    @Test
+    void 관리자가_없는_게임을_고치면_400용_예외() {
+        when(boardGameRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> boardGameService.updateGameByAdmin(999L,
+                new BoardGameDto.AdminRequest("x", "", 2, 4, "{\"type\":\"simple\"}")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("존재하지 않는 게임입니다.");
+    }
+
+    @Test
     void 쓰는_곳이_없으면_지운다() {
         asAdmin();
         BoardGame game = customGame();
