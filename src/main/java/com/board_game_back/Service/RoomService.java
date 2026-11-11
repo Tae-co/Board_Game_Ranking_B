@@ -95,6 +95,13 @@ public class RoomService {
         boolean isAlreadyMember = roomMemberRepository.findByRoomIdAndMemberId(room.getId(), memberId).isPresent();
         if (isAlreadyMember) return room;
 
+        // 화면에서는 커뮤니티 멤버만 "참가하기"를 누를 수 있다. 서버도 같은 규칙으로 막는다.
+        // 커뮤니티가 없는 옛 게임방(커뮤니티 기능 이전)은 지금처럼 코드만 본다.
+        if (room.getCommunityId() != null
+            && !communityMemberRepository.existsByCommunityIdAndMemberId(room.getCommunityId(), memberId)) {
+            throw new AppException(ErrorCode.COMMUNITY_MEMBER_ONLY_JOIN_ROOM);
+        }
+
         roomMemberRepository.save(new RoomMember(room, member, MemberRole.MEMBER));
 
         if (room.getBoardGameId() != null) {
