@@ -2,11 +2,11 @@ package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.BoardGameDto;
 import com.board_game_back.DTO.MemberDto;
+import com.board_game_back.DTO.UploadDto;
 import com.board_game_back.Service.BoardGameService;
 import com.board_game_back.Service.MemberService;
 import com.board_game_back.Service.RoomService;
 import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -88,12 +88,12 @@ public class AdminController {
 
     /** 게임 이미지 업로드 */
     @PostMapping("/upload-image")
-    public ResponseEntity<Map<String, String>> uploadImage(@RequestParam MultipartFile file) {
+    public ResponseEntity<UploadDto.Response> uploadImage(@RequestParam MultipartFile file) {
         checkAdmin();
         try {
-            return ResponseEntity.ok(Map.of("url", boardGameService.uploadOfficialGameImage(file)));
+            return ResponseEntity.ok(UploadDto.Response.ok(boardGameService.uploadOfficialGameImage(file)));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(500).body(UploadDto.Response.fail(e.getMessage()));
         }
     }
 }
