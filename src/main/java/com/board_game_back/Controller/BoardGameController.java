@@ -1,9 +1,9 @@
 package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.BoardGameDto;
+import com.board_game_back.DTO.UploadDto;
 import com.board_game_back.Service.BoardGameService;
 import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -60,12 +60,12 @@ public class BoardGameController {
 
     // [POST] /api/games/upload-image - 커스텀 게임 썸네일 업로드 (커뮤니티 어드민만)
     @PostMapping("/upload-image")
-    public ResponseEntity<Map<String, String>> uploadGameImage(
+    public ResponseEntity<UploadDto.Response> uploadGameImage(
             @AuthenticationPrincipal Long memberId,
             @RequestParam MultipartFile file,
             @RequestParam Long communityId) {
         requireLogin(memberId);
-        return ResponseEntity.ok(Map.of("url", boardGameService.uploadGameImage(memberId, communityId, file)));
+        return ResponseEntity.ok(UploadDto.Response.ok(boardGameService.uploadGameImage(memberId, communityId, file)));
     }
 
     private void requireLogin(Long memberId) {
