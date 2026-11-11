@@ -14,5 +14,10 @@ public class RoomDto {
 
     public record UpdateRatingRequest(double rating) {}
 
+    public record UpdateNameRequest(String roomName) {}
+
+    /** STOMP /app/presence/join 페이로드 */
+    public record PresenceJoinRequest(String roomId) {}
+
     public record RoomMemberResponse(Long memberId, String nickname, boolean isHost, String profileImage) {}
 }

@@ -52,8 +52,8 @@ public class AuthController {
 
     /** 닉네임 중복 체크 */
     @GetMapping("/check-nickname")
-    public ResponseEntity<Map<String, Boolean>> checkNickname(@RequestParam String nickname) {
-        return ResponseEntity.ok(Map.of("available", authService.isNicknameAvailable(nickname)));
+    public ResponseEntity<AuthDto.NicknameCheckResponse> checkNickname(@RequestParam String nickname) {
+        return ResponseEntity.ok(new AuthDto.NicknameCheckResponse(authService.isNicknameAvailable(nickname)));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
