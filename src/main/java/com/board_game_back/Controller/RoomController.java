@@ -167,11 +167,9 @@ public class RoomController {
     @PatchMapping("/{roomId}/name")
     public ResponseEntity<String> updateRoomName(
             @PathVariable Long roomId,
-            @RequestBody java.util.Map<String, Object> body,
+            @RequestBody RoomDto.UpdateNameRequest request,
             @AuthenticationPrincipal Long requesterId) {
-        Object roomNameObj = body.get("roomName");
-        if (roomNameObj == null) return ResponseEntity.badRequest().body("방 이름을 입력해주세요.");
-        String newName = roomNameObj.toString().trim();
+        String newName = request.roomName() == null ? "" : request.roomName().trim();
         if (newName.isBlank()) return ResponseEntity.badRequest().body("방 이름을 입력해주세요.");
         roomService.updateRoomName(roomId, requesterId, newName);
         return ResponseEntity.ok("방 이름이 변경되었습니다.");
