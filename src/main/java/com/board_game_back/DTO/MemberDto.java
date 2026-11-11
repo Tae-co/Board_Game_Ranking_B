@@ -37,6 +37,18 @@ public class MemberDto {
         List<GameStatItem> games
     ) {}
 
+    // 📤 [Response] 닉네임 검색 결과 한 줄
+    public record SearchItem(
+        Long memberId,
+        String nickname
+    ) {}
+
+    // 📩 [Request] 프로필 사진 바꾸기. null이면 기본 아바타로
+    public record ProfileImageRequest(String profileImage) {}
+
+    // 📩 [Request] 닉네임 바꾸기
+    public record NicknameRequest(String nickname) {}
+
     // 📤 [Response] 관리자 회원 목록 한 줄. 값이 없으면 빈 문자열 (Map으로 내보내던 때와 같음)
     public record AdminSummary(
         Long memberId,

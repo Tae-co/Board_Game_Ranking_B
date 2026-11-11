@@ -2,22 +2,14 @@ package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.MemberDto;
 import com.board_game_back.DTO.SeasonDto;
-import com.board_game_back.Entity.Member;
-import com.board_game_back.Entity.PlayerGameRating;
-import com.board_game_back.Repository.MemberRepository;
-import com.board_game_back.Repository.PlayerGameRatingRepository;
-import com.board_game_back.Service.RoomService;
+import com.board_game_back.Service.MemberService;
 import com.board_game_back.Service.SeasonArchiveService;
+import com.board_game_back.Utils.NicknameRules;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-import com.board_game_back.Entity.EventName;
-import com.board_game_back.Service.UserEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,69 +18,30 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.board_game_back.Utils.NicknameRules;
 
 @RestController
 @RequestMapping("/api/members")
 @RequiredArgsConstructor
 public class MemberController {
 
-    private final MemberRepository memberRepository;
-    private final PlayerGameRatingRepository playerGameRatingRepository;
-    private final RoomService roomService;
+    private final MemberService memberService;
     private final SeasonArchiveService seasonArchiveService;
-    private final UserEventService userEventService;
 
     @GetMapping("/search")
-    public ResponseEntity<List<Map<String, Object>>> searchMembers(
+    public ResponseEntity<List<MemberDto.SearchItem>> searchMembers(
         @RequestParam(required = false, defaultValue = "") String nickname,
         @RequestParam(required = false) Long excludeId) {
-        // 빈 쿼리로 전체 회원 명부(memberId+nickname)를 덤프하지 못하게 한다.
-        // 검색어가 있어야만 결과를 준다 (닉네임으로 특정 유저를 찾는 용도).
-        if (nickname.isBlank()) {
-            return ResponseEntity.ok(List.of());
-        }
-        List<Member> source = memberRepository.findByNicknameContainingIgnoreCase(nickname);
-        List<Map<String, Object>> results = source.stream()
-            .filter(m -> excludeId == null || !m.getId().equals(excludeId))
-            .filter(m -> !m.isLeftPlaceholder())
-            .limit(100)
-            .map(m -> Map.<String, Object>of("memberId", m.getId(), "nickname", m.getNickname()))
-            .collect(Collectors.toList());
-        return ResponseEntity.ok(results);
+        return ResponseEntity.ok(memberService.searchByNickname(nickname, excludeId));
     }
 
     @GetMapping("/{memberId}")
-    public ResponseEntity<?> getMember(@PathVariable Long memberId) {
-        Member member = memberRepository.findById(memberId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 멤버입니다."));
-        return ResponseEntity.ok(
-            new MemberDto.ProfileResponse(
-                member.getId(),
-                member.getNickname(),
-                member.getBestDisplayScore(),
-                member.getOverallStats().getRatingDeviation(),
-                member.getProfileImage()
-            )
-        );
+    public ResponseEntity<MemberDto.ProfileResponse> getMember(@PathVariable Long memberId) {
+        return ResponseEntity.ok(memberService.getProfile(memberId));
     }
 
     @GetMapping("/{memberId}/stats")
-    @Transactional(readOnly = true)
     public ResponseEntity<MemberDto.StatsResponse> getMemberStats(@PathVariable Long memberId) {
-        List<PlayerGameRating> ratings = playerGameRatingRepository.findPlayedByMemberId(memberId);
-
-        int totalPlay = ratings.stream().mapToInt(PlayerGameRating::getPlayCount).sum();
-        int totalWin  = ratings.stream().mapToInt(PlayerGameRating::getWinCount).sum();
-        int totalLose = ratings.stream().mapToInt(PlayerGameRating::getLoseCount).sum();
-        List<MemberDto.GameStatItem> games = ratings.stream()
-            .map(r -> new MemberDto.GameStatItem(
-                r.getBoardGame().getName(),
-                r.getPlayCount(), r.getWinCount(), r.getLoseCount()
-            ))
-            .collect(Collectors.toList());
-
-        return ResponseEntity.ok(new MemberDto.StatsResponse(totalPlay, totalWin, totalLose, games));
+        return ResponseEntity.ok(memberService.getStats(memberId));
     }
 
     /** 시즌별 내 점수 추이 (시즌 탭 ④). boardGameId를 주지 않으면 방의 게임으로 채운다. */
@@ -114,44 +67,34 @@ public class MemberController {
         if (!id.equals(requesterId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("본인 계정만 탈퇴할 수 있습니다.");
         }
-        if (!memberRepository.existsById(id)) {
+        if (!memberService.exists(id)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("존재하지 않는 회원입니다.");
         }
-        roomService.deleteMember(id);
-        // member 행이 통째로 사라지므로 user_event가 이탈의 유일한 기록이다.
-        userEventService.recordServerSide(EventName.MEMBER_DELETED, id);
+        memberService.withdraw(id);
         return ResponseEntity.ok("탈퇴되었습니다.");
     }
 
     @PatchMapping("/{id}/profile-image")
-    @Transactional
     public ResponseEntity<Void> updateProfileImage(
             @PathVariable Long id,
-            @RequestBody Map<String, String> body,
+            @RequestBody MemberDto.ProfileImageRequest body,
             @AuthenticationPrincipal Long requesterId) {
         if (!id.equals(requesterId)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        String profileImage = body.get("profileImage");
-        Member member = memberRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
-        member.updateProfileImage(profileImage);
-        memberRepository.save(member);
+        memberService.updateProfileImage(id, body.profileImage());
         return ResponseEntity.ok().build();
     }
 
     @PatchMapping("/{id}/nickname")
-    @Transactional
     public ResponseEntity<Void> updateNickname(
             @PathVariable Long id,
-            @RequestBody Map<String, String> body,
+            @RequestBody MemberDto.NicknameRequest body,
             @AuthenticationPrincipal Long requesterId) {
         if (!id.equals(requesterId)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        String nickname = body.get("nickname") == null ? null : body.get("nickname").trim();
+        String nickname = body.nickname() == null ? null : body.nickname().trim();
         if (!NicknameRules.isValid(nickname)) {
             return ResponseEntity.badRequest().build();
         }
-        Member member = memberRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
-        member.updateNickname(nickname);
+        memberService.updateNickname(id, nickname);
         return ResponseEntity.ok().build();
     }
 }
