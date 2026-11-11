@@ -1,5 +1,7 @@
 package com.board_game_back.Service;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.DTO.SeasonDto;
 import com.board_game_back.Entity.MemberRole;
 import com.board_game_back.Entity.RoomSeason;
@@ -72,12 +74,12 @@ public class RoomSeasonService {
         Long roomId, Long requesterId, String name, LocalDate endDate) {
 
         var rm = roomMemberRepository.findByRoomIdAndMemberId(roomId, requesterId)
-            .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_ROOM_MEMBER));
         if (rm.getRole() != MemberRole.HOST) {
-            throw new IllegalStateException("방장만 수정할 수 있습니다.");
+            throw new AppException(ErrorCode.ROOM_OWNER_ONLY_EDIT);
         }
-        if (name != null && name.isBlank()) throw new IllegalArgumentException("시즌 이름을 입력해주세요.");
-        if (endDate == null) throw new IllegalArgumentException("시즌 종료일을 입력해주세요.");
+        if (name != null && name.isBlank()) throw new AppException(ErrorCode.SEASON_NAME_REQUIRED);
+        if (endDate == null) throw new AppException(ErrorCode.SEASON_END_DATE_REQUIRED);
 
         RoomSeason season = getCurrentSeason(roomId);
         ZoneId zone = boundaryService.zoneOfRoom(roomId);
@@ -104,7 +106,7 @@ public class RoomSeasonService {
 
     private static void validateEndDate(LocalDate endDate, ZoneId zone) {
         if (!endDate.isAfter(LocalDate.now(zone))) {
-            throw new IllegalArgumentException("시즌 종료일은 내일 이후로 정해주세요.");
+            throw new AppException(ErrorCode.SEASON_END_DATE_TOO_EARLY);
         }
     }
 }

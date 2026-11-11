@@ -1,5 +1,7 @@
 package com.board_game_back.Service;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.DTO.MemberDto;
 import com.board_game_back.Entity.EventName;
 import com.board_game_back.Entity.Member;
@@ -43,7 +45,7 @@ public class MemberService {
 
     public MemberDto.ProfileResponse getProfile(Long memberId) {
         Member member = memberRepository.findById(memberId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 멤버입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.MEMBER_NOT_FOUND));
         return new MemberDto.ProfileResponse(
             member.getId(),
             member.getNickname(),
@@ -99,6 +101,6 @@ public class MemberService {
 
     private Member findMember(Long memberId) {
         return memberRepository.findById(memberId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.ACCOUNT_NOT_FOUND));
     }
 }

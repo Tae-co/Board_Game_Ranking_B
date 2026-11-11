@@ -1,5 +1,7 @@
 package com.board_game_back.Service;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.DTO.MatchDto;
 import com.board_game_back.DTO.MatchDto.ResultResponse;
 import com.board_game_back.Entity.BoardGame;
@@ -46,13 +48,13 @@ public class MatchService {
     @Transactional
     public List<ResultResponse> recordMatchResult(MatchDto.ResultRequest request, Long requesterId) {
         roomMemberRepository.findByRoomIdAndMemberId(request.roomId(), requesterId)
-            .orElseThrow(() -> new SecurityException("방 멤버만 매치를 등록할 수 있습니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.ROOM_MEMBER_ONLY_RECORD));
 
         BoardGame game = boardGameRepository.findById(request.boardGameId())
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.UNKNOWN_GAME));
 
         Room room = roomRepository.findById(request.roomId())
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
 
         // 정각 스케줄러를 기다리면 시즌 종료 후 최대 1시간 동안의 경기가 지난 시즌 점수에 섞인다 (§22).
         seasonRolloverService.rolloverIfDue(room.getId());
@@ -65,12 +67,12 @@ public class MatchService {
 
         for (MatchDto.ParticipantRequest pr : request.participants()) {
             Member member = memberRepository.findById(pr.memberId())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
             // 참가자는 반드시 이 방의 멤버여야 한다. 요청자만 검증하면 임의 memberId를
             // 참가자로 넣어 남의 레이팅을 조작할 수 있으므로 각 참가자도 검증한다. (#17)
             roomMemberRepository.findByRoomIdAndMemberId(request.roomId(), pr.memberId())
-                .orElseThrow(() -> new SecurityException("방 멤버가 아닌 참가자는 등록할 수 없습니다."));
+                .orElseThrow(() -> new AppException(ErrorCode.PARTICIPANT_NOT_ROOM_MEMBER));
 
             PlayerGameRating gameRating = ratingRepository.findByMemberAndBoardGameAndRoom(member, game, room)
                 .orElseGet(() -> ratingRepository.save(
@@ -186,13 +188,13 @@ public class MatchService {
     @Transactional
     public List<MatchDto.ResultResponse> updateMatchResult(Long matchId, MatchDto.ResultRequest request, Long requesterId) {
         MatchRecord match = matchRecordRepository.findById(matchId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 매치입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.MATCH_NOT_FOUND));
 
         Long roomId = match.getRoom().getId();
         RoomMember rm = roomMemberRepository.findByRoomIdAndMemberId(roomId, requesterId)
-            .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_ROOM_MEMBER));
         if (rm.getRole() != MemberRole.HOST) {
-            throw new SecurityException("방장만 매치를 수정할 수 있습니다.");
+            throw new AppException(ErrorCode.ROOM_OWNER_ONLY_EDIT_MATCH);
         }
 
         Long boardGameId = match.getBoardGame().getId();
@@ -225,19 +227,19 @@ public class MatchService {
     @Transactional
     public void deleteMatch(Long matchId, Long requesterId) {
         MatchRecord match = matchRecordRepository.findById(matchId)
-            .orElseThrow(() -> new IllegalArgumentException("매치를 찾을 수 없습니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.MATCH_TO_DELETE_NOT_FOUND));
 
         if (match.getRoom() == null) {
-            throw new IllegalArgumentException("방 정보가 없는 매치는 삭제할 수 없습니다.");
+            throw new AppException(ErrorCode.MATCH_WITHOUT_ROOM);
         }
 
         Long roomId = match.getRoom().getId();
         Long boardGameId = match.getBoardGame().getId();
 
         RoomMember roomMember = roomMemberRepository.findByRoomIdAndMemberId(roomId, requesterId)
-            .orElseThrow(() -> new IllegalArgumentException("방 멤버가 아닙니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_ROOM_MEMBER));
         if (roomMember.getRole() != MemberRole.HOST) {
-            throw new SecurityException("방장만 삭제할 수 있습니다.");
+            throw new AppException(ErrorCode.ROOM_OWNER_ONLY_DELETE_MATCH);
         }
 
         matchRecordRepository.delete(match);
@@ -346,8 +348,8 @@ public class MatchService {
     /** 칩 게임은 손익과 바이인 횟수가 있어야 기록할 수 있다. Elo 게임은 무시한다. */
     private void applyChipRequest(MatchParticipant mp, BoardGame game, MatchDto.ParticipantRequest pr) {
         if (!game.isChipGame()) return;
-        if (pr.chipDelta() == null) throw new IllegalArgumentException("칩 손익을 입력해주세요.");
-        if (pr.buyIns() == null || pr.buyIns() < 1) throw new IllegalArgumentException("바이인 횟수는 1 이상이어야 합니다.");
+        if (pr.chipDelta() == null) throw new AppException(ErrorCode.CHIP_DELTA_REQUIRED);
+        if (pr.buyIns() == null || pr.buyIns() < 1) throw new AppException(ErrorCode.BUY_INS_INVALID);
         mp.updateChipResult(pr.chipDelta(), pr.buyIns());
     }
 

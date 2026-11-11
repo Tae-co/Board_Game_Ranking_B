@@ -1,5 +1,7 @@
 package com.board_game_back.Service;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.DTO.CommunityDto;
 import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Community;
@@ -60,7 +62,7 @@ public class CommunityService {
         communityRepository.save(community);
 
         Member creator = memberRepository.findById(createdBy)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         communityAdminRepository.save(new CommunityAdmin(community, creator));
         communityMemberRepository.save(new CommunityMember(community, creator));
@@ -84,10 +86,10 @@ public class CommunityService {
     @Transactional
     public CommunityDto.JoinResponse joinCommunity(String inviteCode, Long memberId) {
         Community community = communityRepository.findByInviteCode(inviteCode.toUpperCase().trim())
-            .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 초대 코드입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.INVALID_INVITE_CODE));
 
         Member member = memberRepository.findById(memberId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         boolean alreadyMember = communityMemberRepository.existsByCommunityIdAndMemberId(community.getId(), memberId);
         if (!alreadyMember) {
@@ -107,7 +109,7 @@ public class CommunityService {
     @Transactional(readOnly = true)
     public CommunityDto.DetailResponse getCommunityDetail(Long communityId) {
         Community community = communityRepository.findById(communityId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.COMMUNITY_NOT_FOUND));
 
         int groupCount = (int) roomRepository.countByCommunityId(communityId);
         long memberCount = communityMemberRepository.countByCommunityId(communityId);
@@ -164,10 +166,10 @@ public class CommunityService {
     @Transactional
     public CommunityDto.Response updateCommunity(Long communityId, CommunityDto.UpdateRequest req, Long requesterId) {
         Community community = communityRepository.findById(communityId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.COMMUNITY_NOT_FOUND));
 
         if (!communityAdminRepository.existsByCommunityIdAndMemberId(communityId, requesterId)) {
-            throw new SecurityException("커뮤니티 어드민만 수정할 수 있습니다.");
+            throw new AppException(ErrorCode.COMMUNITY_ADMIN_ONLY_EDIT);
         }
 
         community.update(req.name(), req.region(), req.imageUrl());
@@ -196,10 +198,10 @@ public class CommunityService {
         Set<Long> wanted = new LinkedHashSet<>(adminMemberIds);
         wanted.remove(ownerId);
         if (ownerLeaves && wanted.isEmpty()) {
-            throw new IllegalArgumentException("다른 어드민이 1명 이상 있어야 어드민을 내려놓을 수 있습니다.");
+            throw new AppException(ErrorCode.LAST_ADMIN_CANNOT_RESIGN);
         }
         if (wanted.size() + (ownerLeaves ? 0 : 1) > MAX_ADMINS) {
-            throw new IllegalArgumentException("어드민은 최대 " + MAX_ADMINS + "명입니다.");
+            throw new AppException(ErrorCode.ADMIN_LIMIT_EXCEEDED, MAX_ADMINS);
         }
 
         List<CommunityAdmin> remaining = new ArrayList<>();
@@ -225,7 +227,7 @@ public class CommunityService {
         if (ownerLeaves) {
             CommunityAdmin next = remaining.stream()
                 .min(CommunityAdmin.OLDEST_FIRST)
-                .orElseThrow(() -> new IllegalArgumentException("다른 어드민이 1명 이상 있어야 어드민을 내려놓을 수 있습니다."));
+                .orElseThrow(() -> new AppException(ErrorCode.LAST_ADMIN_CANNOT_RESIGN));
             community.transferOwnership(next.getMember().getId());
         }
     }
@@ -233,12 +235,12 @@ public class CommunityService {
     @Transactional
     public void addRoomToCommunity(Long communityId, Long roomId, Long requesterId) {
         communityRepository.findById(communityId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.COMMUNITY_NOT_FOUND));
         if (!communityAdminRepository.existsByCommunityIdAndMemberId(communityId, requesterId)) {
-            throw new SecurityException("커뮤니티 어드민만 그룹을 연결할 수 있습니다.");
+            throw new AppException(ErrorCode.COMMUNITY_ADMIN_ONLY_LINK_ROOM);
         }
         Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
         room.assignCommunity(communityId);
         roomRepository.save(room);
     }
@@ -246,9 +248,9 @@ public class CommunityService {
     @Transactional
     public void deleteCommunity(Long communityId, Long requesterId) {
         Community community = communityRepository.findById(communityId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.COMMUNITY_NOT_FOUND));
         if (!community.getCreatedBy().equals(requesterId)) {
-            throw new SecurityException("커뮤니티 생성자만 삭제할 수 있습니다.");
+            throw new AppException(ErrorCode.COMMUNITY_OWNER_ONLY_DELETE);
         }
         roomService.deleteRoomsOfCommunity(communityId);
         communityAdminRepository.deleteByCommunityId(communityId);
@@ -270,13 +272,13 @@ public class CommunityService {
     @Transactional
     public void removeCommunityMember(Long communityId, Long memberId, Long requesterId) {
         Community community = communityRepository.findById(communityId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.COMMUNITY_NOT_FOUND));
         if (!communityAdminRepository.existsByCommunityIdAndMemberId(communityId, requesterId)) {
-            throw new SecurityException("커뮤니티 어드민만 멤버를 제거할 수 있습니다.");
+            throw new AppException(ErrorCode.COMMUNITY_ADMIN_ONLY_KICK);
         }
         // 소유자는 어드민 해제도 본인만 할 수 있다 — 강퇴로 우회하지 못하게 막는다
         if (community.getCreatedBy().equals(memberId)) {
-            throw new SecurityException("커뮤니티 소유자는 내보낼 수 없습니다.");
+            throw new AppException(ErrorCode.COMMUNITY_OWNER_CANNOT_BE_KICKED);
         }
         detachMember(communityId, memberId);
     }
@@ -285,13 +287,13 @@ public class CommunityService {
     @Transactional
     public void leaveCommunity(Long communityId, Long memberId) {
         Community community = communityRepository.findById(communityId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 커뮤니티입니다."));
+            .orElseThrow(() -> new AppException(ErrorCode.COMMUNITY_NOT_FOUND));
         // 소유자가 나가면 주인 없는 커뮤니티가 된다 — 설정에서 소유권을 넘기거나 삭제해야 한다
         if (community.getCreatedBy().equals(memberId)) {
-            throw new IllegalStateException("커뮤니티를 만든 사람은 나갈 수 없어요. 관리에서 소유권을 넘기거나 커뮤니티를 삭제해 주세요.");
+            throw new AppException(ErrorCode.COMMUNITY_OWNER_CANNOT_LEAVE);
         }
         if (!communityMemberRepository.existsByCommunityIdAndMemberId(communityId, memberId)) {
-            throw new IllegalArgumentException("이 커뮤니티의 멤버가 아닙니다.");
+            throw new AppException(ErrorCode.NOT_COMMUNITY_MEMBER);
         }
         detachMember(communityId, memberId);
     }
