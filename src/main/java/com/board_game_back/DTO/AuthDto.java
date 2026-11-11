@@ -9,4 +9,6 @@ public class AuthDto {
     public record TokenResponse(String accessToken, String refreshToken) {}
 
     public record AppleLoginRequest(String identityToken, String nickname) {}
+
+    public record NicknameCheckResponse(boolean available) {}
 }
