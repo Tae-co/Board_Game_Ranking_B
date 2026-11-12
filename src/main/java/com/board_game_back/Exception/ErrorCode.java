@@ -13,6 +13,7 @@ public enum ErrorCode {
 
     // ── 공통 ──
     LOGIN_REQUIRED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
+    INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청 형식이 올바르지 않습니다."),
     ADMIN_REQUIRED(HttpStatus.FORBIDDEN, "관리자 권한이 필요합니다."),
     SELF_ONLY(HttpStatus.FORBIDDEN, "본인 정보만 볼 수 있습니다."),
     ROOM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 게임방을 볼 권한이 없습니다."),
@@ -23,6 +24,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 유저입니다."),
     MEMBER_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 멤버입니다."),
     ACCOUNT_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 회원입니다."),
+    NICKNAME_TAKEN(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
 
     // ── 커뮤니티 ──
     COMMUNITY_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 커뮤니티입니다."),

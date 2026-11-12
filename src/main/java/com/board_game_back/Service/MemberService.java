@@ -91,7 +91,12 @@ public class MemberService {
     /** 닉네임 규칙(NicknameRules) 검사는 호출하는 쪽에서 끝낸 뒤 부른다 */
     @Transactional
     public void updateNickname(Long memberId, String nickname) {
-        findMember(memberId).updateNickname(nickname);
+        Member member = findMember(memberId);
+        // 화면은 미리 중복을 확인하지만, API로 바로 오면 DB 유니크 제약에 걸려 500이 났다
+        if (!nickname.equals(member.getNickname()) && memberRepository.existsByNickname(nickname)) {
+            throw new AppException(ErrorCode.NICKNAME_TAKEN);
+        }
+        member.updateNickname(nickname);
     }
 
     /** 관리자 회원 목록 */
