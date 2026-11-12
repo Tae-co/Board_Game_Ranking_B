@@ -13,12 +13,18 @@ public enum ErrorCode {
 
     // ── 공통 ──
     LOGIN_REQUIRED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
+    INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청 형식이 올바르지 않습니다."),
     ADMIN_REQUIRED(HttpStatus.FORBIDDEN, "관리자 권한이 필요합니다."),
+    SELF_ONLY(HttpStatus.FORBIDDEN, "본인 정보만 볼 수 있습니다."),
+    ROOM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 게임방을 볼 권한이 없습니다."),
+    COMMUNITY_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 커뮤니티를 볼 권한이 없습니다."),
+    COMMUNITY_MEMBER_ONLY_JOIN_ROOM(HttpStatus.FORBIDDEN, "커뮤니티 멤버만 이 게임방에 참가할 수 있습니다."),
 
     // ── 회원 ──
     USER_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 유저입니다."),
     MEMBER_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 멤버입니다."),
     ACCOUNT_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 회원입니다."),
+    NICKNAME_TAKEN(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
 
     // ── 커뮤니티 ──
     COMMUNITY_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 커뮤니티입니다."),
@@ -63,6 +69,10 @@ public enum ErrorCode {
     ROOM_MEMBER_ONLY_RECORD(HttpStatus.FORBIDDEN, "방 멤버만 매치를 등록할 수 있습니다."),
     PARTICIPANT_NOT_ROOM_MEMBER(HttpStatus.FORBIDDEN, "방 멤버가 아닌 참가자는 등록할 수 없습니다."),
     MATCH_GAME_NOT_ROOM_GAME(HttpStatus.BAD_REQUEST, "이 방의 게임이 아닌 경기는 기록할 수 없습니다."),
+    MATCH_REQUEST_INCOMPLETE(HttpStatus.BAD_REQUEST, "게임과 방 정보가 필요합니다."),
+    MATCH_TOO_FEW_PARTICIPANTS(HttpStatus.BAD_REQUEST, "참가자는 2명 이상이어야 합니다."),
+    MATCH_DUPLICATE_PARTICIPANT(HttpStatus.BAD_REQUEST, "같은 참가자가 두 번 들어갈 수 없습니다."),
+    MATCH_INVALID_PLACEMENT(HttpStatus.BAD_REQUEST, "순위는 1등부터 참가자 수 사이여야 합니다."),
     ROOM_OWNER_ONLY_EDIT_MATCH(HttpStatus.FORBIDDEN, "방장만 매치를 수정할 수 있습니다."),
     ROOM_OWNER_ONLY_DELETE_MATCH(HttpStatus.FORBIDDEN, "방장만 삭제할 수 있습니다."),
     CHIP_DELTA_REQUIRED(HttpStatus.BAD_REQUEST, "칩 손익을 입력해주세요."),

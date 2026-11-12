@@ -1,11 +1,13 @@
 package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.RankingDto;
+import com.board_game_back.Service.AccessGuard;
 import com.board_game_back.Service.RankingService;
 import com.board_game_back.Service.SeasonArchiveService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +21,7 @@ public class RankingController {
 
     private final RankingService rankingService;
     private final SeasonArchiveService seasonArchiveService;
+    private final AccessGuard accessGuard;
 
     @GetMapping("/game/{boardGameId}")
     public ResponseEntity<List<RankingDto.GameRankingResponse>> getGameRanking(
@@ -35,7 +38,9 @@ public class RankingController {
             @PathVariable Long roomId,
             @PathVariable Long boardGameId,
             @RequestParam(required = false) String seasonId,
-            @RequestParam(required = false) String season) {
+            @RequestParam(required = false) String season,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireRoomReader(roomId, requesterId);
         // season(yyyy-MM)은 구버전 앱(1.10.x)이 보낸다. 새 앱은 seasonId를 쓴다.
         String seasonRef = seasonId != null ? seasonId : season;
         if (seasonRef != null) {

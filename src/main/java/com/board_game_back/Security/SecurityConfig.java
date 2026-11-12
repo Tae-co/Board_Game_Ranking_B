@@ -50,6 +50,9 @@ public class SecurityConfig {
                 .requestMatchers("/oauth2/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/api/health").permitAll()
+                // 에러가 나면 서블릿이 /error로 넘긴다. 여기가 막혀 있으면 403(관리자 아님)·400(필수 값 누락)이
+                // 전부 401로 바뀌어, 앱이 로그인 만료로 오해한다. 상태 코드만 그대로 내보내는 경로라 열어 둔다.
+                .requestMatchers("/error").permitAll()
                 .requestMatchers("/api/images/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/games/**").permitAll()
                 // 행동 로그: 로그인 전 초대 랜딩 유입까지 측정해야 해서 비로그인도 허용한다.

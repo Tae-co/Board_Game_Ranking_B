@@ -23,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,6 +48,10 @@ public class MatchService {
 
     @Transactional
     public List<ResultResponse> recordMatchResult(MatchDto.ResultRequest request, Long requesterId) {
+        if (request.boardGameId() == null || request.roomId() == null) {
+            throw new AppException(ErrorCode.MATCH_REQUEST_INCOMPLETE);
+        }
+        validateParticipants(request.participants());
         roomMemberRepository.findByRoomIdAndMemberId(request.roomId(), requesterId)
             .orElseThrow(() -> new AppException(ErrorCode.ROOM_MEMBER_ONLY_RECORD));
 
@@ -205,10 +210,15 @@ public class MatchService {
         }
 
         Long boardGameId = match.getBoardGame().getId();
+        validateParticipants(request.participants());
 
         List<MatchParticipant> newParticipants = new ArrayList<>();
         for (MatchDto.ParticipantRequest pr : request.participants()) {
-            Member member = memberRepository.findById(pr.memberId()).orElseThrow();
+            Member member = memberRepository.findById(pr.memberId())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+            // 기록과 같은 규칙: 방 멤버가 아닌 사람을 넣으면 남의 레이팅이 바뀐다 (#17)
+            roomMemberRepository.findByRoomIdAndMemberId(roomId, pr.memberId())
+                .orElseThrow(() -> new AppException(ErrorCode.PARTICIPANT_NOT_ROOM_MEMBER));
             MatchParticipant newMp = new MatchParticipant(match, member, pr.placement());
             if (pr.scoresJson() != null) newMp.updateScoresJson(pr.scoresJson());
             applyChipRequest(newMp, match.getBoardGame(), pr);
@@ -251,6 +261,26 @@ public class MatchService {
 
         matchRecordRepository.delete(match);
         recalculateRatings(roomId, boardGameId);
+    }
+
+    /**
+     * 새로 들어오는 기록·수정 요청만 검사한다. 재계산은 저장된 경기를 그대로 다시 돌리므로 여기를 거치지 않는다
+     * (회원 탈퇴로 참가 줄이 빠진 옛 경기가 있어도 리플레이는 그대로 된다).
+     * 동순위(1, 1, 3)는 허용한다.
+     */
+    private void validateParticipants(List<MatchDto.ParticipantRequest> participants) {
+        if (participants == null || participants.size() < 2) {
+            throw new AppException(ErrorCode.MATCH_TOO_FEW_PARTICIPANTS);
+        }
+        Set<Long> memberIds = new HashSet<>();
+        for (MatchDto.ParticipantRequest pr : participants) {
+            if (pr.memberId() == null || !memberIds.add(pr.memberId())) {
+                throw new AppException(ErrorCode.MATCH_DUPLICATE_PARTICIPANT);
+            }
+            if (pr.placement() < 1 || pr.placement() > participants.size()) {
+                throw new AppException(ErrorCode.MATCH_INVALID_PLACEMENT);
+            }
+        }
     }
 
     private void recalculateRatings(Long roomId, Long boardGameId) {

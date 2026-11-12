@@ -1,6 +1,7 @@
 package com.board_game_back.Controller;
 
 import com.board_game_back.DTO.CommunityDto;
+import com.board_game_back.Service.AccessGuard;
 import com.board_game_back.Service.CommunityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,7 @@ import java.util.List;
 public class CommunityController {
 
     private final CommunityService communityService;
+    private final AccessGuard accessGuard;
 
     @PostMapping
     public ResponseEntity<CommunityDto.Response> createCommunity(
@@ -31,29 +33,44 @@ public class CommunityController {
     }
 
     @GetMapping("/my/{memberId}")
-    public ResponseEntity<CommunityDto.Response> getMyCommunity(@PathVariable Long memberId) {
+    public ResponseEntity<CommunityDto.Response> getMyCommunity(
+            @PathVariable Long memberId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireSelf(memberId, requesterId);
         CommunityDto.Response response = communityService.getMyCommunity(memberId);
         if (response == null) return ResponseEntity.noContent().build();
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/my/list/{memberId}")
-    public ResponseEntity<List<CommunityDto.Response>> getMyCommunitiesList(@PathVariable Long memberId) {
+    public ResponseEntity<List<CommunityDto.Response>> getMyCommunitiesList(
+            @PathVariable Long memberId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireSelf(memberId, requesterId);
         return ResponseEntity.ok(communityService.getMyCommunitiesList(memberId));
     }
 
     @GetMapping("/joined/{memberId}")
-    public ResponseEntity<List<CommunityDto.Response>> getJoinedCommunities(@PathVariable Long memberId) {
+    public ResponseEntity<List<CommunityDto.Response>> getJoinedCommunities(
+            @PathVariable Long memberId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireSelf(memberId, requesterId);
         return ResponseEntity.ok(communityService.getJoinedCommunities(memberId));
     }
 
     @GetMapping("/{communityId}")
-    public ResponseEntity<CommunityDto.DetailResponse> getCommunityDetail(@PathVariable Long communityId) {
+    public ResponseEntity<CommunityDto.DetailResponse> getCommunityDetail(
+            @PathVariable Long communityId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireCommunityMember(communityId, requesterId);
         return ResponseEntity.ok(communityService.getCommunityDetail(communityId));
     }
 
     @GetMapping("/{communityId}/members")
-    public ResponseEntity<List<CommunityDto.MemberInfo>> getCommunityMembers(@PathVariable Long communityId) {
+    public ResponseEntity<List<CommunityDto.MemberInfo>> getCommunityMembers(
+            @PathVariable Long communityId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireCommunityMember(communityId, requesterId);
         return ResponseEntity.ok(communityService.getCommunityMembers(communityId));
     }
 
@@ -78,7 +95,9 @@ public class CommunityController {
     @GetMapping("/{communityId}/rooms")
     public ResponseEntity<List<CommunityDto.RoomResponse>> getCommunityRooms(
             @PathVariable Long communityId,
-            @RequestParam(required = false) Long memberId) {
+            @RequestParam(required = false) Long memberId,
+            @AuthenticationPrincipal Long requesterId) {
+        accessGuard.requireCommunityMember(communityId, requesterId);
         return ResponseEntity.ok(communityService.getCommunityRooms(communityId, memberId));
     }
 

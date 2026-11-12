@@ -1,6 +1,7 @@
 package com.board_game_back.Service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -11,9 +12,12 @@ import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.EventName;
 import com.board_game_back.Entity.Member;
 import com.board_game_back.Entity.PlayerGameRating;
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.LongStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -91,5 +95,39 @@ class MemberServiceTest {
 
         verify(roomService).deleteMember(4L);
         verify(userEventService).recordServerSide(EventName.MEMBER_DELETED, 4L);
+    }
+
+    @Test
+    void 다른_사람이_쓰는_닉네임으로는_바꿀_수_없다() {
+        Member me = member(4, "캐롤", "USER");
+        when(memberRepository.findById(4L)).thenReturn(Optional.of(me));
+        when(memberRepository.existsByNickname("앨리스")).thenReturn(true);
+
+        assertThatThrownBy(() -> memberService.updateNickname(4L, "앨리스"))
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.NICKNAME_TAKEN);
+        assertThat(me.getNickname()).isEqualTo("캐롤");
+    }
+
+    @Test
+    void 지금_내_닉네임_그대로_저장하면_통과한다() {
+        Member me = member(4, "캐롤", "USER");
+        when(memberRepository.findById(4L)).thenReturn(Optional.of(me));
+        when(memberRepository.existsByNickname("캐롤")).thenReturn(true);
+
+        memberService.updateNickname(4L, "캐롤");
+
+        assertThat(me.getNickname()).isEqualTo("캐롤");
+    }
+
+    @Test
+    void 비어_있는_닉네임으로는_바꾼다() {
+        Member me = member(4, "캐롤", "USER");
+        when(memberRepository.findById(4L)).thenReturn(Optional.of(me));
+        when(memberRepository.existsByNickname("캐롤2")).thenReturn(false);
+
+        memberService.updateNickname(4L, "캐롤2");
+
+        assertThat(me.getNickname()).isEqualTo("캐롤2");
     }
 }

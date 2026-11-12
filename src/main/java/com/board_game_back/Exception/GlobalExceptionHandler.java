@@ -4,8 +4,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
@@ -37,6 +40,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleApp(AppException e) {
         return ResponseEntity.status(e.code().status())
             .body(Map.of("message", e.getMessage(), "code", e.code().name()));
+    }
+
+    /** 클라이언트가 잘못 보낸 요청 (깨진 JSON, 타입 불일치, 필수 값 누락). 예전엔 아래 RuntimeException으로 빠져 500이었다. */
+    @ExceptionHandler({
+        HttpMessageNotReadableException.class,
+        MethodArgumentTypeMismatchException.class,
+        MissingServletRequestParameterException.class
+    })
+    public ResponseEntity<Map<String, String>> handleInvalidRequest(Exception e, HttpServletRequest req) {
+        log.warn("Invalid request at {}: {}", req.getRequestURI(), e.getMessage());
+        ErrorCode code = ErrorCode.INVALID_REQUEST;
+        return ResponseEntity.status(code.status())
+            .body(Map.of("message", code.message(), "code", code.name()));
     }
 
     // ResponseStatusException은 RuntimeException을 상속하므로 RuntimeException 핸들러보다 먼저 선언
