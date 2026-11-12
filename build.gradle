@@ -58,6 +58,13 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 테스트는 항상 로컬 Supabase(supabase start)에 붙는다. application.properties가 불러오는
+    // .env.local엔 운영 주소가 있어, 이게 없으면 Spring 테스트가 운영 DB에 붙는다 (2026-11-10).
+    // 시스템 프로퍼티가 .env.local보다 우선한다. 빠지면 TestDatabaseGuard가 연결 전에 멈춘다.
+    systemProperty 'spring.datasource.url', 'jdbc:postgresql://127.0.0.1:54322/postgres'
+    systemProperty 'spring.datasource.username', 'postgres'
+    systemProperty 'spring.datasource.password', 'postgres'
+    systemProperty 'supabase.url', 'http://127.0.0.1:54321'
 }
 
 bootRun {

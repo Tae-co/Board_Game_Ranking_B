@@ -89,6 +89,13 @@ public class Member {
         this.bestDisplayScore = RatingConstants.INITIAL_RATING;
     }
 
+    /** 커뮤니티를 나간 사람의 경기 기록을 대신 들고 있는 계정. 로그인·검색·랭킹에 안 나온다 */
+    public static final String ROLE_LEFT = "LEFT";
+
+    public boolean isLeftPlaceholder() {
+        return ROLE_LEFT.equals(role);
+    }
+
     @Builder
     public Member(String phoneNumber, String socialId, String username, String nickname,
         String password, String role) {

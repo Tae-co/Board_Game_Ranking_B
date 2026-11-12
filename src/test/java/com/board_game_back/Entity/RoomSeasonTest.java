@@ -1,5 +1,7 @@
 package com.board_game_back.Entity;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -73,6 +75,7 @@ class RoomSeasonTest {
         RoomSeason season = RoomSeason.open(1L, 1, "봄", LocalDateTime.now(), LocalDate.now().plusDays(3), 서울);
 
         assertThatThrownBy(() -> season.rename("가".repeat(RoomSeason.MAX_NAME_LENGTH + 1)))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.SEASON_NAME_TOO_LONG);
     }
 }

@@ -1,5 +1,7 @@
 package com.board_game_back.Entity;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -43,7 +45,7 @@ public class Room {
 
     public void rename(String newName) {
         if (newName == null || newName.isBlank()) {
-            throw new IllegalArgumentException("방 이름은 비워둘 수 없습니다.");
+            throw new AppException(ErrorCode.ROOM_NAME_REQUIRED);
         }
         this.name = newName;
     }

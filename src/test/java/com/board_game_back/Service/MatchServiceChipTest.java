@@ -9,6 +9,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.DTO.MatchDto;
 import com.board_game_back.Entity.BoardGame;
 import com.board_game_back.Entity.Member;
@@ -118,10 +120,28 @@ class MatchServiceChipTest {
         assertThatThrownBy(() -> matchService.recordMatchResult(new MatchDto.ResultRequest(GAME_ID, ROOM_ID, List.of(
             new MatchDto.ParticipantRequest(1L, 1, null, null, 1),
             new MatchDto.ParticipantRequest(2L, 2, null, 0, 1))), 1L))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.CHIP_DELTA_REQUIRED);
         assertThatThrownBy(() -> matchService.recordMatchResult(new MatchDto.ResultRequest(GAME_ID, ROOM_ID, List.of(
             new MatchDto.ParticipantRequest(1L, 1, null, 100, 0),
             new MatchDto.ParticipantRequest(2L, 2, null, -100, 1))), 1L))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.BUY_INS_INVALID);
+    }
+
+    @Test
+    void 방의_게임이_아닌_경기는_거절하고_시즌도_넘기지_않는다() {
+        BoardGame 카탄 = BoardGame.builder().name("카탄").build();
+        ReflectionTestUtils.setField(카탄, "id", 31L);
+        when(boardGameRepository.findById(31L)).thenReturn(Optional.of(카탄));
+
+        assertThatThrownBy(() -> matchService.recordMatchResult(new MatchDto.ResultRequest(31L, ROOM_ID, List.of(
+            new MatchDto.ParticipantRequest(1L, 1, null, null, null),
+            new MatchDto.ParticipantRequest(2L, 2, null, null, null))), 1L))
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.MATCH_GAME_NOT_ROOM_GAME);
+        verify(seasonRolloverService, never()).rolloverIfDue(any());
+        verify(ratingRepository, never()).save(any());
+        verify(matchRecordRepository, never()).save(any());
     }
 }

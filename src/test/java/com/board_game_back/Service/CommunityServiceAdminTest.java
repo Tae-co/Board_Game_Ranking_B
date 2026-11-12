@@ -7,6 +7,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.board_game_back.Exception.AppException;
+import com.board_game_back.Exception.ErrorCode;
 import com.board_game_back.DTO.CommunityDto;
 import com.board_game_back.Entity.Community;
 import com.board_game_back.Entity.CommunityAdmin;
@@ -14,10 +16,12 @@ import com.board_game_back.Entity.Member;
 import com.board_game_back.Repository.CommunityAdminRepository;
 import com.board_game_back.Repository.CommunityMemberRepository;
 import com.board_game_back.Repository.CommunityRepository;
+import com.board_game_back.Repository.MatchParticipantRepository;
 import com.board_game_back.Repository.MemberRepository;
 import com.board_game_back.Repository.PlayerGameRatingRepository;
 import com.board_game_back.Repository.RoomMemberRepository;
 import com.board_game_back.Repository.RoomRepository;
+import com.board_game_back.Repository.SeasonRankSnapshotRepository;
 import com.board_game_back.Entity.Room;
 import com.board_game_back.Entity.RoomMember;
 import java.time.LocalDateTime;
@@ -52,6 +56,8 @@ class CommunityServiceAdminTest {
     @Mock private RoomMemberRepository roomMemberRepository;
     @Mock private PlayerGameRatingRepository playerGameRatingRepository;
     @Mock private RoomService roomService;
+    @Mock private MatchParticipantRepository matchParticipantRepository;
+    @Mock private SeasonRankSnapshotRepository seasonRankSnapshotRepository;
 
     @InjectMocks private CommunityService communityService;
 
@@ -109,7 +115,8 @@ class CommunityServiceAdminTest {
     @Test
     void 소유자_혼자면_내려놓을_수_없다() {
         assertThatThrownBy(() -> update(OWNER, List.of(), true))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.LAST_ADMIN_CANNOT_RESIGN);
 
         verify(communityAdminRepository, never()).delete(any());
         assertThat(community.getCreatedBy()).isEqualTo(OWNER);
@@ -127,7 +134,8 @@ class CommunityServiceAdminTest {
     @Test
     void 공동_어드민은_소유자를_내보낼_수_없다() {
         assertThatThrownBy(() -> communityService.removeCommunityMember(COMMUNITY_ID, OWNER, OLD_ADMIN))
-            .isInstanceOf(SecurityException.class);
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("code", ErrorCode.COMMUNITY_OWNER_CANNOT_BE_KICKED);
 
         verify(communityMemberRepository, never()).delete(any());
         verify(communityAdminRepository, never()).delete(any());
