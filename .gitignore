@@ -49,3 +49,6 @@ data/
 
 ## Node modules
 node_modules/
+
+### gstack 브라우저 도구 기록
+.gstack/
